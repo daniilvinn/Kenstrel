@@ -67,6 +67,16 @@ actions! {
     HelpOpen => "help.open", "Help";
     JobsOpen => "jobs.open", "Jobs overlay";
     JobCancel => "job.cancel", "Cancel selected job";
+    // Find file / content search overlays (P3+P4)
+    FinderScope => "finder.scope", "Find file: cycle scope (cwd, git root, home, drive)";
+    FinderHidden => "finder.hidden", "Find file: toggle hidden files";
+    FinderGitignore => "finder.gitignore", "Find file: toggle gitignored files";
+    FinderOpen => "finder.open", "Find file: open with default app";
+    FinderMark => "finder.mark", "Find file: mark result";
+    GrepRegex => "grep.regex", "Search contents: toggle regex";
+    GrepWholeWord => "grep.word", "Search contents: toggle whole word";
+    GrepNextField => "grep.field", "Search contents: switch query/glob field";
+    GrepToList => "grep.to_list", "Search contents: send results to a list view";
     // Selection
     MarkToggle => "mark.toggle", "Toggle mark";
     VisualToggle => "mode.visual", "Visual (range select) mode";

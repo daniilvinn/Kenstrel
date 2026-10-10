@@ -1,0 +1,89 @@
+---
+source: crates/ks-ui/src/search/tests.rs
+expression: text
+---
+ Search results: handle
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▌ ◆ passes/pass_a.rs
+   ◆ vulkan_device.rs
+   ◆ 日本語のメモ.txt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                                                          1/3
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹/› filter  ‹ctrl-p› find  ‹ctrl-f› search  ‹g /› drives  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..160 fg=#d97757 bg=reset bold
+  1   0..160 fg=#403a35 bg=reset
+  2   0..1   fg=#e8e3dc bg=#2f2a26
+  2   1..3   fg=#d97757 bg=#2f2a26
+  2   3..5   fg=#a9a29a bg=#2f2a26
+  2   5..137 fg=#e8e3dc bg=#2f2a26
+  2 137..146 fg=#a9a29a bg=#2f2a26
+  2 146..147 fg=#e8e3dc bg=#2f2a26
+  2 147..157 fg=#716b64 bg=#2f2a26
+  2 157..160 fg=#e8e3dc bg=#2f2a26
+  3   3..5   fg=#a9a29a bg=reset
+  3   5..160 fg=#e8e3dc bg=reset
+  4   3..5   fg=#a9a29a bg=reset
+  4   5..160 fg=#e8e3dc bg=reset
+ 45   0..160 fg=#403a35 bg=reset
+ 46   1..156 fg=#d97757 bg=reset bold
+ 46 156..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..5   fg=#a9a29a bg=reset
+ 47   5..16  fg=#716b64 bg=reset
+ 47  16..17  fg=#a9a29a bg=reset
+ 47  17..26  fg=#716b64 bg=reset
+ 47  26..31  fg=#a9a29a bg=reset
+ 47  31..40  fg=#716b64 bg=reset
+ 47  40..41  fg=#a9a29a bg=reset
+ 47  41..52  fg=#716b64 bg=reset
+ 47  52..53  fg=#a9a29a bg=reset
+ 47  53..64  fg=#716b64 bg=reset
+ 47  64..70  fg=#a9a29a bg=reset
+ 47  70..79  fg=#716b64 bg=reset
+ 47  79..85  fg=#a9a29a bg=reset
+ 47  85..96  fg=#716b64 bg=reset
+ 47  96..99  fg=#a9a29a bg=reset
+ 47  99..110 fg=#716b64 bg=reset
+ 47 110..111 fg=#a9a29a bg=reset
+ 47 111..160 fg=#716b64 bg=reset

@@ -30,6 +30,15 @@ pub struct DirView {
     entries: Vec<Entry>,
     /// Indices into `entries` of the rows that are shown.
     visible: Vec<u32>,
+    /// Matched character indices of each shown row (parallel to `visible`; empty without a
+    /// filter).
+    highlights: Vec<Vec<u32>>,
+    /// Entries hidden by the hidden-file rule (not counting the filter).
+    hidden: usize,
+    /// The in-directory fuzzy filter (`/`).
+    filter: Option<String>,
+    /// Set for a virtual listing (search results): the header shows it instead of the path.
+    pub label: Option<String>,
     pub cursor: Cursor,
     marks: HashSet<OsString>,
     /// More chunks of the listing are expected.
@@ -51,6 +60,10 @@ impl DirView {
             show_hidden,
             entries: Vec::new(),
             visible: Vec::new(),
+            highlights: Vec::new(),
+            hidden: 0,
+            filter: None,
+            label: None,
             cursor: Cursor::default(),
             marks: HashSet::new(),
             loading: false,
@@ -79,7 +92,7 @@ impl DirView {
 
     /// Number of entries hidden by the hidden-file filter.
     pub fn hidden_count(&self) -> usize {
-        self.entries.len() - self.visible.len()
+        self.hidden
     }
 
     /// The `row`-th shown entry.
@@ -214,13 +227,29 @@ impl DirView {
         let cursor_name = self.current().map(|e| e.name.clone());
         let anchor_name = self.visual.as_ref().map(|v| v.anchor_name.clone());
         change(self);
-        self.visible = self
+        let by_attr: Vec<u32> = self
             .entries
             .iter()
             .enumerate()
             .filter(|(_, e)| self.show_hidden || !e.is_hidden())
             .map(|(i, _)| u32::try_from(i).unwrap_or(u32::MAX))
             .collect();
+        self.hidden = self.entries.len() - by_attr.len();
+        match self.filter.as_deref() {
+            Some(query) => {
+                let names: Vec<std::borrow::Cow<'_, str>> = by_attr
+                    .iter()
+                    .map(|&i| self.entries[i as usize].display_name())
+                    .collect();
+                let matches = ks_search::filter_list(&names, query);
+                self.visible = matches.iter().map(|m| by_attr[m.index]).collect();
+                self.highlights = matches.into_iter().map(|m| m.indices).collect();
+            }
+            None => {
+                self.visible = by_attr;
+                self.highlights.clear();
+            }
+        }
 
         let revealed = self
             .reveal
@@ -255,6 +284,47 @@ impl DirView {
                 None => self.visual = None,
             }
         }
+    }
+
+    // ----- the in-directory filter -----
+
+    /// The active filter query.
+    pub fn filter_query(&self) -> Option<&str> {
+        self.filter.as_deref()
+    }
+
+    /// Matched character indices (into the display name) of the `row`-th shown entry; empty
+    /// without a filter.
+    pub fn highlight(&self, row: usize) -> &[u32] {
+        self.highlights.get(row).map_or(&[], Vec::as_slice)
+    }
+
+    /// Sets or clears the filter. A new query puts the cursor on the best match; clearing it
+    /// keeps the cursor on the entry it was on.
+    pub fn set_filter(&mut self, query: Option<String>, height: usize) {
+        if self.filter == query {
+            return;
+        }
+        let narrowing = query.is_some();
+        self.follow = true;
+        self.reposition(height, |view| view.filter = query);
+        if narrowing {
+            self.cursor.set(0, self.visible.len());
+            self.cursor.offset = 0;
+        }
+        self.moved(height);
+    }
+
+    /// Marks the entries called `names` (those that exist).
+    pub fn mark_names(&mut self, names: &[OsString]) {
+        self.exit_visual();
+        let present: HashSet<&OsStr> = self.entries.iter().map(|e| e.name.as_os_str()).collect();
+        self.marks.extend(
+            names
+                .iter()
+                .filter(|n| present.contains(n.as_os_str()))
+                .cloned(),
+        );
     }
 
     // ----- cursor movement -----

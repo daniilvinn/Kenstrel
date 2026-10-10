@@ -128,6 +128,8 @@ pub struct AppState {
     pub(crate) git_gen: GenCounter,
     pub(crate) git_timer_gen: GenCounter,
     pub(crate) children_gen: GenCounter,
+    /// In-directory filter input, find file and content search (P3 + P4).
+    pub search: crate::search::SearchState,
 }
 
 impl AppState {
@@ -165,6 +167,7 @@ impl AppState {
             git_gen: GenCounter::default(),
             git_timer_gen: GenCounter::default(),
             children_gen: GenCounter::default(),
+            search: crate::search::SearchState::default(),
         }
     }
 

@@ -93,7 +93,7 @@ where
                 None => return Err(anyhow!("terminal input stream closed")),
             },
             Some(msg) = rx.recv() => Some(msg),
-            _ = spinner.tick(), if state.has_running_jobs() => Some(Msg::Tick),
+            _ = spinner.tick(), if state.has_running_jobs() || state.search.is_busy() => Some(Msg::Tick),
             _ = clock.tick() => Some(Msg::Clock {
                 now: SystemTime::now(),
                 utc_offset_secs: ks_fs::utc_offset_secs(),

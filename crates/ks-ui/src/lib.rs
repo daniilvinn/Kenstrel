@@ -4,6 +4,7 @@ pub mod format;
 pub mod icons;
 pub mod list;
 pub mod render;
+pub mod search;
 pub mod text;
 pub mod theme;
 

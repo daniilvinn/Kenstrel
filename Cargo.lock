@@ -1417,6 +1417,7 @@ dependencies = [
  "futures-util",
  "ks-core",
  "ks-fs",
+ "ks-search",
  "ks-ui",
  "ratatui",
  "tempfile",
@@ -1451,6 +1452,7 @@ dependencies = [
 name = "ks-core"
 version = "0.1.0"
 dependencies = [
+ "ks-search",
  "serde",
  "thiserror 2.0.21",
  "toml",
@@ -1516,6 +1518,7 @@ dependencies = [
  "dunce",
  "insta",
  "ks-core",
+ "ks-search",
  "ratatui",
  "serde",
  "tempfile",

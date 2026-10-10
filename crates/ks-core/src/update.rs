@@ -12,6 +12,7 @@ use crate::keymap::{Invocation, Resolution};
 use crate::mode::Mode;
 use crate::msg::{Msg, TimerKind};
 use crate::nav;
+use crate::search;
 use crate::state::{AppState, Level, QuitKind, Status};
 
 /// How long informational messages stay on the status line.
@@ -29,11 +30,12 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             if state.size != size {
                 state.size = size;
                 nav::fit_viewport(state);
+                search::on_resize(state, &mut effects);
             }
             state.dirty = true;
         }
         Msg::Tick => {
-            if state.has_running_jobs() {
+            if state.has_running_jobs() || state.search.is_busy() {
                 state.spinner_frame = state.spinner_frame.wrapping_add(1);
                 state.dirty = true;
             }
@@ -64,6 +66,8 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::ChildCounts { gen, counts } => nav::on_child_counts(state, gen, counts),
         Msg::DirChanged { gen } => nav::on_dir_changed(state, &mut effects, gen),
         Msg::GitStatus { gen, snapshot } => nav::on_git_status(state, gen, snapshot),
+        Msg::FinderResults { gen, snapshot } => search::on_finder_results(state, gen, *snapshot),
+        Msg::Grep(event) => search::grep::on_event(state, event),
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
@@ -94,6 +98,11 @@ fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Eff
         }
         // An unbound key with nothing pending changes nothing, so it costs no redraw.
         Resolution::NoMatch => {
+            if search::on_unbound_key(state, effects, key) {
+                clear_pending(state, effects);
+                state.dirty = true;
+                return;
+            }
             if clear_pending(state, effects) {
                 state.dirty = true;
             }
@@ -122,6 +131,7 @@ fn on_timer(
 ) {
     match kind {
         TimerKind::GitRefresh => nav::on_git_timer(state, effects, gen),
+        TimerKind::GrepDebounce => search::on_timer(state, effects, gen),
         TimerKind::WhichKey => {
             if state.which_key_gen.is_current(gen) && !state.pending.is_empty() {
                 state.which_key_visible = true;
@@ -157,10 +167,13 @@ pub(crate) fn set_status(
 }
 
 fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Effect>) {
+    if search::run_action(state, invocation, effects) {
+        return;
+    }
     match invocation.action {
         Action::Quit => state.quit = Some(QuitKind::Exit),
         Action::QuitCd => state.quit = Some(QuitKind::ChangeDir),
-        Action::Cancel => cancel(state),
+        Action::Cancel => cancel(state, effects),
         Action::CursorDown => nav::move_cursor(state, 1),
         Action::CursorUp => nav::move_cursor(state, -1),
         Action::CursorTop => nav::cursor_edge(state, false),
@@ -195,7 +208,10 @@ fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Ef
 
 /// `esc`: close the top overlay, else leave the current mode (visual mode keeps its marks),
 /// else clear the marks, else dismiss the status line.
-fn cancel(state: &mut AppState) {
+fn cancel(state: &mut AppState, effects: &mut Vec<Effect>) {
+    if search::cancel(state, effects) {
+        return;
+    }
     if state.overlays.pop().is_some() {
         return;
     }

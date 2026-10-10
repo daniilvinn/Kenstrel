@@ -18,6 +18,7 @@ pub mod layout;
 pub mod mode;
 pub mod msg;
 mod nav;
+pub mod search;
 pub mod state;
 pub mod update;
 pub mod view;
@@ -34,6 +35,10 @@ pub use key::{Key, KeyChord, Modifiers};
 pub use keymap::Keymap;
 pub use mode::{KeyContext, Mode, Overlay};
 pub use msg::{Msg, TimerKind};
+pub use search::{
+    preview_target, FinderSnapshot, FinderState, GrepField, GrepRow, GrepState, LineInput,
+    PreviewTarget, SearchState,
+};
 pub use state::{AppState, JobId, Level, Places, QuitKind, Size, StartParams, Status};
 pub use update::update;
 pub use view::DirView;

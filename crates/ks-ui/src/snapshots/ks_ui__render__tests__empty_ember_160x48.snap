@@ -49,7 +49,7 @@ expression: "draw(&s, &theme(name))"
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ›                                                                                                                                                          0/0
-   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹/› filter  ‹ctrl-p› find  ‹ctrl-f› search  ‹g /› drives  ‹q› quit
 --- styles (row cols fg bg mods) ---
   0   1..26  fg=#a9a29a bg=reset
   0  26..160 fg=#e8e3dc bg=reset bold
@@ -67,7 +67,13 @@ expression: "draw(&s, &theme(name))"
  47  31..40  fg=#716b64 bg=reset
  47  40..41  fg=#a9a29a bg=reset
  47  41..52  fg=#716b64 bg=reset
- 47  52..55  fg=#a9a29a bg=reset
- 47  55..66  fg=#716b64 bg=reset
- 47  66..67  fg=#a9a29a bg=reset
- 47  67..160 fg=#716b64 bg=reset
+ 47  52..53  fg=#a9a29a bg=reset
+ 47  53..64  fg=#716b64 bg=reset
+ 47  64..70  fg=#a9a29a bg=reset
+ 47  70..79  fg=#716b64 bg=reset
+ 47  79..85  fg=#a9a29a bg=reset
+ 47  85..96  fg=#716b64 bg=reset
+ 47  96..99  fg=#a9a29a bg=reset
+ 47  99..110 fg=#716b64 bg=reset
+ 47 110..111 fg=#a9a29a bg=reset
+ 47 111..160 fg=#716b64 bg=reset

@@ -20,6 +20,8 @@ pub enum TimerKind {
     StatusExpiry,
     /// The debounce for re-running `git status` after the directory changed.
     GitRefresh,
+    /// The 120 ms quiet period of the content-search query (PLAN 6.3).
+    GrepDebounce,
 }
 
 /// Input to [`update`](crate::update::update).
@@ -77,6 +79,14 @@ pub enum Msg {
         gen: Gen,
     },
     /// Result of `git status`; `None` when the directory is not in a repository.
+    /// A snapshot of the find-file session `gen` (results window, counters).
+    FinderResults {
+        gen: u64,
+        snapshot: Box<crate::search::FinderSnapshot>,
+    },
+    /// An event of the content search with generation `event.generation()`, 1:1 from the
+    /// engine.
+    Grep(ks_search::GrepEvent),
     GitStatus {
         gen: Gen,
         snapshot: Option<Box<GitSnapshot>>,

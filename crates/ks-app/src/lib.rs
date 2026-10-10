@@ -9,6 +9,7 @@ pub mod event_loop;
 pub mod input;
 pub mod logging;
 pub mod paths;
+pub mod search;
 pub mod settings;
 pub mod startup;
 pub mod terminal;

@@ -1,0 +1,132 @@
+---
+source: crates/ks-ui/src/search/tests.rs
+expression: "draw(&s, &theme(name))"
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▌ ◆ a_rather_long_file_name_that_must_be_cut_in_the_middle_of_the_list_row.rs                                                             75.2 KB 2025-03-11
+   ◆ descriptors.rs                                                                                                                         6.1 KB  yesterday +
+   ◆ mod.rs                                                                                                                                  412 B 2024-02-08
+   ◆ new_pass.rs                                                                                                                               0 B     1m ago ?
+   ◆ pipeline_cache.rs                                                                                                                      3.3 KB   just now
+  ●◆ swapchain.rs                                                                                                                           9.8 KB    12m ago
+   ◆ vulkan_device.rs                                                                                                                      14.2 KB     3h ago M
+   ◆ shaders/                                                                                                                                   12 2025-03-12 !
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ › /rs                                                                                                                                         1/8 · 1 selected
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹/› filter  ‹ctrl-p› find  ‹ctrl-f› search  ‹g /› drives  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..143 fg=#e8e3dc bg=reset bold
+  0 143..148 fg=#a9a29a bg=reset bold
+  0 148..151 fg=#a9a29a bg=reset
+  0 151..154 fg=#92c07f bg=reset
+  0 154..157 fg=#e5b567 bg=reset
+  0 157..160 fg=#c9a27f bg=reset
+  1   0..160 fg=#403a35 bg=reset
+  2   0..1   fg=#e8e3dc bg=#2f2a26
+  2   1..3   fg=#d97757 bg=#2f2a26
+  2   3..5   fg=#a9a29a bg=#2f2a26
+  2   5..76  fg=#e8e3dc bg=#2f2a26
+  2  76..78  fg=#d97757 bg=#2f2a26 bold
+  2  78..137 fg=#e8e3dc bg=#2f2a26
+  2 137..146 fg=#a9a29a bg=#2f2a26
+  2 146..147 fg=#e8e3dc bg=#2f2a26
+  2 147..157 fg=#716b64 bg=#2f2a26
+  2 157..160 fg=#e8e3dc bg=#2f2a26
+  3   3..5   fg=#a9a29a bg=reset
+  3   5..17  fg=#e8e3dc bg=reset
+  3  17..140 fg=#d97757 bg=reset bold
+  3 140..148 fg=#a9a29a bg=reset
+  3 148..158 fg=#716b64 bg=reset
+  3 158..160 fg=#92c07f bg=reset
+  4   3..5   fg=#a9a29a bg=reset
+  4   5..9   fg=#e8e3dc bg=reset
+  4   9..141 fg=#d97757 bg=reset bold
+  4 141..147 fg=#a9a29a bg=reset
+  4 147..160 fg=#716b64 bg=reset
+  5   3..5   fg=#a9a29a bg=reset
+  5   5..14  fg=#e8e3dc bg=reset
+  5  14..143 fg=#d97757 bg=reset bold
+  5 143..151 fg=#a9a29a bg=reset
+  5 151..158 fg=#716b64 bg=reset
+  5 158..160 fg=#c9a27f bg=reset
+  6   3..5   fg=#a9a29a bg=reset
+  6   5..20  fg=#e8e3dc bg=reset
+  6  20..140 fg=#d97757 bg=reset bold
+  6 140..149 fg=#a9a29a bg=reset
+  6 149..160 fg=#716b64 bg=reset
+  7   2..3   fg=#d97757 bg=reset
+  7   3..5   fg=#a9a29a bg=reset
+  7   5..140 fg=#d97757 bg=reset bold
+  7 140..150 fg=#a9a29a bg=reset
+  7 150..160 fg=#716b64 bg=reset
+  8   3..5   fg=#a9a29a bg=reset
+  8   5..19  fg=#e8e3dc bg=reset
+  8  19..139 fg=#d97757 bg=reset bold
+  8 139..151 fg=#a9a29a bg=reset
+  8 151..158 fg=#716b64 bg=reset
+  8 158..160 fg=#e5b567 bg=reset
+  9   3..10  fg=#7fa8c9 bg=reset
+  9  10..12  fg=#d97757 bg=reset bold
+  9  12..144 fg=#7fa8c9 bg=reset
+  9 144..147 fg=#a9a29a bg=reset
+  9 147..158 fg=#716b64 bg=reset
+  9 158..160 fg=#625c56 bg=reset
+ 45   0..160 fg=#403a35 bg=reset
+ 46   1..143 fg=#d97757 bg=reset bold
+ 46 143..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..5   fg=#a9a29a bg=reset
+ 47   5..16  fg=#716b64 bg=reset
+ 47  16..17  fg=#a9a29a bg=reset
+ 47  17..26  fg=#716b64 bg=reset
+ 47  26..31  fg=#a9a29a bg=reset
+ 47  31..40  fg=#716b64 bg=reset
+ 47  40..41  fg=#a9a29a bg=reset
+ 47  41..52  fg=#716b64 bg=reset
+ 47  52..53  fg=#a9a29a bg=reset
+ 47  53..64  fg=#716b64 bg=reset
+ 47  64..70  fg=#a9a29a bg=reset
+ 47  70..79  fg=#716b64 bg=reset
+ 47  79..85  fg=#a9a29a bg=reset
+ 47  85..96  fg=#716b64 bg=reset
+ 47  96..99  fg=#a9a29a bg=reset
+ 47  99..110 fg=#716b64 bg=reset
+ 47 110..111 fg=#a9a29a bg=reset
+ 47 111..160 fg=#716b64 bg=reset

@@ -8,12 +8,16 @@
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use ks_core::{Effect, Gen, Level, Msg, TimerKind};
 use ks_fs::DirWatcher;
+use ks_search::{FinderOptions, FinderSession, GrepHandle, GrepQuery, WalkCache};
 use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
+
+use crate::search::FinderWorker;
 
 /// Background work of which only the latest request matters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -31,15 +35,30 @@ pub struct EffectRunner {
     shutdown: CancellationToken,
     timers: HashMap<TimerKind, CancellationToken>,
     slots: HashMap<Slot, CancellationToken>,
+    /// The walk cache of find file, shared by every finder session of this run.
+    walk_cache: Arc<WalkCache>,
+    finder: Option<FinderWorker>,
+    /// Replaces the `$VISUAL`/`$EDITOR` lookup (tests must not start a real editor).
+    editor_override: Option<ks_fs::launch::editor::Editor>,
+    grep: Option<GrepHandle>,
 }
 
 impl EffectRunner {
+    /// Uses `editor` instead of resolving one from the environment.
+    pub fn set_editor(&mut self, editor: ks_fs::launch::editor::Editor) {
+        self.editor_override = Some(editor);
+    }
+
     pub fn new(tx: Sender<Msg>) -> Self {
         Self {
             tx,
             shutdown: CancellationToken::new(),
             timers: HashMap::new(),
             slots: HashMap::new(),
+            walk_cache: Arc::new(WalkCache::new()),
+            finder: None,
+            editor_override: None,
+            grep: None,
         }
     }
 
@@ -78,15 +97,118 @@ impl EffectRunner {
                 }
                 Effect::GitStatus { gen, dir } => self.git_status(gen, dir),
                 Effect::CountChildren { gen, dir, names } => self.count_children(gen, dir, names),
+                Effect::FinderStart {
+                    gen,
+                    scope,
+                    cwd,
+                    show_hidden,
+                    respect_gitignore,
+                    query,
+                    offset,
+                    limit,
+                } => self.finder_start(
+                    gen,
+                    scope,
+                    cwd,
+                    (show_hidden, respect_gitignore),
+                    (query, offset, limit),
+                ),
+                Effect::FinderQuery {
+                    gen,
+                    query,
+                    offset,
+                    limit,
+                } => {
+                    if let Some(worker) = self.finder.as_ref().filter(|w| w.gen() == gen) {
+                        worker.set_query(query, offset, limit);
+                    }
+                }
+                Effect::FinderWindow { gen, offset, limit } => {
+                    if let Some(worker) = self.finder.as_ref().filter(|w| w.gen() == gen) {
+                        worker.set_window(offset, limit);
+                    }
+                }
+                // Dropping the worker stops its thread and cancels the walk.
+                Effect::FinderStop => self.finder = None,
+                Effect::GrepStart {
+                    gen,
+                    root,
+                    pattern,
+                    regex,
+                    whole_word,
+                    glob,
+                    show_hidden,
+                    respect_gitignore,
+                } => {
+                    let mut query = GrepQuery::new(root, pattern);
+                    query.regex = regex;
+                    query.whole_word = whole_word;
+                    query.glob = glob;
+                    query.show_hidden = show_hidden;
+                    query.respect_gitignore = respect_gitignore;
+                    self.grep_start(gen, query);
+                }
+                // Dropping the handle cancels the search.
+                Effect::GrepCancel => self.grep = None,
+                Effect::WalkCacheChanges(changes) => {
+                    let cache = self.walk_cache.clone();
+                    tokio::task::spawn_blocking(move || cache.apply_changes(&changes));
+                }
+                // P6 owns the full launch story (terminal suspend/resume); this is the
+                // non-blocking subset: default app and GUI editors.
+                Effect::OpenInEditor { path, line } => self.open_in_editor(path, line),
+                Effect::OpenDefault { path } => self.open_default(path),
             }
         }
     }
 
+    /// Opens `path` with the default application, off the UI thread.
+    fn open_default(&self, path: PathBuf) {
+        let tx = self.tx.clone();
+        tokio::task::spawn_blocking(move || {
+            let msg = match ks_fs::launch::open_default(&path) {
+                Ok(()) => (Level::Info, format!("Opened {}", path.display())),
+                Err(e) => (Level::Error, format!("Cannot open {}: {e}", path.display())),
+            };
+            let _ = tx.try_send(Msg::Notify {
+                level: msg.0,
+                text: msg.1,
+            });
+        });
+    }
+
+    /// Opens `path` in the editor at `line`. GUI editors are spawned detached; terminal editors
+    /// need the TUI suspended, which P6 implements, so they are only reported here.
+    fn open_in_editor(&self, path: PathBuf, line: Option<u32>) {
+        let tx = self.tx.clone();
+        let editor = self.editor_override.clone();
+        tokio::task::spawn_blocking(move || {
+            use ks_fs::launch::editor::{
+                build_open_command, resolve_editor, spawn_detached, SystemEnv,
+            };
+            let editor = editor.unwrap_or_else(|| resolve_editor(&SystemEnv));
+            let (level, text) = if editor.terminal {
+                (
+                    Level::Info,
+                    "Terminal editor: suspend/resume wired by P6".to_owned(),
+                )
+            } else {
+                let spec = build_open_command(&editor, &path, line, None, None);
+                match spawn_detached(&spec) {
+                    Ok(()) => (Level::Info, format!("Editing {}", path.display())),
+                    Err(e) => (Level::Error, format!("Cannot start editor: {e}")),
+                }
+            };
+            let _ = tx.try_send(Msg::Notify { level, text });
+        });
+    }
     /// Cancels everything still running.
     pub fn shutdown(&mut self) {
         self.shutdown.cancel();
         self.timers.clear();
         self.slots.clear();
+        self.finder = None;
+        self.grep = None;
     }
 
     /// A fresh token for `slot`; whatever ran there before is cancelled.
@@ -186,6 +308,58 @@ impl EffectRunner {
                 })
                 .await;
         });
+    }
+
+    fn finder_start(
+        &mut self,
+        gen: u64,
+        scope: ks_search::Scope,
+        cwd: PathBuf,
+        (show_hidden, respect_gitignore): (bool, bool),
+        (query, offset, limit): (String, u32, u32),
+    ) {
+        // Replacing the worker drops (stops) the previous one.
+        self.finder = None;
+        let cache = self.walk_cache.clone();
+        let make = move |notify: ks_search::Notify| {
+            // Resolving the scope touches the file system, so it happens on the worker.
+            let root = ks_search::resolve_scope(scope, &cwd);
+            let mut options = FinderOptions::new(root.clone());
+            options.show_hidden = show_hidden;
+            options.respect_gitignore = respect_gitignore;
+            (
+                FinderSession::start(options, gen, Some(cache), notify),
+                root,
+            )
+        };
+        self.finder = Some(FinderWorker::spawn(
+            gen,
+            make,
+            query,
+            offset,
+            limit,
+            self.tx.clone(),
+        ));
+    }
+
+    fn grep_start(&mut self, gen: u64, query: GrepQuery) {
+        self.grep = None;
+        let tx = self.tx.clone();
+        // Runs on the engine's threads (plain std threads), where blocking is fine and
+        // gives the engine backpressure when the UI is behind.
+        let sink: ks_search::EventSink<ks_search::GrepEvent> = Arc::new(move |event| {
+            let _ = tx.blocking_send(Msg::Grep(event));
+        });
+        match ks_search::spawn_search(query, gen, self.shutdown.child_token(), sink) {
+            Ok(handle) => self.grep = Some(handle),
+            Err(error) => {
+                tracing::error!(%error, "cannot start the content search");
+                let _ = self.tx.try_send(Msg::Notify {
+                    level: Level::Error,
+                    text: format!("Cannot start the search: {error}"),
+                });
+            }
+        }
     }
 
     fn count_children(&mut self, gen: Gen, dir: PathBuf, names: Vec<OsString>) {
