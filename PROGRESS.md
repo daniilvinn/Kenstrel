@@ -248,10 +248,10 @@ Workspace: `ks-core`, `ks-ui` (path). External: `anyhow`, `clap` (derive), `cros
   then `2025-03-14`; calendar based with the local UTC offset), both pure and tested.
 - **Clock**: `Msg::Clock` every 30 s carries "now" and the UTC offset (`GetTimeZoneInformation`),
   so relative times age without `update` doing I/O.
-- **Tests**: `ks-core` 123 (entry/sort, view, cursor, drives, git aggregation, and `nav::tests`:
-  end-to-end `update` runs against a fake file system with a mini effect runner), `ks-fs` 39
+- **Tests**: `ks-core` 126 (entry/sort, view, cursor, drives, git aggregation, and `nav::tests`:
+  end-to-end `update` runs against a fake file system with a mini effect runner), `ks-fs` 40
   (real temp dirs, a real git repository, real junction via `mklink /J`, watcher timing, real
-  drives), `ks-ui` 59 (snapshots, formatting, icons), `ks-app` 53 + `tests/navigation.rs`
+  drives), `ks-ui` 63 (snapshots, formatting, icons), `ks-app` 53 + `tests/navigation.rs`
   (real runner + real directory: keyboard navigation, external create/delete/rename with the
   cursor kept, marks across refresh, vanished directory, drives, git follow-up, 100k budget).
   Snapshots at 80x24 and 160x48 in both themes for the main screen, prompt/status, which-key and
