@@ -23,3 +23,15 @@ git_untracked = "#8a6a3f"
 git_ignored = "#a39c94"
 git_conflict = "#b8333f"
 match = "#b4472a"
+
+# Syntax highlighting for the preview pane (see ember.toml for the defaults).
+[syntax]
+keyword = "#b04a2a"
+string = "#3f7a2e"
+comment = "#8a847a"
+function = "#1f5f99"
+type = "#9a6a10"
+number = "#8a3fa8"
+constant = "#a05a1a"
+operator = "#555048"
+punctuation = "#6f6a60"

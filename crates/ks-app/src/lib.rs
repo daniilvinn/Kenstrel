@@ -60,9 +60,16 @@ pub fn run(cli: &Cli) -> Result<()> {
         .context("cannot start the async runtime")?;
 
     let mut state = session.state;
+    // Load the syntax set while the first listing is on its way.
+    std::thread::spawn(ks_preview::highlight::warm_up);
     let outcome = {
         // Dropping the session restores the terminal on every path out of this block.
         let mut tui = TerminalSession::enter().context("cannot initialise the terminal")?;
+        // With previews off there is nothing to draw images with: skip the query (up to
+        // 250 ms at start-up). Pressing `w` later falls back to halfblocks.
+        if state.config.preview.enabled {
+            init_images(state.config.preview.image_protocol);
+        }
         runtime.block_on(event_loop::run(
             tui.terminal(),
             EventStream::new(),
@@ -82,4 +89,22 @@ pub fn run(cli: &Cli) -> Result<()> {
     startup::finish(quit, cli.cwd_file.as_deref(), &state.cwd)?;
     tracing::info!("exiting");
     Ok(())
+}
+
+/// Asks the terminal which graphics protocol it speaks and installs the image renderer.
+///
+/// Runs right after the alternate screen is entered and before the first input is read (the
+/// query's answer arrives on stdin). It waits at most `ks_ui::images::QUERY_TIMEOUT`; a
+/// terminal that does not answer gets halfblocks, and `[preview] image_protocol` can force a
+/// protocol (or skip the query with `"halfblocks"`).
+fn init_images(preference: ks_core::config::ImageProtocol) {
+    let started = std::time::Instant::now();
+    let picker = ks_ui::images::detect_picker(preference);
+    tracing::info!(
+        detected = %ks_ui::images::describe(&picker),
+        ?preference,
+        took_ms = started.elapsed().as_millis() as u64,
+        "image protocol"
+    );
+    ks_ui::images::install(picker);
 }

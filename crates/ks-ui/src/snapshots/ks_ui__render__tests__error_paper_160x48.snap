@@ -49,7 +49,7 @@ expression: "draw(&s, &theme(name))"
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ›                                                                                                 Cannot open C:\Secret: Access is denied.  12/13 · 1 selected
-   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit  ‹w› preview  ‹P› columns  ‹i› info
 --- styles (row cols fg bg mods) ---
   0   1..26  fg=#6b645d bg=reset
   0  26..143 fg=#2b2724 bg=reset bold
@@ -134,4 +134,10 @@ expression: "draw(&s, &theme(name))"
  47  52..55  fg=#6b645d bg=reset
  47  55..66  fg=#958e86 bg=reset
  47  66..67  fg=#6b645d bg=reset
- 47  67..160 fg=#958e86 bg=reset
+ 47  67..76  fg=#958e86 bg=reset
+ 47  76..77  fg=#6b645d bg=reset
+ 47  77..89  fg=#958e86 bg=reset
+ 47  89..90  fg=#6b645d bg=reset
+ 47  90..102 fg=#958e86 bg=reset
+ 47 102..103 fg=#6b645d bg=reset
+ 47 103..160 fg=#958e86 bg=reset

@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use crate::generation::Gen;
 use crate::msg::TimerKind;
+use crate::preview::PreviewRequest;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Effect {
@@ -41,4 +42,13 @@ pub enum Effect {
         dir: PathBuf,
         names: Vec<OsString>,
     },
+    /// Preview `request.path`, reporting `Msg::Preview` tagged with `gen`. Cancels the
+    /// request still running for the main pane.
+    RequestPreview { gen: Gen, request: PreviewRequest },
+    /// The main pane no longer needs a preview: cancel the running request.
+    CancelPreview,
+    /// List the parent directory for the parent column, reporting `Msg::ParentPreview`.
+    RequestParent { gen: Gen, request: PreviewRequest },
+    /// The parent column is gone: cancel its request.
+    CancelParent,
 }

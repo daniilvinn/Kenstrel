@@ -131,7 +131,7 @@ fn ago(secs: u64) -> SystemTime {
 }
 
 pub fn empty_state(width: u16, height: u16) -> AppState {
-    AppState::new(StartParams {
+    let mut state = AppState::new(StartParams {
         cwd: PathBuf::from("/home/me/projects/omniforce/src/renderer"),
         home: Some(PathBuf::from("/home/me")),
         places: Places::default(),
@@ -140,7 +140,11 @@ pub fn empty_state(width: u16, height: u16) -> AppState {
         size: Size::new(width, height),
         now: now(),
         utc_offset_secs: 0,
-    })
+    });
+    // Screens that are not about the preview keep the list full width; preview snapshots
+    // switch it on with `with_preview`.
+    state.preview.user_visible = Some(false);
+    state
 }
 
 /// The entries of the mock-up in PLAN section 4.2, plus one of every special kind.

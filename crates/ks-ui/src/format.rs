@@ -64,6 +64,19 @@ pub fn relative_time(time: SystemTime, now: SystemTime, utc_offset_secs: i32) ->
     date(day_of(then))
 }
 
+/// `2025-03-14 12:00:00` in local time, for the metadata view.
+pub fn absolute_time(time: SystemTime, utc_offset_secs: i32) -> String {
+    let local = unix_seconds(time) + i64::from(utc_offset_secs);
+    let (days, rem) = (local.div_euclid(DAY), local.rem_euclid(DAY));
+    format!(
+        "{} {:02}:{:02}:{:02}",
+        date(days),
+        rem / HOUR,
+        rem % HOUR / MINUTE,
+        rem % MINUTE
+    )
+}
+
 /// `YYYY-MM-DD` for a count of days since 1970-01-01.
 fn date(days_since_epoch: i64) -> String {
     let (year, month, day) = civil_from_days(days_since_epoch);

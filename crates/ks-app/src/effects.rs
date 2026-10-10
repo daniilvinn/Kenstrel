@@ -9,8 +9,9 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use ks_core::{Effect, Gen, Level, Msg, TimerKind};
+use ks_core::{Effect, Gen, Level, Msg, PreviewKind, PreviewMsg, PreviewRequest, TimerKind};
 use ks_fs::DirWatcher;
+use ks_preview::{Limits, Palette, PreviewEvent, PreviewOptions, Previewer, RequestKind};
 use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
@@ -31,6 +32,12 @@ pub struct EffectRunner {
     shutdown: CancellationToken,
     timers: HashMap<TimerKind, CancellationToken>,
     slots: HashMap<Slot, CancellationToken>,
+    /// Preview engines, created on first use (they start worker threads). The main pane and
+    /// the parent column each have their own because a `Previewer` has one request slot.
+    previewer: Option<Previewer>,
+    parent_previewer: Option<Previewer>,
+    /// Syntax colours handed to the engine, derived from the active theme.
+    palette: Palette,
 }
 
 impl EffectRunner {
@@ -40,7 +47,16 @@ impl EffectRunner {
             shutdown: CancellationToken::new(),
             timers: HashMap::new(),
             slots: HashMap::new(),
+            previewer: None,
+            parent_previewer: None,
+            palette: Palette::default(),
         }
+    }
+
+    /// Sets the syntax palette used for text previews (call again after a theme change; the
+    /// engine's cache key includes the palette, so old entries are simply not hit).
+    pub fn set_preview_palette(&mut self, palette: Palette) {
+        self.palette = palette;
     }
 
     /// Starts the given effects. Must be called from within a tokio runtime.
@@ -78,6 +94,20 @@ impl EffectRunner {
                 }
                 Effect::GitStatus { gen, dir } => self.git_status(gen, dir),
                 Effect::CountChildren { gen, dir, names } => self.count_children(gen, dir, names),
+                Effect::RequestPreview { gen, request } => {
+                    self.request_preview(gen, &request, false)
+                }
+                Effect::RequestParent { gen, request } => self.request_preview(gen, &request, true),
+                Effect::CancelPreview => {
+                    if let Some(previewer) = &self.previewer {
+                        previewer.cancel();
+                    }
+                }
+                Effect::CancelParent => {
+                    if let Some(previewer) = &self.parent_previewer {
+                        previewer.cancel();
+                    }
+                }
             }
         }
     }
@@ -87,6 +117,9 @@ impl EffectRunner {
         self.shutdown.cancel();
         self.timers.clear();
         self.slots.clear();
+        // Dropping a previewer cancels its work and stops its threads.
+        self.previewer = None;
+        self.parent_previewer = None;
     }
 
     /// A fresh token for `slot`; whatever ran there before is cancelled.
@@ -186,6 +219,50 @@ impl EffectRunner {
                 })
                 .await;
         });
+    }
+
+    /// Hands a preview request to the engine. Never blocks and never touches the file
+    /// system on this thread; the engine answers through the sink, which forwards the event
+    /// 1:1 as a message.
+    fn request_preview(&mut self, gen: Gen, request: &PreviewRequest, parent: bool) {
+        let options = self.preview_options(request);
+        let tx = self.tx.clone();
+        let slot = if parent {
+            &mut self.parent_previewer
+        } else {
+            &mut self.previewer
+        };
+        let previewer = slot.get_or_insert_with(|| {
+            // The sink runs on the engine's own worker threads (plain `std` threads), where
+            // `blocking_send` is allowed.
+            Previewer::new(move |event: PreviewEvent| {
+                let msg = PreviewMsg(event);
+                let _ = tx.blocking_send(if parent {
+                    Msg::ParentPreview(msg)
+                } else {
+                    Msg::Preview(msg)
+                });
+            })
+        });
+        previewer.request(request.path.clone(), gen.raw(), options);
+    }
+
+    fn preview_options(&self, request: &PreviewRequest) -> PreviewOptions {
+        let limits = Limits {
+            max_text_bytes: usize::try_from(request.max_bytes).unwrap_or(usize::MAX),
+            max_text_lines: request.max_lines,
+            ..Limits::default()
+        };
+        PreviewOptions {
+            kind: match request.kind {
+                PreviewKind::Auto => RequestKind::Auto,
+                PreviewKind::Metadata => RequestKind::Metadata,
+            },
+            palette: self.palette,
+            limits,
+            show_hidden: request.show_hidden,
+            ..PreviewOptions::default()
+        }
     }
 
     fn count_children(&mut self, gen: Gen, dir: PathBuf, names: Vec<OsString>) {
@@ -347,6 +424,52 @@ mod fs_effect_tests {
         }
         names.sort();
         assert_eq!(names, ["a.txt", "b.txt", "c.txt"]);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_new_palette_re_highlights_cached_previews() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.rs");
+        std::fs::write(
+            &file,
+            "fn main() { let x = 1; }
+",
+        )
+        .unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let request = || PreviewRequest {
+            path: file.clone(),
+            kind: PreviewKind::Auto,
+            show_hidden: false,
+            max_bytes: 1 << 20,
+            max_lines: 1000,
+        };
+        let ask = |runner: &mut EffectRunner| {
+            runner.run([Effect::RequestPreview {
+                gen: gen(),
+                request: request(),
+            }]);
+        };
+
+        ask(&mut runner);
+        let Msg::Preview(first) = next(&mut rx).await else {
+            panic!("a preview")
+        };
+        assert!(!first.0.from_cache);
+        ask(&mut runner);
+        let Msg::Preview(again) = next(&mut rx).await else {
+            panic!("a preview")
+        };
+        assert!(again.0.from_cache, "same palette: served from the cache");
+
+        runner.set_preview_palette(Palette::light());
+        ask(&mut runner);
+        let Msg::Preview(relit) = next(&mut rx).await else {
+            panic!("a preview")
+        };
+        assert!(!relit.0.from_cache, "new palette: highlighted again");
+        assert!(!std::sync::Arc::ptr_eq(&first.0.result, &relit.0.result));
     }
 
     #[tokio::test(flavor = "multi_thread")]

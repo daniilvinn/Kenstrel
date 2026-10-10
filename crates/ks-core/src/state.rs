@@ -14,6 +14,7 @@ use crate::keymap::Keymap;
 use crate::layout;
 use crate::mode::{KeyContext, Mode, Overlay};
 use crate::nav::{History, PendingNav};
+use crate::preview::PreviewState;
 use crate::view::DirView;
 
 /// Terminal size in cells.
@@ -116,6 +117,8 @@ pub struct AppState {
     pub drives: DrivesView,
     /// Git status of `cwd`, when it is inside a repository.
     pub git: Option<GitSnapshot>,
+    /// The preview pane and parent column.
+    pub preview: PreviewState,
     pub(crate) history: History,
     /// Where the cursor was in directories left earlier (by entry name).
     pub(crate) cursor_memory: HashMap<PathBuf, OsString>,
@@ -133,6 +136,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(params: StartParams) -> Self {
         let view = DirView::new(params.config.sort.clone(), params.config.files.show_hidden);
+        let preview = PreviewState::new(&params.config);
         Self {
             cwd: params.cwd,
             home: params.home,
@@ -155,6 +159,7 @@ impl AppState {
             show_drives: false,
             drives: DrivesView::default(),
             git: None,
+            preview,
             history: History::default(),
             cursor_memory: HashMap::new(),
             nav: None,

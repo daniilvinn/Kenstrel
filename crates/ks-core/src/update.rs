@@ -12,6 +12,7 @@ use crate::keymap::{Invocation, Resolution};
 use crate::mode::Mode;
 use crate::msg::{Msg, TimerKind};
 use crate::nav;
+use crate::preview;
 use crate::state::{AppState, Level, QuitKind, Status};
 
 /// How long informational messages stay on the status line.
@@ -64,12 +65,17 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::ChildCounts { gen, counts } => nav::on_child_counts(state, gen, counts),
         Msg::DirChanged { gen } => nav::on_dir_changed(state, &mut effects, gen),
         Msg::GitStatus { gen, snapshot } => nav::on_git_status(state, gen, snapshot),
+        Msg::Preview(msg) => preview::on_preview(state, msg),
+        Msg::ParentPreview(msg) => preview::on_parent(state, msg),
+        Msg::ImageReady => state.dirty = true,
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
         state.mode = Mode::Normal;
         state.dirty = true;
     }
+    // The preview pane follows the cursor, whatever moved it.
+    preview::sync(state, &mut effects);
     effects
 }
 
@@ -184,6 +190,13 @@ fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Ef
         Action::SortSize => nav::sort_by(state, effects, SortKey::Size),
         Action::SortMtime => nav::sort_by(state, effects, SortKey::Mtime),
         Action::SortExt => nav::sort_by(state, effects, SortKey::Ext),
+        Action::PreviewToggle
+        | Action::ParentColumnToggle
+        | Action::MetadataToggle
+        | Action::PreviewScrollDown
+        | Action::PreviewScrollUp => {
+            preview::run_action(state, invocation.action, effects);
+        }
         other => set_status(
             state,
             Level::Info,

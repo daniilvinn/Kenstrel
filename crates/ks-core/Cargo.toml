@@ -9,6 +9,10 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+ks-preview = { version = "0.1.0", path = "../ks-preview" }
 serde.workspace = true
 thiserror.workspace = true
 toml.workspace = true
+
+[dev-dependencies]
+image = { version = "0.25.10", default-features = false }

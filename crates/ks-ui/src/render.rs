@@ -13,7 +13,7 @@ use ks_core::keymap::{Continuation, ContinuationTarget, KeyPattern};
 use ks_core::layout::shows_hint_line;
 use ks_core::{Action, AppState, GitSnapshot, KeyContext, Level, Mode};
 
-use crate::list::render_list;
+use crate::preview::render_body;
 use crate::text::{breadcrumb, truncate_end, width};
 use crate::theme::Theme;
 
@@ -26,7 +26,8 @@ const ASCII_SPINNER: &[&str] = &["|", "/", "-", "\\"];
 
 /// Draws the whole screen.
 ///
-/// There is no preview pane yet (phase P2), so the list takes the whole body at every width.
+/// The body is split into an optional parent column, the list and the preview pane by
+/// [`render_body`].
 pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
     let area = frame.area();
     frame.render_widget(Block::new().style(theme.base_style()), area);
@@ -44,7 +45,8 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
 
     render_header(frame, header, state, theme);
     render_rule(frame, top_rule, theme);
-    render_list(frame, body, state, theme);
+    crate::images::begin_frame();
+    render_body(frame, body, state, theme);
     render_rule(frame, bottom_rule, theme);
     render_prompt(frame, prompt, state, theme);
     if show_hint {
@@ -273,6 +275,9 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::HiddenToggle, "hidden"),
             (Action::GoDrives, "drives"),
             (Action::Quit, "quit"),
+            (Action::PreviewToggle, "preview"),
+            (Action::ParentColumnToggle, "columns"),
+            (Action::MetadataToggle, "info"),
         ],
         (KeyContext::Visual, _) => &[
             (Action::CursorDown, "down"),
