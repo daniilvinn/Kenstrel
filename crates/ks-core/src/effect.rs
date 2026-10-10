@@ -8,11 +8,14 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::aids::StateFile;
+use crate::claude::{ClaudeRequest, ClaudeResponse, ClaudeSpawn, IpcContext};
 use crate::fileops::{ConflictAnswer, ForegroundSpec, JobRequest, PathFormatKind};
 use crate::generation::Gen;
+use crate::key::KeyChord;
 use crate::msg::TimerKind;
 use crate::preview::PreviewRequest;
 use crate::state::JobId;
+use crate::state::Size;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Effect {
@@ -163,4 +166,48 @@ pub enum Effect {
     /// Apply listing differences of the displayed directory to the walk cache (the
     /// incremental refresh of PLAN 6.2).
     WalkCacheChanges(Vec<ks_search::PathChange>),
+    /// Enable or disable bracketed paste in the terminal (on while a pane has focus).
+    SetBracketedPaste(bool),
+    /// Run `claude auth status`, reporting `Msg::ClaudePreflight`.
+    ClaudePreflight { generation: u64, spawn: ClaudeSpawn },
+    /// Start the embedded pane, reporting `Msg::ClaudeStarted` or `Msg::ClaudeLaunchFailed`.
+    /// Later output arrives as `Msg::ClaudeScreen` / `Msg::ClaudePaneExited`.
+    ClaudeLaunch {
+        generation: u64,
+        cwd: PathBuf,
+        resume: bool,
+        size: Size,
+        spawn: ClaudeSpawn,
+    },
+    /// Open Claude in a Windows Terminal split (10a); failures come back as `Msg::Notify`.
+    ClaudeWtSplit { cwd: PathBuf, spawn: ClaudeSpawn },
+    /// Send a key press to the pane verbatim.
+    ClaudeKey(KeyChord),
+    /// Send pasted text to the pane.
+    ClaudePaste(String),
+    /// Type `@` mentions for these paths into the pane.
+    ClaudeSendPaths { paths: Vec<PathBuf> },
+    /// Type an `@path#Lstart-end` mention into the pane.
+    ClaudeSendRange {
+        path: PathBuf,
+        start: usize,
+        end: usize,
+    },
+    /// Resize the pane's pseudo console.
+    ClaudeResize { size: Size },
+    /// Scroll the pane's history (positive = towards older output).
+    ClaudeScroll { lines: isize },
+    /// Kill the pane's process, and any launch still in progress under an older generation than
+    /// `generation`.
+    ClaudeClose { generation: u64 },
+    /// Answer the IPC request `id` right away.
+    ClaudeIpcReply { id: u64, response: ClaudeResponse },
+    /// Load the git diff of a file Claude changed (answered by `Msg::ClaudeDiff`).
+    ClaudeDiff { path: PathBuf },
+    /// Answer the IPC request `id` with file-system work done off the UI thread.
+    ClaudeIpcWork {
+        id: u64,
+        request: ClaudeRequest,
+        ctx: IpcContext,
+    },
 }

@@ -6,6 +6,7 @@
 pub mod action;
 pub mod aids;
 pub mod bookmarks;
+pub mod claude;
 pub mod command;
 pub mod config;
 pub mod cursor;
@@ -39,6 +40,10 @@ pub mod view;
 pub use action::Action;
 pub use aids::{pending_writes, JumpHit, JumpState, LoadedNavData, NavAids, StateFile};
 pub use bookmarks::Bookmarks;
+pub use claude::{
+    ClaudeDialog, ClaudePhase, ClaudePreflight, ClaudeRequest, ClaudeResponse, ClaudeScreen,
+    ClaudeSpawn, ClaudeState, IpcContext,
+};
 pub use config::Config;
 pub use drives::{DriveInfo, DriveKind, DrivesView};
 pub use effect::Effect;

@@ -10,8 +10,8 @@ use ratatui::Frame;
 
 use ks_core::config::IconSet;
 use ks_core::fileops::{
-    pager_rows, pager_width, ConfirmDialog, ConflictDialog, ItemMeta, JobRow, JobStatus, Menu,
-    MenuKind, Pager, PagerStatus, PromptInput,
+    pager_rows, pager_width, ConfirmAction, ConfirmDialog, ConflictDialog, ItemMeta, JobRow,
+    JobStatus, Menu, MenuKind, Pager, PagerStatus, PromptInput,
 };
 use ks_core::{AppState, Mode, Overlay};
 
@@ -651,7 +651,13 @@ fn render_confirm(frame: &mut Frame, area: Rect, confirm: &ConfirmDialog, theme:
         }
     }
     let hints: Vec<(&str, &str)> = if confirm.action.is_some() {
-        vec![("enter", confirm.accept_label.as_str()), ("esc", "cancel")]
+        // Launching Claude on API billing is accepted with `y` only, never enter.
+        let key = if confirm.action == Some(ConfirmAction::ClaudeProceed) {
+            "y"
+        } else {
+            "enter"
+        };
+        vec![(key, confirm.accept_label.as_str()), ("esc", "cancel")]
     } else {
         vec![("enter/esc", "close")]
     };

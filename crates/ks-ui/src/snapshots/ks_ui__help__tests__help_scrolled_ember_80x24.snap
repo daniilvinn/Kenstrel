@@ -24,7 +24,7 @@ expression: "draw(&s, &theme(name))"
   │                                                                          │
   │ Selection                                                                │
   │   space               Toggle mark                                        │
-──╰───────────────────────────────────────────────────────────── 17-33 / 91 ─╯──
+──╰──────────────────────────────────────────────────────────── 17-33 / 104 ─╯──
  ›                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -119,8 +119,8 @@ expression: "draw(&s, &theme(name))"
  20  26..77  fg=#a9a29a bg=reset
  20  77..80  fg=#8f5c47 bg=reset
  21   0..2   fg=#403a35 bg=reset
- 21   2..65  fg=#8f5c47 bg=reset
- 21  65..76  fg=#716b64 bg=reset
+ 21   2..64  fg=#8f5c47 bg=reset
+ 21  64..76  fg=#716b64 bg=reset
  21  76..78  fg=#8f5c47 bg=reset
  21  78..80  fg=#403a35 bg=reset
  22   1..61  fg=#d97757 bg=reset bold

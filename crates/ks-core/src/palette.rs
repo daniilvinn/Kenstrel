@@ -240,9 +240,14 @@ fn keys_of(keymap: &Keymap, action: Action, arg: Option<char>) -> Vec<String> {
 }
 
 /// All command entries. `Switch to tab` is expanded to one entry per tab number.
-fn command_items(keymap: &Keymap) -> Vec<Item> {
+fn command_items(state: &AppState) -> Vec<Item> {
+    let keymap = &state.keymap;
     let mut items = Vec::new();
     for info in command::all() {
+        // `claude.proceed` and `claude.changes_clear` only make sense in some states.
+        if !crate::claude::palette_visible(state, info.action) {
+            continue;
+        }
         if info.action == Action::TabGoto {
             for n in 1..=9u8 {
                 let arg = char::from(b'0' + n);
@@ -267,7 +272,7 @@ fn command_items(keymap: &Keymap) -> Vec<Item> {
 
 fn page_items(state: &AppState, page: Page) -> Vec<Item> {
     match page {
-        Page::Commands => command_items(&state.keymap),
+        Page::Commands => command_items(state),
         Page::Themes => state
             .themes
             .iter()
@@ -517,6 +522,9 @@ pub(crate) mod tests {
         let mut s = state();
         key(&mut s, ":");
         for &action in Action::ALL {
+            if !crate::claude::palette_visible(&s, action) {
+                continue;
+            }
             let listed = s
                 .palette
                 .items
@@ -641,13 +649,28 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn unimplemented_commands_report_not_available() {
+    fn claude_commands_run_from_the_palette() {
         let mut s = state();
         key(&mut s, ":");
         type_text(&mut s, "open claude");
         key(&mut s, "enter");
-        let status = s.status.as_ref().unwrap();
-        assert_eq!(status.text, "Open Claude is not available yet");
+        assert!(s.overlays.is_empty());
+        assert_eq!(s.claude.phase, crate::claude::ClaudePhase::Checking);
+    }
+
+    #[test]
+    fn context_dependent_claude_commands_are_hidden_from_the_palette() {
+        let mut s = state();
+        key(&mut s, ":");
+        let listed = |s: &AppState, action: Action| {
+            s.palette
+                .items
+                .iter()
+                .any(|i| matches!(i.kind, ItemKind::Command(a, _) if a == action))
+        };
+        assert!(!listed(&s, Action::ClaudeProceed));
+        assert!(!listed(&s, Action::ClaudeChangesClear));
+        assert!(listed(&s, Action::ClaudeOpen));
     }
 
     #[test]

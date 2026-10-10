@@ -353,6 +353,71 @@ const COMMANDS: &[(Action, Category, &str)] = &[
         "Send the marked files to Claude as @ mentions.",
     ),
     (
+        Action::ClaudeResume,
+        C::Claude,
+        "Resume the last Claude session of this project.",
+    ),
+    (
+        Action::ClaudeSplit,
+        C::Claude,
+        "Open Claude in a Windows Terminal split pane.",
+    ),
+    (
+        Action::ClaudeFocus,
+        C::Claude,
+        "Move the keyboard between the explorer and the Claude pane.",
+    ),
+    (
+        Action::ClaudeClose,
+        C::Claude,
+        "Close the Claude pane and end its session process.",
+    ),
+    (
+        Action::ClaudeGrow,
+        C::Claude,
+        "Make the Claude pane larger.",
+    ),
+    (
+        Action::ClaudeShrink,
+        C::Claude,
+        "Make the Claude pane smaller.",
+    ),
+    (
+        Action::ClaudePosition,
+        C::Claude,
+        "Move the Claude pane between the bottom and the right.",
+    ),
+    (
+        Action::ClaudeScrollUp,
+        C::Claude,
+        "Scroll the Claude pane towards older output.",
+    ),
+    (
+        Action::ClaudeScrollDown,
+        C::Claude,
+        "Scroll the Claude pane towards newer output.",
+    ),
+    (
+        Action::ClaudeChanges,
+        C::Claude,
+        "List the files Claude changed, with their git diff.",
+    ),
+    (
+        Action::ClaudeChangesClear,
+        C::Claude,
+        "Forget the list of files Claude changed.",
+    ),
+    (
+        Action::ClaudeChangesDiff,
+        C::Claude,
+        "Show or hide the git diff of the selected changed file.",
+    ),
+    (
+        Action::ClaudeProceed,
+        C::Claude,
+        "Launch Claude although it would bill the API key (billing question only).",
+    ),
+    (
         Action::Cancel,
         C::App,
         "Close the top overlay, leave the mode, clear marks.",

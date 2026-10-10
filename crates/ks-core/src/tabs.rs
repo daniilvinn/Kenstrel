@@ -171,6 +171,9 @@ fn classify_state_fields(state: &AppState) {
         fileops: _,
         palette: _,
         help: _,
+        // The Claude pane, its dialogs and the changes log belong to the whole app: one pane,
+        // and the `◆` markers are keyed by absolute path, so they show in every tab.
+        claude: _,
         themes: _,
         which_key_gen: _,
         status_gen: _,

@@ -128,6 +128,19 @@ the palette (`Reload config`).
 |---|---|---|---|
 | `c` | Open Claude | `claude.open` | Open Claude Code beside the explorer. |
 | `C` | Send marked files to Claude | `claude.send_marked` | Send the marked files to Claude as @ mentions. |
+| `g r` | Resume last Claude session | `claude.resume` | Resume the last Claude session of this project. |
+| `g w` | Open Claude in Windows Terminal split | `claude.split` | Open Claude in a Windows Terminal split pane. |
+| `ctrl-\` | Toggle focus between explorer and Claude | `claude.focus` | Move the keyboard between the explorer and the Claude pane. |
+| `g X` | Close Claude pane | `claude.close` | Close the Claude pane and end its session process. |
+| `alt-=` | Grow Claude pane | `claude.grow` | Make the Claude pane larger. |
+| `alt--` | Shrink Claude pane | `claude.shrink` | Make the Claude pane smaller. |
+| `g p` | Move Claude pane (bottom / right) | `claude.position` | Move the Claude pane between the bottom and the right. |
+| — | Scroll Claude pane up | `claude.scroll_up` | Scroll the Claude pane towards older output. |
+| — | Scroll Claude pane down | `claude.scroll_down` | Scroll the Claude pane towards newer output. |
+| `g a` | Claude changes | `claude.changes` | List the files Claude changed, with their git diff. |
+| — | Clear Claude changes | `claude.changes_clear` | Forget the list of files Claude changed. |
+| — | Proceed with API billing anyway | `claude.proceed` | Launch Claude although it would bill the API key (billing question only). |
+| — | Toggle the git diff in the Claude changes view | `claude.changes_diff` | Show or hide the git diff of the selected changed file. |
 
 ### Application
 
@@ -274,6 +287,16 @@ the palette (`Reload config`).
 | `g g` | `cursor.top` |
 | `G` | `cursor.bottom` |
 
+### `claude`
+
+| Keys | Command |
+|---|---|
+| `ctrl-\` | `claude.focus` |
+| `alt-=` | `claude.grow` |
+| `alt--` | `claude.shrink` |
+| `shift-pageup` | `claude.scroll_up` |
+| `shift-pagedown` | `claude.scroll_down` |
+
 ### `bookmarks`
 
 | Keys | Command |
@@ -341,3 +364,22 @@ the palette (`Reload config`).
 | `k` | `cursor.up` |
 | `down` | `cursor.down` |
 | `up` | `cursor.up` |
+
+### `claude_changes`
+
+| Keys | Command |
+|---|---|
+| `esc` | `cancel` |
+| `q` | `cancel` |
+| `ctrl-c` | `cancel` |
+| `enter` | `accept` |
+| `j` | `cursor.down` |
+| `down` | `cursor.down` |
+| `k` | `cursor.up` |
+| `up` | `cursor.up` |
+| `g g` | `cursor.top` |
+| `home` | `cursor.top` |
+| `G` | `cursor.bottom` |
+| `end` | `cursor.bottom` |
+| `X` | `claude.changes_clear` |
+| `d` | `claude.changes_diff` |

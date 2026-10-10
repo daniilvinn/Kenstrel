@@ -231,7 +231,8 @@ impl AppState {
 
     /// The pane geometry at the current size.
     pub fn pane_widths(&self) -> PaneWidths {
-        self.pane_widths_at(self.size.width)
+        // A right-hand Claude pane narrows the area the list/preview split lives in.
+        self.pane_widths_at(crate::claude::list_width(self, self.size.width))
     }
 
     /// The pane geometry for a terminal `width` columns wide (the renderer passes the width
@@ -273,7 +274,8 @@ impl AppState {
             let rows = crate::search::geometry::preview_rows(self.size, grep);
             return usize::from(rows.saturating_sub(HEADER_ROWS));
         }
-        usize::from(crate::layout::body_height(self.size).saturating_sub(HEADER_ROWS))
+        let body = crate::layout::body_height(self.size);
+        usize::from(crate::claude::list_height(self, body).saturating_sub(HEADER_ROWS))
     }
 }
 

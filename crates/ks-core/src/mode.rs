@@ -40,6 +40,7 @@ pub enum Overlay {
     Pager,
     /// A small choice list: `Y` copy-as, `O` open-with (P6).
     Menu,
+    ClaudeChanges,
 }
 
 /// Selects which keymap table handles a key press.
@@ -61,6 +62,7 @@ pub enum KeyContext {
     Conflict,
     Pager,
     Menu,
+    ClaudeChanges,
 }
 
 impl KeyContext {
@@ -81,6 +83,7 @@ impl KeyContext {
         KeyContext::Conflict,
         KeyContext::Pager,
         KeyContext::Menu,
+        KeyContext::ClaudeChanges,
     ];
 
     /// Name used for the `[keymap.<name>]` table in `config.toml`.
@@ -102,6 +105,7 @@ impl KeyContext {
             KeyContext::Conflict => "conflict",
             KeyContext::Pager => "pager",
             KeyContext::Menu => "menu",
+            KeyContext::ClaudeChanges => "claude_changes",
         }
     }
 
@@ -158,6 +162,7 @@ impl From<Overlay> for KeyContext {
             Overlay::Conflict => KeyContext::Conflict,
             Overlay::Pager => KeyContext::Pager,
             Overlay::Menu => KeyContext::Menu,
+            Overlay::ClaudeChanges => KeyContext::ClaudeChanges,
         }
     }
 }

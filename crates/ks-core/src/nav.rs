@@ -174,6 +174,36 @@ pub(crate) fn enter(state: &mut AppState, effects: &mut Vec<Effect>) {
     }
 }
 
+/// Shows `path` with the cursor on it (a path Claude mentioned): in place when its parent is
+/// the displayed directory, otherwise by navigating to the parent.
+pub(crate) fn reveal(state: &mut AppState, effects: &mut Vec<Effect>, path: &std::path::Path) {
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        set_status(
+            state,
+            Level::Warning,
+            format!("Cannot reveal {}", path.display()),
+            effects,
+        );
+        return;
+    };
+    if !state.show_drives
+        && crate::claude::path_key(parent) == crate::claude::path_key(&state.cwd)
+        && state.nav.is_none()
+    {
+        let height = state.viewport_height();
+        if state.view.reveal_now(name, height) {
+            state.dirty = true;
+            return;
+        }
+    }
+    visit(
+        state,
+        effects,
+        Location::Dir(parent.to_owned()),
+        Some(name.to_owned()),
+    );
+}
+
 /// `h` / `left` / `backspace`: up one level; above a drive root lies "This PC".
 pub(crate) fn parent(state: &mut AppState, effects: &mut Vec<Effect>) {
     if state.show_drives {

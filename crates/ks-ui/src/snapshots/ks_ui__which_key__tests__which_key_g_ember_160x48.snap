@@ -1,5 +1,6 @@
 ---
 source: crates/ks-ui/src/which_key.rs
+assertion_line: 170
 expression: "draw(&pending(w, h, &keys), &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
@@ -33,20 +34,20 @@ expression: "draw(&pending(w, h, &keys), &theme(name))"
 
 
 
-
-
-
-
-
-                                                                                                                                  ╭─ g ───────────────────────╮
-                                                                                                                                  │ g  Jump to top            │
-                                                                                                                                  │ h  Go to home directory   │
-                                                                                                                                  │ d  Go to Downloads        │
-                                                                                                                                  │ D  Go to Desktop          │
-                                                                                                                                  │ c  Go to config directory │
-                                                                                                                                  │ /  Go to This PC (drives) │
-                                                                                                                                  │ j  Jobs overlay           │
-                                                                                                                                  ╰───────────────────────────╯
+                                                                                                                   ╭─ g ──────────────────────────────────────╮
+                                                                                                                   │ g  Jump to top                           │
+                                                                                                                   │ h  Go to home directory                  │
+                                                                                                                   │ d  Go to Downloads                       │
+                                                                                                                   │ D  Go to Desktop                         │
+                                                                                                                   │ c  Go to config directory                │
+                                                                                                                   │ /  Go to This PC (drives)                │
+                                                                                                                   │ j  Jobs overlay                          │
+                                                                                                                   │ r  Resume last Claude session            │
+                                                                                                                   │ w  Open Claude in Windows Terminal split │
+                                                                                                                   │ a  Claude changes                        │
+                                                                                                                   │ X  Close Claude pane                     │
+                                                                                                                   │ p  Move Claude pane (bottom / right)     │
+                                                                                                                   ╰──────────────────────────────────────────╯
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ›                                                                                                                                        g  12/13 · 1 selected
    ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
@@ -118,38 +119,58 @@ expression: "draw(&pending(w, h, &keys), &theme(name))"
  14   5..141 fg=#e8e3dc bg=reset
  14 141..151 fg=#a9a29a bg=reset
  14 151..160 fg=#716b64 bg=reset
- 36 130..133 fg=#403a35 bg=reset
- 36 133..135 fg=#d97757 bg=reset bold
- 36 135..160 fg=#403a35 bg=reset
- 37 130..132 fg=#403a35 bg=reset
- 37 132..135 fg=#d97757 bg=reset bold
- 37 135..158 fg=#a9a29a bg=reset
+ 31 115..118 fg=#403a35 bg=reset
+ 31 118..120 fg=#d97757 bg=reset bold
+ 31 120..160 fg=#403a35 bg=reset
+ 32 115..117 fg=#403a35 bg=reset
+ 32 117..120 fg=#d97757 bg=reset bold
+ 32 120..158 fg=#a9a29a bg=reset
+ 32 158..160 fg=#403a35 bg=reset
+ 33 115..117 fg=#403a35 bg=reset
+ 33 117..120 fg=#d97757 bg=reset bold
+ 33 120..158 fg=#a9a29a bg=reset
+ 33 158..160 fg=#403a35 bg=reset
+ 34 115..117 fg=#403a35 bg=reset
+ 34 117..120 fg=#d97757 bg=reset bold
+ 34 120..158 fg=#a9a29a bg=reset
+ 34 158..160 fg=#403a35 bg=reset
+ 35 115..117 fg=#403a35 bg=reset
+ 35 117..120 fg=#d97757 bg=reset bold
+ 35 120..158 fg=#a9a29a bg=reset
+ 35 158..160 fg=#403a35 bg=reset
+ 36 115..117 fg=#403a35 bg=reset
+ 36 117..120 fg=#d97757 bg=reset bold
+ 36 120..158 fg=#a9a29a bg=reset
+ 36 158..160 fg=#403a35 bg=reset
+ 37 115..117 fg=#403a35 bg=reset
+ 37 117..120 fg=#d97757 bg=reset bold
+ 37 120..158 fg=#a9a29a bg=reset
  37 158..160 fg=#403a35 bg=reset
- 38 130..132 fg=#403a35 bg=reset
- 38 132..135 fg=#d97757 bg=reset bold
- 38 135..158 fg=#a9a29a bg=reset
+ 38 115..117 fg=#403a35 bg=reset
+ 38 117..120 fg=#d97757 bg=reset bold
+ 38 120..158 fg=#a9a29a bg=reset
  38 158..160 fg=#403a35 bg=reset
- 39 130..132 fg=#403a35 bg=reset
- 39 132..135 fg=#d97757 bg=reset bold
- 39 135..158 fg=#a9a29a bg=reset
+ 39 115..117 fg=#403a35 bg=reset
+ 39 117..120 fg=#d97757 bg=reset bold
+ 39 120..158 fg=#a9a29a bg=reset
  39 158..160 fg=#403a35 bg=reset
- 40 130..132 fg=#403a35 bg=reset
- 40 132..135 fg=#d97757 bg=reset bold
- 40 135..158 fg=#a9a29a bg=reset
+ 40 115..117 fg=#403a35 bg=reset
+ 40 117..120 fg=#d97757 bg=reset bold
+ 40 120..158 fg=#a9a29a bg=reset
  40 158..160 fg=#403a35 bg=reset
- 41 130..132 fg=#403a35 bg=reset
- 41 132..135 fg=#d97757 bg=reset bold
- 41 135..158 fg=#a9a29a bg=reset
+ 41 115..117 fg=#403a35 bg=reset
+ 41 117..120 fg=#d97757 bg=reset bold
+ 41 120..158 fg=#a9a29a bg=reset
  41 158..160 fg=#403a35 bg=reset
- 42 130..132 fg=#403a35 bg=reset
- 42 132..135 fg=#d97757 bg=reset bold
- 42 135..158 fg=#a9a29a bg=reset
+ 42 115..117 fg=#403a35 bg=reset
+ 42 117..120 fg=#d97757 bg=reset bold
+ 42 120..158 fg=#a9a29a bg=reset
  42 158..160 fg=#403a35 bg=reset
- 43 130..132 fg=#403a35 bg=reset
- 43 132..135 fg=#d97757 bg=reset bold
- 43 135..158 fg=#a9a29a bg=reset
+ 43 115..117 fg=#403a35 bg=reset
+ 43 117..120 fg=#d97757 bg=reset bold
+ 43 120..158 fg=#a9a29a bg=reset
  43 158..160 fg=#403a35 bg=reset
- 44 130..160 fg=#403a35 bg=reset
+ 44 115..160 fg=#403a35 bg=reset
  45   0..160 fg=#403a35 bg=reset
  46   1..141 fg=#d97757 bg=reset bold
  46 141..160 fg=#a9a29a bg=reset

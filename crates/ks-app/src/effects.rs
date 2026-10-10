@@ -13,6 +13,8 @@ use std::sync::Arc;
 use crate::fileops::{EditorSettings, FileOpsRunner};
 use crate::persist::{StateStore, StateWriter};
 use ks_core::{Effect, Gen, Level, Msg, PreviewKind, PreviewMsg, PreviewRequest, TimerKind};
+
+use crate::claude::{ClaudeHost, ClaudeOptions};
 use ks_fs::DirWatcher;
 use ks_preview::{Limits, Palette, PreviewEvent, PreviewOptions, Previewer, RequestKind};
 use ks_search::{FinderOptions, FinderSession, GrepHandle, GrepQuery, WalkCache};
@@ -52,6 +54,8 @@ pub struct EffectRunner {
     walk_cache: Arc<WalkCache>,
     finder: Option<FinderWorker>,
     grep: Option<GrepHandle>,
+    /// Performs the `Effect::Claude*` requests (PLAN section 10).
+    claude: ClaudeHost,
 }
 
 impl EffectRunner {
@@ -59,6 +63,7 @@ impl EffectRunner {
         let shutdown = CancellationToken::new();
         Self {
             fileops: FileOpsRunner::new(tx.clone(), shutdown.child_token()),
+            claude: ClaudeHost::new(tx.clone(), ClaudeOptions::default()),
             tx,
             shutdown,
             timers: HashMap::new(),
@@ -111,6 +116,18 @@ impl EffectRunner {
     /// engine's cache key includes the palette, so old entries are simply not hit).
     pub fn set_preview_palette(&mut self, palette: Palette) {
         self.palette = palette;
+    }
+
+    /// Replaces the Claude host with one using `options` (file locations).
+    #[must_use]
+    pub fn with_claude(mut self, options: ClaudeOptions) -> Self {
+        self.claude = ClaudeHost::new(self.tx.clone(), options);
+        self
+    }
+
+    /// The Claude host, for tests.
+    pub fn claude(&mut self) -> &mut ClaudeHost {
+        &mut self.claude
     }
 
     /// Starts the given effects. Must be called from within a tokio runtime.
@@ -234,6 +251,20 @@ impl EffectRunner {
                     let cache = self.walk_cache.clone();
                     tokio::task::spawn_blocking(move || cache.apply_changes(&changes));
                 }
+                claude @ (Effect::SetBracketedPaste(_)
+                | Effect::ClaudePreflight { .. }
+                | Effect::ClaudeLaunch { .. }
+                | Effect::ClaudeWtSplit { .. }
+                | Effect::ClaudeKey(_)
+                | Effect::ClaudePaste(_)
+                | Effect::ClaudeSendPaths { .. }
+                | Effect::ClaudeSendRange { .. }
+                | Effect::ClaudeResize { .. }
+                | Effect::ClaudeScroll { .. }
+                | Effect::ClaudeClose { .. }
+                | Effect::ClaudeIpcReply { .. }
+                | Effect::ClaudeDiff { .. }
+                | Effect::ClaudeIpcWork { .. }) => self.claude.run(claude),
                 // File operations, shell runs and launching (P6).
                 other => self.fileops.handle(other),
             }
@@ -243,6 +274,7 @@ impl EffectRunner {
     /// Cancels everything still running.
     pub fn shutdown(&mut self) {
         self.fileops.shutdown();
+        self.claude.shutdown();
         self.shutdown.cancel();
         self.timers.clear();
         self.slots.clear();

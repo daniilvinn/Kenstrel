@@ -15,7 +15,7 @@ expression: rendered
    ◆ new_pass.rs                                                                                                                               0 B     1m ago ?
    ◆ photo_from_phone.jpg                                                                                                                   4.0 MB 2025-02-22
    ◆ pipeline_cache.rs             ╭─ Commands ─────────────────────────────────────────────────────────────────────────────╮               3.3 KB   just now
-  ●◆ swapchain.rs                  │ › srt                                                                             2/16 │               9.8 KB    12m ago
+  ●◆ swapchain.rs                  │ › srt                                                                             2/17 │               9.8 KB    12m ago
  ▌ ◆ vulkan_device.rs              │────────────────────────────────────────────────────────────────────────────────────────│              14.2 KB     3h ago M
    ◆ 日本語のメモ.txt              │  Sort by name                                                                      S n │                220 B     2h ago
                                    │▌ Sort by size                                                                      S s │
@@ -31,9 +31,9 @@ expression: rendered
                                    │  Quit and cd shell to current directory                                              Q │
                                    │  Visual (range select) mode                                                          v │
                                    │  Undo last file operation                                                            u │
+                                   │  Open Claude in Windows Terminal split                                             g w │
                                    │  Jump to top                                                                 g g, home │
                                    │  Jump to bottom                                                                 G, end │
-                                   │                                                                                        │
                                    │                                                                                        │
                                    │                                                                                        │
                                    │                                                                                        │
@@ -251,14 +251,22 @@ expression: rendered
  27 122..124 fg=#958e86 bg=reset
  27 124..160 fg=#c4623f bg=reset
  28  35..38  fg=#c4623f bg=reset
- 28  38..114 fg=#2b2724 bg=reset
- 28 114..124 fg=#958e86 bg=reset
+ 28  38..59  fg=#2b2724 bg=reset
+ 28  59..61  fg=#c4623f bg=reset bold
+ 28  61..63  fg=#2b2724 bg=reset
+ 28  63..64  fg=#c4623f bg=reset bold
+ 28  64..74  fg=#2b2724 bg=reset
+ 28  74..120 fg=#c4623f bg=reset bold
+ 28 120..124 fg=#958e86 bg=reset
  28 124..160 fg=#c4623f bg=reset
  29  35..38  fg=#c4623f bg=reset
- 29  38..117 fg=#2b2724 bg=reset
- 29 117..124 fg=#958e86 bg=reset
+ 29  38..114 fg=#2b2724 bg=reset
+ 29 114..124 fg=#958e86 bg=reset
  29 124..160 fg=#c4623f bg=reset
- 30  35..160 fg=#c4623f bg=reset
+ 30  35..38  fg=#c4623f bg=reset
+ 30  38..117 fg=#2b2724 bg=reset
+ 30 117..124 fg=#958e86 bg=reset
+ 30 124..160 fg=#c4623f bg=reset
  31  35..160 fg=#c4623f bg=reset
  32  35..160 fg=#c4623f bg=reset
  33  35..160 fg=#c4623f bg=reset

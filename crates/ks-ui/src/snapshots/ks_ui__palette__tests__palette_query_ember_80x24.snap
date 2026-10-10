@@ -6,7 +6,7 @@ expression: rendered
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────
    ◆ current/   ╭─ Commands ───────────────────────────────────╮
-   ◆ passes/    │ › srt                                   2/16 │            7 M
+   ◆ passes/    │ › srt                                   2/17 │            7 M
    ◆ shaders/   │──────────────────────────────────────────────│           12 !
    ◆ a_rather_lo│  Sort by name                            S n │.rs   75.2 KB
    ◆ build.ps1  │▌ Sort by size                            S s │       1.9 KB
@@ -22,8 +22,8 @@ expression: rendered
                 │  Quit and cd shell to current directory    Q │
                 │  Visual (range select) mode                v │
                 │  Undo last file operation                  u │
+                │  Open Claude in Windows Terminal split   g w │
                 │  Jump to top                       g g, home │
-                │  Jump to bottom                       G, end │
 ────────────────╰──────────────────────────────────────────────╯────────────────
  ›                                                           12/13 · 1 selected
    ‹enter› run  ‹down› down  ‹up› up  ‹esc› close
@@ -214,12 +214,17 @@ expression: rendered
  18  61..63  fg=#716b64 bg=reset
  18  63..80  fg=#8f5c47 bg=reset
  19  16..19  fg=#8f5c47 bg=reset
- 19  19..53  fg=#e8e3dc bg=reset
- 19  53..63  fg=#716b64 bg=reset
+ 19  19..40  fg=#e8e3dc bg=reset
+ 19  40..42  fg=#d97757 bg=reset bold
+ 19  42..44  fg=#e8e3dc bg=reset
+ 19  44..45  fg=#d97757 bg=reset bold
+ 19  45..55  fg=#e8e3dc bg=reset
+ 19  55..59  fg=#d97757 bg=reset bold
+ 19  59..63  fg=#716b64 bg=reset
  19  63..80  fg=#8f5c47 bg=reset
  20  16..19  fg=#8f5c47 bg=reset
- 20  19..56  fg=#e8e3dc bg=reset
- 20  56..63  fg=#716b64 bg=reset
+ 20  19..53  fg=#e8e3dc bg=reset
+ 20  53..63  fg=#716b64 bg=reset
  20  63..80  fg=#8f5c47 bg=reset
  21   0..16  fg=#403a35 bg=reset
  21  16..64  fg=#8f5c47 bg=reset

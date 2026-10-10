@@ -6,7 +6,7 @@ expression: "draw(&s, &theme(name))"
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────
   ╭─ Help ───────────────────────────────────────────────────────────────────╮
-  │ / sort                                                          42 shown │M
+  │ / sort                                                          49 shown │M
   │ Navigation                                                               │!
   │   j, down             Move cursor down                                   │
   │   k, up               Move cursor up                                     │
@@ -24,7 +24,7 @@ expression: "draw(&s, &theme(name))"
   │   —                   Search contents: toggle regex                      │
   │   —                   Search contents: toggle whole word                 │
   │   —                   Search contents: switch query/glo…                 │
-──╰────────────────────────────────────────────────────────────── 1-17 / 57 ─╯──
+──╰────────────────────────────────────────────────────────────── 1-17 / 64 ─╯──
  ›                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---

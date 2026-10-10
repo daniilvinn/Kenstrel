@@ -46,7 +46,12 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
     render_header(frame, header, state, theme);
     render_rule(frame, top_rule, theme);
     crate::images::begin_frame();
-    render_body(frame, body, state, theme);
+    // The Claude pane takes its room first; the list/preview split lives in what is left.
+    let (list_area, pane) = crate::claude::split_body(body, state);
+    render_body(frame, list_area, state, theme);
+    if let Some((pane_rect, split)) = pane {
+        crate::claude::render_pane(frame, pane_rect, split, state, theme);
+    }
     render_rule(frame, bottom_rule, theme);
     render_prompt(frame, prompt, state, theme);
     // The which-key popup floats over the list; only when there is no room for it do the
@@ -64,6 +69,7 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
     crate::navaids::render_overlays(frame, state, theme);
     // Overlays are drawn last, over everything.
     crate::fileops::render_overlays(frame, state, theme);
+    crate::claude::render_overlays(frame, state, theme);
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
@@ -326,6 +332,19 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::HiddenToggle, "hidden"),
             (Action::GoDrives, "drives"),
             (Action::Quit, "quit"),
+        ],
+        (KeyContext::Claude, _) => &[
+            (Action::ClaudeFocus, "explorer"),
+            (Action::ClaudeGrow, "grow"),
+            (Action::ClaudeShrink, "shrink"),
+            (Action::ClaudeScrollUp, "scroll"),
+        ],
+        (KeyContext::ClaudeChanges, _) => &[
+            (Action::Accept, "reveal"),
+            (Action::CursorDown, "down"),
+            (Action::CursorUp, "up"),
+            (Action::ClaudeChangesClear, "clear"),
+            (Action::Cancel, "close"),
         ],
         (KeyContext::Visual, _) => &[
             (Action::CursorDown, "down"),

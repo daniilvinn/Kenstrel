@@ -44,6 +44,16 @@
 [ui]
 # which_key_delay_ms = 300
 
+[claude]
+# Claude Code integration. Kestrel only starts your installed `claude`; it never reads
+# credentials. An empty binary means: look it up on PATH.
+# binary = ""
+# Variables removed from the claude process so your subscription login is used.
+# strip_env = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY"]
+# pane_position = "bottom"   # "bottom" | "right"
+# pane_percent = 40          # share of the screen body, 15..=85
+# focus_key = 'ctrl-\'      # toggles focus between the explorer and the Claude pane
+
 # Key bindings. Keys are space-separated sequences: "g g", "ctrl-p", "m <char>".
 # The value is an action id, optionally with a one-character argument ("tab.goto:3"),
 # or "none" to remove a binding. Contexts: normal, visual, prompt, filter, finder, grep,

@@ -1,0 +1,187 @@
+---
+source: crates/ks-ui/src/claude.rs
+expression: rendered
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   ◆ current/                                                                      2025-02-02   ╭ Claude ────────────────────────────── ◆ Edit vulkan_device.rs
+   ◆ passes/                                                                     7     5h ago M │ * Welcome to Claude Code
+   ◆ shaders/                                                                   12 2025-03-12 ! │ cwd: /home/me/projects/omniforce
+   ◆ a_rather_long_file_name_that_must_be_cut_in_the_middle_of_t…_row.rs   75.2 KB 2025-03-11   │ > refactor the renderer
+   ◆ build.ps1                                                              1.9 KB 2025-03-05   │ [inverse]
+   ◆ descriptors.rs                                                         6.1 KB  yesterday + │
+   ◆ mod.rs                                                                  412 B 2024-02-08   │
+   ◆ new_pass.rs                                                               0 B     1m ago ? │
+   ◆ photo_from_phone.jpg                                                   4.0 MB 2025-02-22   │
+   ◆ pipeline_cache.rs                                                      3.3 KB   just now   │
+  ●◆ swapchain.rs                                                           9.8 KB    12m ago   │
+ ▌ ◆ vulkan_device.rs                                                  ◆   14.2 KB     3h ago M │
+   ◆ 日本語のメモ.txt                                                        220 B     2h ago   │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+                                                                                                │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                 Checking Claude login...  12/13 · 1 selected
+   ‹ctrl-\› explorer  ‹alt-=› grow  ‹alt--› shrink  ‹shift-pageup› scroll
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..143 fg=#e8e3dc bg=reset bold
+  0 143..148 fg=#a9a29a bg=reset bold
+  0 148..151 fg=#a9a29a bg=reset
+  0 151..154 fg=#92c07f bg=reset
+  0 154..157 fg=#e5b567 bg=reset
+  0 157..160 fg=#c9a27f bg=reset
+  1   0..160 fg=#403a35 bg=reset
+  2   3..5   fg=#7fa8c9 bg=reset
+  2   5..83  fg=#b799d9 bg=reset
+  2  83..96  fg=#716b64 bg=reset
+  2  96..98  fg=#8f5c47 bg=reset
+  2  98..105 fg=#d97757 bg=reset bold
+  2 105..136 fg=#8f5c47 bg=reset
+  2 136..138 fg=#d97757 bg=reset
+  2 138..160 fg=#a9a29a bg=reset
+  3   3..81  fg=#7fa8c9 bg=reset
+  3  81..87  fg=#a9a29a bg=reset
+  3  87..94  fg=#716b64 bg=reset
+  3  94..96  fg=#e5b567 bg=reset
+  3  96..98  fg=#8f5c47 bg=reset
+  3  98..160 fg=#d97757 bg=reset bold
+  4   3..80  fg=#7fa8c9 bg=reset
+  4  80..83  fg=#a9a29a bg=reset
+  4  83..94  fg=#716b64 bg=reset
+  4  94..96  fg=#625c56 bg=reset
+  4  96..98  fg=#8f5c47 bg=reset
+  4  98..160 fg=#e8e3dc bg=reset dim
+  5   3..5   fg=#a9a29a bg=reset
+  5   5..75  fg=#e8e3dc bg=reset
+  5  75..83  fg=#a9a29a bg=reset
+  5  83..96  fg=#716b64 bg=reset
+  5  96..98  fg=#8f5c47 bg=reset
+  5  98..100 fg=#e8e3dc bg=reset
+  5 100..109 fg=idx6 bg=reset
+  5 109..160 fg=#e8e3dc bg=reset
+  6   3..76  fg=#92c07f bg=reset
+  6  76..83  fg=#a9a29a bg=reset
+  6  83..96  fg=#716b64 bg=reset
+  6  96..98  fg=#8f5c47 bg=reset
+  6  98..160 fg=black bg=#e8e3dc
+  7   3..5   fg=#a9a29a bg=reset
+  7   5..76  fg=#e8e3dc bg=reset
+  7  76..84  fg=#a9a29a bg=reset
+  7  84..94  fg=#716b64 bg=reset
+  7  94..96  fg=#92c07f bg=reset
+  7  96..160 fg=#8f5c47 bg=reset
+  8   3..5   fg=#a9a29a bg=reset
+  8   5..77  fg=#e8e3dc bg=reset
+  8  77..83  fg=#a9a29a bg=reset
+  8  83..96  fg=#716b64 bg=reset
+  8  96..160 fg=#8f5c47 bg=reset
+  9   3..5   fg=#a9a29a bg=reset
+  9   5..79  fg=#e8e3dc bg=reset
+  9  79..87  fg=#a9a29a bg=reset
+  9  87..94  fg=#716b64 bg=reset
+  9  94..96  fg=#c9a27f bg=reset
+  9  96..160 fg=#8f5c47 bg=reset
+ 10   3..5   fg=#a9a29a bg=reset
+ 10   5..76  fg=#a9a29a bg=reset italic
+ 10  76..83  fg=#a9a29a bg=reset
+ 10  83..96  fg=#716b64 bg=reset
+ 10  96..160 fg=#8f5c47 bg=reset
+ 11   3..5   fg=#a9a29a bg=reset
+ 11   5..76  fg=#e8e3dc bg=reset
+ 11  76..85  fg=#a9a29a bg=reset
+ 11  85..96  fg=#716b64 bg=reset
+ 11  96..160 fg=#8f5c47 bg=reset
+ 12   2..3   fg=#d97757 bg=reset
+ 12   3..5   fg=#a9a29a bg=reset
+ 12   5..76  fg=#d97757 bg=reset bold
+ 12  76..86  fg=#a9a29a bg=reset
+ 12  86..96  fg=#716b64 bg=reset
+ 12  96..160 fg=#8f5c47 bg=reset
+ 13   0..1   fg=#e8e3dc bg=#2f2a26
+ 13   1..3   fg=#d97757 bg=#2f2a26
+ 13   3..5   fg=#a9a29a bg=#2f2a26
+ 13   5..70  fg=#e8e3dc bg=#2f2a26
+ 13  70..72  fg=#d97757 bg=#2f2a26
+ 13  72..73  fg=#e8e3dc bg=#2f2a26
+ 13  73..82  fg=#a9a29a bg=#2f2a26
+ 13  82..83  fg=#e8e3dc bg=#2f2a26
+ 13  83..93  fg=#716b64 bg=#2f2a26
+ 13  93..94  fg=#e8e3dc bg=#2f2a26
+ 13  94..95  fg=#e5b567 bg=#2f2a26
+ 13  95..96  fg=#e8e3dc bg=#2f2a26
+ 13  96..160 fg=#8f5c47 bg=reset
+ 14   3..5   fg=#a9a29a bg=reset
+ 14   5..77  fg=#e8e3dc bg=reset
+ 14  77..87  fg=#a9a29a bg=reset
+ 14  87..96  fg=#716b64 bg=reset
+ 14  96..160 fg=#8f5c47 bg=reset
+ 15  96..160 fg=#8f5c47 bg=reset
+ 16  96..160 fg=#8f5c47 bg=reset
+ 17  96..160 fg=#8f5c47 bg=reset
+ 18  96..160 fg=#8f5c47 bg=reset
+ 19  96..160 fg=#8f5c47 bg=reset
+ 20  96..160 fg=#8f5c47 bg=reset
+ 21  96..160 fg=#8f5c47 bg=reset
+ 22  96..160 fg=#8f5c47 bg=reset
+ 23  96..160 fg=#8f5c47 bg=reset
+ 24  96..160 fg=#8f5c47 bg=reset
+ 25  96..160 fg=#8f5c47 bg=reset
+ 26  96..160 fg=#8f5c47 bg=reset
+ 27  96..160 fg=#8f5c47 bg=reset
+ 28  96..160 fg=#8f5c47 bg=reset
+ 29  96..160 fg=#8f5c47 bg=reset
+ 30  96..160 fg=#8f5c47 bg=reset
+ 31  96..160 fg=#8f5c47 bg=reset
+ 32  96..160 fg=#8f5c47 bg=reset
+ 33  96..160 fg=#8f5c47 bg=reset
+ 34  96..160 fg=#8f5c47 bg=reset
+ 35  96..160 fg=#8f5c47 bg=reset
+ 36  96..160 fg=#8f5c47 bg=reset
+ 37  96..160 fg=#8f5c47 bg=reset
+ 38  96..160 fg=#8f5c47 bg=reset
+ 39  96..160 fg=#8f5c47 bg=reset
+ 40  96..160 fg=#8f5c47 bg=reset
+ 41  96..160 fg=#8f5c47 bg=reset
+ 42  96..160 fg=#8f5c47 bg=reset
+ 43  96..160 fg=#8f5c47 bg=reset
+ 44  96..160 fg=#8f5c47 bg=reset
+ 45   0..160 fg=#403a35 bg=reset
+ 46   1..115 fg=#d97757 bg=reset bold
+ 46 115..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..10  fg=#a9a29a bg=reset
+ 47  10..23  fg=#716b64 bg=reset
+ 47  23..28  fg=#a9a29a bg=reset
+ 47  28..37  fg=#716b64 bg=reset
+ 47  37..42  fg=#a9a29a bg=reset
+ 47  42..53  fg=#716b64 bg=reset
+ 47  53..65  fg=#a9a29a bg=reset
+ 47  65..160 fg=#716b64 bg=reset

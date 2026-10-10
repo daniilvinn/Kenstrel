@@ -7,6 +7,7 @@ use std::panic;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crossterm::cursor::Show;
+use crossterm::event::{DisableBracketedPaste, EnableBracketedPaste};
 use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -19,6 +20,29 @@ pub type Tui = Terminal<CrosstermBackend<Stdout>>;
 /// True while the terminal is in TUI mode; makes [`restore`] idempotent so the panic hook
 /// and `Drop` can both call it.
 static ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// True while bracketed paste is enabled (only while the Claude pane has focus, so other
+/// text inputs keep receiving pasted text as ordinary key events).
+static BRACKETED_PASTE: AtomicBool = AtomicBool::new(false);
+
+/// Turns bracketed paste on or off. A no-op outside TUI mode (tests, `ks hook`).
+///
+/// Not enabled on Windows: crossterm's console reader never parses the paste markers, so they
+/// would arrive as raw key events (`Esc [ 2 0 0 ~`). There a paste is detected as a burst of
+/// keys instead (`input::coalesce_burst`).
+pub fn set_bracketed_paste(on: bool) {
+    if cfg!(windows)
+        || !ACTIVE.load(Ordering::SeqCst)
+        || BRACKETED_PASTE.swap(on, Ordering::SeqCst) == on
+    {
+        return;
+    }
+    let _ = if on {
+        execute!(io::stdout(), EnableBracketedPaste)
+    } else {
+        execute!(io::stdout(), DisableBracketedPaste)
+    };
+}
 
 /// Owns the terminal for the lifetime of the TUI. Dropping it restores the terminal, so
 /// every exit path (return, `?`, unwinding) leaves the shell usable.
@@ -57,6 +81,9 @@ impl Drop for TerminalSession {
 /// do about them.
 pub fn restore() {
     if ACTIVE.swap(false, Ordering::SeqCst) {
+        if BRACKETED_PASTE.swap(false, Ordering::SeqCst) {
+            let _ = execute!(io::stdout(), DisableBracketedPaste);
+        }
         let _ = execute!(io::stdout(), LeaveAlternateScreen, Show);
         let _ = disable_raw_mode();
     }

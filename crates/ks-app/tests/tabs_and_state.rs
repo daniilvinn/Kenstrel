@@ -303,6 +303,7 @@ async fn the_event_loop_saves_state_on_exit() {
             startup: vec![Msg::Start],
             panic_after_first_frame: false,
             foreground: None,
+            claude: ks_app::claude::ClaudeOptions::default(),
         },
         None,
         Some(state_dir.path().to_owned()),

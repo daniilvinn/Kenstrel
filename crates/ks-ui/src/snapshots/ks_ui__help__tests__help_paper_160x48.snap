@@ -48,7 +48,7 @@ expression: "draw(&opened(w, h), &theme(name))"
                          │   x                   Cut                                 Cut the marked entries to move them.             │
                          │   p                   Paste                               Paste copied or cut entries into this directory. │
                          │   Y                   Copy path to clipboard              Copy absolute path(s) to the clipboard.          │
-─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 91 ─╯─────────────────────────
+─────────────────────────╰─────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 104 ─╯─────────────────────────
  ›                                                                                                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -320,8 +320,8 @@ expression: "draw(&opened(w, h), &theme(name))"
  44  85..134 fg=#958e86 bg=reset
  44 134..160 fg=#c4623f bg=reset
  45   0..25  fg=#d4ccc2 bg=reset
- 45  25..123 fg=#c4623f bg=reset
- 45 123..133 fg=#958e86 bg=reset
+ 45  25..122 fg=#c4623f bg=reset
+ 45 122..133 fg=#958e86 bg=reset
  45 133..135 fg=#c4623f bg=reset
  45 135..160 fg=#d4ccc2 bg=reset
  46   1..141 fg=#c4623f bg=reset bold

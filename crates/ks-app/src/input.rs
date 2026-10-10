@@ -16,6 +16,10 @@ pub fn translate_key(event: KeyEvent) -> Option<KeyChord> {
     if !is_actionable(event.kind) {
         return None;
     }
+    // Some consoles deliver ctrl-\ as the raw FS control character.
+    if event.code == KeyCode::Char('\u{1c}') {
+        return Some(KeyChord::ctrl('\\'));
+    }
     let key = match event.code {
         KeyCode::Char(c) => Key::Char(c),
         KeyCode::Enter => Key::Enter,
@@ -59,7 +63,40 @@ pub fn translate_event(event: Event) -> Option<Msg> {
     match event {
         Event::Key(key) => translate_key(key).map(Msg::Key),
         Event::Resize(width, height) => Some(Msg::Resize(Size::new(width, height))),
+        Event::Paste(text) => Some(Msg::Paste(text)),
         _ => None,
+    }
+}
+
+/// A run of at least this many text keys that arrive together is a paste.
+pub const PASTE_BURST_MIN: usize = 4;
+
+/// True for keys a paste can consist of: plain characters, enter and tab.
+pub fn is_paste_key(chord: KeyChord) -> bool {
+    let plain = !chord.mods.contains(Modifiers::CTRL) && !chord.mods.contains(Modifiers::ALT);
+    plain && matches!(chord.key, Key::Char(_) | Key::Enter | Key::Tab)
+}
+
+/// The text of a burst of paste keys (enter becomes a newline).
+pub fn burst_text(keys: &[KeyChord]) -> String {
+    keys.iter()
+        .map(|k| match k.key {
+            Key::Char(c) => c,
+            Key::Tab => '\t',
+            _ => '\n',
+        })
+        .collect()
+}
+
+/// crossterm's Windows reader never produces `Event::Paste`: a paste arrives as one key event
+/// per character, with every newline as an Enter that would submit a prompt. Given the keys
+/// of a run that were all ready at once, returns the messages to apply: one `Msg::Paste` for
+/// a run of [`PASTE_BURST_MIN`] or more, else the keys unchanged.
+pub fn coalesce_burst(keys: Vec<KeyChord>) -> Vec<Msg> {
+    if keys.len() >= PASTE_BURST_MIN {
+        vec![Msg::Paste(burst_text(&keys))]
+    } else {
+        keys.into_iter().map(Msg::Key).collect()
     }
 }
 
@@ -76,6 +113,31 @@ mod tests {
             kind,
             state: KeyEventState::NONE,
         }
+    }
+
+    #[test]
+    fn a_burst_of_text_keys_becomes_one_paste() {
+        let keys: Vec<KeyChord> = "ab\ncd"
+            .chars()
+            .map(|c| {
+                if c == '\n' {
+                    KeyChord::plain(Key::Enter)
+                } else {
+                    KeyChord::char(c)
+                }
+            })
+            .collect();
+        assert_eq!(coalesce_burst(keys), vec![Msg::Paste("ab\ncd".into())]);
+        let short = vec![KeyChord::char('l'), KeyChord::plain(Key::Enter)];
+        assert_eq!(
+            coalesce_burst(short),
+            vec![
+                Msg::Key(KeyChord::char('l')),
+                Msg::Key(KeyChord::plain(Key::Enter))
+            ]
+        );
+        assert!(!is_paste_key(KeyChord::ctrl('c')));
+        assert!(!is_paste_key(KeyChord::plain(Key::Esc)));
     }
 
     #[test]
@@ -132,6 +194,22 @@ mod tests {
     }
 
     #[test]
+    fn ctrl_backslash_in_both_spellings() {
+        let plain = key(
+            KeyCode::Char('\\'),
+            KeyModifiers::CONTROL,
+            KeyEventKind::Press,
+        );
+        let raw = key(
+            KeyCode::Char('\u{1c}'),
+            KeyModifiers::NONE,
+            KeyEventKind::Press,
+        );
+        assert_eq!(translate_key(plain), Some(KeyChord::ctrl('\\')));
+        assert_eq!(translate_key(raw), Some(KeyChord::ctrl('\\')));
+    }
+
+    #[test]
     fn unsupported_keys_are_ignored() {
         let caps = key(KeyCode::CapsLock, KeyModifiers::NONE, KeyEventKind::Press);
         assert_eq!(translate_key(caps), None);
@@ -144,7 +222,10 @@ mod tests {
             Some(Msg::Resize(Size::new(100, 30)))
         );
         assert_eq!(translate_event(Event::FocusGained), None);
-        assert_eq!(translate_event(Event::Paste("x".into())), None);
+        assert_eq!(
+            translate_event(Event::Paste("x".into())),
+            Some(Msg::Paste("x".into()))
+        );
         let mouse = Event::Mouse(MouseEvent {
             kind: MouseEventKind::Moved,
             column: 0,

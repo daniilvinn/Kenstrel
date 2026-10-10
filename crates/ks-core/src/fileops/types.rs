@@ -316,6 +316,9 @@ pub enum ConfirmAction {
     Quit {
         kind: crate::state::QuitKind,
     },
+    /// Launch Claude although it would bill the API key (P10). Accepted with `y` only; enter
+    /// is ignored by `claude::handle_action`, which runs before this overlay's own handling.
+    ClaudeProceed,
 }
 
 /// The generic confirmation overlay: a title, some lines, and optionally a text the user must

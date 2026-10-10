@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use crate::aids::NavAids;
+use crate::claude::ClaudeState;
 use crate::config::Config;
 use crate::drives::DrivesView;
 use crate::fileops::FileOps;
@@ -136,6 +137,8 @@ pub struct AppState {
     pub fileops: FileOps,
     /// The preview pane and parent column.
     pub preview: PreviewState,
+    /// Claude Code integration (PLAN section 10).
+    pub claude: ClaudeState,
     pub(crate) history: History,
     /// Where the cursor was in directories left earlier (by entry name).
     pub(crate) cursor_memory: HashMap<PathBuf, OsString>,
@@ -156,6 +159,7 @@ impl AppState {
     pub fn new(params: StartParams) -> Self {
         let view = DirView::new(params.config.sort.clone(), params.config.files.show_hidden);
         let preview = PreviewState::new(&params.config);
+        let claude = ClaudeState::new(&params.config.claude);
         Self {
             cwd: params.cwd,
             home: params.home,
@@ -185,6 +189,7 @@ impl AppState {
             themes: Vec::new(),
             fileops: FileOps::default(),
             preview,
+            claude,
             history: History::default(),
             cursor_memory: HashMap::new(),
             nav: None,
@@ -201,7 +206,11 @@ impl AppState {
 
     /// Rows available to the list at the current terminal size.
     pub fn viewport_height(&self) -> usize {
-        usize::from(layout::body_height(self.size))
+        // A bottom Claude pane takes rows from the list.
+        usize::from(crate::claude::list_height(
+            self,
+            layout::body_height(self.size),
+        ))
     }
 
     /// The keymap context that receives the next key: the topmost overlay, else the mode.

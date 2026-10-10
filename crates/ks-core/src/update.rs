@@ -7,11 +7,12 @@ use std::time::Duration;
 
 use crate::action::Action;
 use crate::aids;
+use crate::claude;
 use crate::config::SortKey;
 use crate::effect::Effect;
 use crate::fileops;
 use crate::keymap::{Invocation, Resolution};
-use crate::mode::{Mode, Overlay};
+use crate::mode::{KeyContext, Mode, Overlay};
 use crate::msg::{Msg, TimerKind};
 use crate::nav;
 use crate::preview;
@@ -38,6 +39,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
                 state.palette.refit(palette::visible_rows(size));
                 state.help.clamp_scroll(help::visible_rows(size));
                 search::on_resize(state, &mut effects);
+                claude::sync_layout(state, &mut effects);
             }
             state.dirty = true;
         }
@@ -107,6 +109,26 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::ImageReady => state.dirty = true,
         Msg::FinderResults { gen, snapshot } => search::on_finder_results(state, gen, *snapshot),
         Msg::Grep(event) => search::grep::on_event(state, event),
+        Msg::Paste(text) => claude::on_paste(state, text, &mut effects),
+        Msg::ClaudePreflight { generation, result } => {
+            claude::on_preflight(state, generation, result, &mut effects);
+        }
+        Msg::ClaudeStarted { generation } => claude::on_started(state, generation, &mut effects),
+        Msg::ClaudeLaunchFailed {
+            generation,
+            message,
+        } => claude::on_launch_failed(state, generation, &message, &mut effects),
+        Msg::ClaudeScreen { generation, screen } => claude::on_screen(state, generation, *screen),
+        Msg::ClaudePaneExited { generation, code } => {
+            claude::on_exited(state, generation, code, &mut effects);
+        }
+        Msg::ClaudeIpc { id, request } => claude::on_ipc(state, id, request, &mut effects),
+        Msg::ClaudeReveal { path } => claude::on_reveal(state, &path, &mut effects),
+        Msg::ClaudeDiff { path, text } => claude::on_diff(state, &path, text),
+        Msg::ClaudeSendPaths(paths) => claude::send_paths(state, paths, &mut effects),
+        Msg::ClaudeSendRange { path, start, end } => {
+            claude::send_range(state, path, start, end, &mut effects);
+        }
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
@@ -150,6 +172,11 @@ fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Eff
         }
         // An unbound key with nothing pending changes nothing, so it costs no redraw.
         Resolution::NoMatch => {
+            // The Claude pane has focus: whatever the keymap does not claim goes to Claude.
+            if ctx == KeyContext::Claude && state.pending.is_empty() {
+                claude::forward_key(state, key, effects);
+                return;
+            }
             // Unbound keys are text for the palette's query field.
             if state.overlays.last() == Some(&Overlay::Palette) && palette::on_text_key(state, key)
             {
@@ -226,6 +253,9 @@ pub(crate) fn set_status(
 }
 
 pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Effect>) {
+    if claude::handle_action(state, invocation.action, effects) {
+        return;
+    }
     let handled = match state.overlays.last() {
         Some(Overlay::Palette) => palette::on_action(state, invocation, effects),
         Some(Overlay::Help) => help::on_action(state, invocation, effects),
@@ -488,19 +518,15 @@ mod tests {
     }
 
     #[test]
-    fn unimplemented_actions_report_instead_of_failing_silently() {
+    fn the_claude_key_starts_the_preflight_and_says_so() {
         let mut s = state();
         let effects = key(&mut s, "c");
         let status = s.status.as_ref().unwrap();
         assert_eq!(status.level, Level::Info);
-        assert_eq!(status.text, "Open Claude is not available yet");
-        assert!(matches!(
-            effects.as_slice(),
-            [Effect::StartTimer {
-                kind: TimerKind::StatusExpiry,
-                ..
-            }]
-        ));
+        assert_eq!(status.text, "Checking Claude login...");
+        assert!(effects
+            .iter()
+            .any(|e| matches!(e, Effect::ClaudePreflight { .. })));
     }
 
     #[test]

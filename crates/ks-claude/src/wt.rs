@@ -66,6 +66,9 @@ pub struct WtSplit {
     pub shell: Shell,
     /// Split direction.
     pub direction: SplitDirection,
+    /// Variables to set inside the pane before `claude` starts (e.g. `KESTREL_IPC`, which the
+    /// hook command needs; a WT pane does not inherit the caller's environment).
+    pub set_env: Vec<(String, String)>,
 }
 
 impl WtSplit {
@@ -77,6 +80,7 @@ impl WtSplit {
             env: EnvPolicy::default(),
             shell: Shell::detect(),
             direction: SplitDirection::Vertical,
+            set_env: Vec::new(),
         }
     }
 }
@@ -99,6 +103,16 @@ fn is_ps_bare_word(s: &str) -> bool {
 
 /// The PowerShell `-Command` text run in the pane (before WT escaping).
 pub fn powershell_command(env: &EnvPolicy, claude_args: &[String]) -> String {
+    powershell_command_with_env(env, &[], claude_args)
+}
+
+/// Like [`powershell_command`], additionally setting `set_env` (`$env:NAME='value'; `) after the
+/// stripping, so a variable that is also on the strip list ends up set.
+pub fn powershell_command_with_env(
+    env: &EnvPolicy,
+    set_env: &[(String, String)],
+    claude_args: &[String],
+) -> String {
     let mut out = String::new();
     let names = env.shell_safe_names();
     if !names.is_empty() {
@@ -107,6 +121,9 @@ pub fn powershell_command(env: &EnvPolicy, claude_args: &[String]) -> String {
             "Remove-Item {} -ErrorAction SilentlyContinue; ",
             list.join(",")
         ));
+    }
+    for (name, value) in set_env {
+        out.push_str(&format!("$env:{name}={}; ", ps_single_quote(value)));
     }
     out.push_str("claude");
     for a in claude_args {
@@ -147,7 +164,7 @@ pub fn build_wt_args(split: &WtSplit) -> Vec<String> {
         split.shell.exe().into(),
         "-NoProfile".into(),
         "-Command".into(),
-        powershell_command(&split.env, &split.claude_args),
+        powershell_command_with_env(&split.env, &split.set_env, &split.claude_args),
     ];
     raw.iter().map(|a| escape_wt_arg(a)).collect()
 }
@@ -255,6 +272,16 @@ mod tests {
         ];
         let cmd = powershell_command(&s.env, &s.claude_args);
         assert!(cmd.ends_with("claude --resume 11111111-2222-3333-4444-555555555555 --append-system-prompt 'it''s fine'"));
+    }
+
+    #[test]
+    fn set_env_comes_after_stripping_and_before_claude() {
+        let mut s = split("C:\\p");
+        s.set_env = vec![("KESTREL_IPC".into(), "kestrel-42".into())];
+        let cmd = build_wt_args(&s)[9].clone();
+        let strip = cmd.find("Remove-Item").unwrap();
+        let set = cmd.find("$env:KESTREL_IPC='kestrel-42'").unwrap();
+        assert!(strip < set && set < cmd.find("claude").unwrap());
     }
 
     #[test]

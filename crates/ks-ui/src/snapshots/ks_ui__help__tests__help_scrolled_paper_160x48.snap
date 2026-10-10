@@ -44,11 +44,11 @@ expression: "draw(&s, &theme(name))"
                          │ Claude Code                                                                                                │
                          │   c                   Open Claude                         Open Claude Code beside the explorer.            │
                          │   C                   Send marked files to Claude         Send the marked files to Claude as @ mentions.   │
-                         │                                                                                                            │
-                         │ Application                                                                                                │
-                         │   :                   Command palette                     Open the command palette.                        │
-                         │   ?                   Help                                Show all key bindings and commands.              │
-─────────────────────────╰─────────────────────────────────────────────────────────────────────────────────────────────── 41-81 / 91 ─╯─────────────────────────
+                         │   g r                 Resume last Claude session          Resume the last Claude session of this project.  │
+                         │   g w                 Open Claude in Windows Terminal s…  Open Claude in a Windows Terminal split pane.    │
+                         │   ctrl-\              Toggle focus between explorer and…  Move the keyboard between the explorer and the … │
+                         │   g X                 Close Claude pane                   Close the Claude pane and end its session proce… │
+─────────────────────────╰────────────────────────────────────────────────────────────────────────────────────────────── 41-81 / 104 ─╯─────────────────────────
  ›                                                                                                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -301,9 +301,15 @@ expression: "draw(&s, &theme(name))"
  40  49..85  fg=#6b645d bg=reset
  40  85..134 fg=#958e86 bg=reset
  40 134..160 fg=#c4623f bg=reset
- 41  25..160 fg=#c4623f bg=reset
- 42  25..27  fg=#c4623f bg=reset
- 42  27..134 fg=#c4623f bg=reset bold
+ 41  25..29  fg=#c4623f bg=reset
+ 41  29..49  fg=#2b2724 bg=reset bold
+ 41  49..85  fg=#6b645d bg=reset
+ 41  85..134 fg=#958e86 bg=reset
+ 41 134..160 fg=#c4623f bg=reset
+ 42  25..29  fg=#c4623f bg=reset
+ 42  29..49  fg=#2b2724 bg=reset bold
+ 42  49..85  fg=#6b645d bg=reset
+ 42  85..134 fg=#958e86 bg=reset
  42 134..160 fg=#c4623f bg=reset
  43  25..29  fg=#c4623f bg=reset
  43  29..49  fg=#2b2724 bg=reset bold
@@ -316,8 +322,8 @@ expression: "draw(&s, &theme(name))"
  44  85..134 fg=#958e86 bg=reset
  44 134..160 fg=#c4623f bg=reset
  45   0..25  fg=#d4ccc2 bg=reset
- 45  25..122 fg=#c4623f bg=reset
- 45 122..133 fg=#958e86 bg=reset
+ 45  25..121 fg=#c4623f bg=reset
+ 45 121..133 fg=#958e86 bg=reset
  45 133..135 fg=#c4623f bg=reset
  45 135..160 fg=#d4ccc2 bg=reset
  46   1..141 fg=#c4623f bg=reset bold

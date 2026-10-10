@@ -226,13 +226,15 @@ fn file_action(state: &mut AppState, action: Action, effects: &mut Vec<Effect>) 
 }
 
 /// Quits, or asks first when jobs are still running (quitting cancels them, which can leave a
-/// move or delete half done). A process-level interrupt (`Msg::Interrupt`) still quits at once.
+/// move or delete half done) or a Claude session is open (quitting kills its process). A
+/// process-level interrupt (`Msg::Interrupt`) still quits at once.
 pub(crate) fn request_quit(state: &mut AppState, kind: QuitKind) {
-    if state.jobs.is_empty() {
+    let claude = state.claude.is_running();
+    if state.jobs.is_empty() && !claude {
         state.quit = Some(kind);
         return;
     }
-    let lines: Vec<String> = state
+    let mut lines: Vec<String> = state
         .fileops
         .jobs
         .iter()
@@ -241,9 +243,21 @@ pub(crate) fn request_quit(state: &mut AppState, kind: QuitKind) {
         .map(|j| j.description.clone())
         .collect();
     let count = state.jobs.len();
+    let more = count.saturating_sub(lines.len());
+    let title = match (count > 0, claude) {
+        (true, false) => format!("Quit and cancel {}?", plural(count, "running job")),
+        (true, true) => format!(
+            "Quit, cancel {} and close Claude?",
+            plural(count, "running job")
+        ),
+        _ => "Quit and close Claude?".to_owned(),
+    };
+    if claude {
+        lines.push("The Claude session in the pane ends with Kestrel.".to_owned());
+    }
     state.fileops.confirm = Some(ConfirmDialog {
-        title: format!("Quit and cancel {}?", plural(count, "running job")),
-        more: count.saturating_sub(lines.len()),
+        title,
+        more,
         lines,
         danger: true,
         token: None,
@@ -687,6 +701,7 @@ fn confirm_action(state: &mut AppState, action: Action, effects: &mut Vec<Effect
 }
 
 fn close_confirm(state: &mut AppState) {
+    crate::claude::on_confirm_closed(state);
     state.fileops.confirm = None;
     remove_overlay(state, Overlay::Confirm);
 }
@@ -713,6 +728,7 @@ fn accept_confirm(state: &mut AppState, effects: &mut Vec<Effect>) {
             });
         }
         Some(ConfirmAction::Quit { kind }) => state.quit = Some(kind),
+        Some(ConfirmAction::ClaudeProceed) => crate::claude::confirm_proceed(state, effects),
         Some(ConfirmAction::BulkRename { steps }) => effects.push(Effect::SubmitJob {
             request: JobRequest::BulkRename { steps },
             keep_both: false,

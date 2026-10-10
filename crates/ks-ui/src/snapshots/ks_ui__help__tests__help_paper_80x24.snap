@@ -24,7 +24,7 @@ expression: "draw(&opened(w, h), &theme(name))"
   │   g c                 Go to config directory                             │
   │   g /                 Go to This PC (drives)                             │
   │                                                                          │
-──╰────────────────────────────────────────────────────────────── 1-17 / 91 ─╯──
+──╰───────────────────────────────────────────────────────────── 1-17 / 104 ─╯──
  ›                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -123,8 +123,8 @@ expression: "draw(&opened(w, h), &theme(name))"
  19  77..80  fg=#c4623f bg=reset
  20   2..80  fg=#c4623f bg=reset
  21   0..2   fg=#d4ccc2 bg=reset
- 21   2..66  fg=#c4623f bg=reset
- 21  66..76  fg=#958e86 bg=reset
+ 21   2..65  fg=#c4623f bg=reset
+ 21  65..76  fg=#958e86 bg=reset
  21  76..78  fg=#c4623f bg=reset
  21  78..80  fg=#d4ccc2 bg=reset
  22   1..61  fg=#c4623f bg=reset bold
