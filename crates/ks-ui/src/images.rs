@@ -40,9 +40,22 @@ struct Host {
     current: Option<u64>,
     /// Receiver of resize requests when no worker thread exists (synchronous mode).
     inline: Option<Receiver<ResizeRequest>>,
+    /// Hands a newly current image to the prepare thread (None in synchronous mode, where the
+    /// protocol is built while drawing).
+    prepare: Option<mpsc::Sender<Prepare>>,
+    /// `proto` holds the image `current` names (false while the prepare thread works).
+    ready: bool,
     /// Area the image was drawn into by the previous frame, and by the current one.
     drawn_prev: Option<Rect>,
     drawn_now: Option<Rect>,
+}
+
+/// A new image for the prepare thread: cloning a 2048 px bitmap and building the resize
+/// protocol is a few milliseconds that must not be spent on the UI thread.
+struct Prepare {
+    id: u64,
+    image: Arc<DynamicImage>,
+    picker: Picker,
 }
 
 static HOST: Mutex<Option<Host>> = Mutex::new(None);
@@ -91,15 +104,41 @@ pub fn describe(picker: &Picker) -> String {
 /// Installs the picker and starts the worker thread that resizes and encodes images.
 pub fn install(picker: Picker) {
     let (tx, rx) = mpsc::channel::<ResizeRequest>();
+    let (prepare_tx, prepare_rx) = mpsc::channel::<Prepare>();
     let host = Host {
         picker,
         proto: ThreadProtocol::new(tx, None),
         current: None,
         inline: None,
+        prepare: Some(prepare_tx),
+        ready: false,
         drawn_prev: None,
         drawn_now: None,
     };
     *lock(&HOST) = Some(host);
+    thread::Builder::new()
+        .name("ks-image-prepare".into())
+        .spawn(move || {
+            while let Ok(mut job) = prepare_rx.recv() {
+                while let Ok(newer) = prepare_rx.try_recv() {
+                    job = newer;
+                }
+                let protocol = job
+                    .picker
+                    .new_resize_protocol(DynamicImage::clone(&job.image));
+                let mut guard = lock(&HOST);
+                let Some(host) = guard.as_mut().filter(|h| h.current == Some(job.id)) else {
+                    continue;
+                };
+                host.proto.replace_protocol(protocol);
+                host.ready = true;
+                drop(guard);
+                if let Some(notify) = lock(&NOTIFIER).clone() {
+                    notify();
+                }
+            }
+        })
+        .ok();
     thread::Builder::new()
         .name("ks-image-encode".into())
         .spawn(move || {
@@ -165,9 +204,23 @@ pub(crate) fn render_image(frame: &mut Frame, area: Rect, id: u64, image: &Arc<D
     let mut guard = lock(&HOST);
     let host = guard.get_or_insert_with(sync_host);
     if host.current != Some(id) {
-        let protocol = host.picker.new_resize_protocol(DynamicImage::clone(image));
-        host.proto.replace_protocol(protocol);
         host.current = Some(id);
+        if let Some(prepare) = &host.prepare {
+            host.ready = false;
+            let job = Prepare {
+                id,
+                image: Arc::clone(image),
+                picker: host.picker.clone(),
+            };
+            let _ = prepare.send(job);
+        } else {
+            let protocol = host.picker.new_resize_protocol(DynamicImage::clone(image));
+            host.proto.replace_protocol(protocol);
+            host.ready = true;
+        }
+    }
+    if !host.ready {
+        return;
     }
     let resize = Resize::Fit(Some(FilterType::Triangle));
     let full = Size::new(area.width, area.height);
@@ -210,6 +263,8 @@ fn sync_host() -> Host {
         proto: ThreadProtocol::new(tx, None),
         current: None,
         inline: Some(rx),
+        prepare: None,
+        ready: false,
         drawn_prev: None,
         drawn_now: None,
     }
@@ -273,5 +328,67 @@ mod tests {
             .any(|cell| cell.symbol() == "▀" || cell.symbol() == "▄");
         assert!(drawn, "expected halfblock cells");
         assert!(!finish_frame(), "halfblocks never need a terminal clear");
+    }
+
+    fn has_halfblocks(terminal: &Terminal<TestBackend>) -> bool {
+        terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .any(|cell| cell.symbol() == "▀" || cell.symbol() == "▄")
+    }
+
+    #[test]
+    fn the_prepare_thread_builds_only_the_latest_image_and_notifies() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        reset_for_tests();
+        install(Picker::halfblocks());
+        let notified = Arc::new(AtomicUsize::new(0));
+        let counter = Arc::clone(&notified);
+        set_notifier(move || {
+            counter.fetch_add(1, Ordering::SeqCst);
+        });
+        let a = Arc::new(crate::testutil_preview::two_tone(64, 64));
+        let b = Arc::new(crate::testutil_preview::two_tone(32, 48));
+        let mut terminal = Terminal::new(TestBackend::new(30, 10)).unwrap();
+        let draw = |terminal: &mut Terminal<TestBackend>, id: u64, image: &Arc<_>| {
+            terminal
+                .draw(|f| {
+                    begin_frame();
+                    render_image(f, f.area(), id, image);
+                })
+                .unwrap();
+        };
+        // Not ready yet: the first frame draws nothing instead of blocking on the clone.
+        draw(&mut terminal, 1, &a);
+        assert!(
+            !has_halfblocks(&terminal),
+            "the protocol is built off-thread"
+        );
+        // A newer image supersedes the first before it was applied.
+        draw(&mut terminal, 2, &b);
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while !has_halfblocks(&terminal) {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "image never became ready"
+            );
+            thread::sleep(Duration::from_millis(10));
+            draw(&mut terminal, 2, &b);
+        }
+        {
+            let guard = lock(&HOST);
+            let host = guard.as_ref().unwrap();
+            assert_eq!(host.current, Some(2));
+            assert!(host.ready);
+        }
+        assert!(
+            notified.load(Ordering::SeqCst) >= 1,
+            "the redraw was requested"
+        );
+        *lock(&NOTIFIER) = None;
+        reset_for_tests();
     }
 }

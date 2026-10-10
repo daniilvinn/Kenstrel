@@ -29,5 +29,5 @@ mod text;
 pub use content::{build_preview, natural_cmp};
 pub use metadata::{human_size, Attributes, FileMetadata};
 pub use model::*;
-pub use options::{Limits, Palette, PreviewOptions};
+pub use options::{Limits, OwnerResolver, Palette, PreviewOptions};
 pub use service::{PreviewEvent, Previewer, CACHE_BYTE_BUDGET, CACHE_CAPACITY};

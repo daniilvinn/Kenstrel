@@ -215,6 +215,9 @@ impl AppState {
 
     /// The keymap context that receives the next key: the topmost overlay, else the mode.
     pub fn key_context(&self) -> KeyContext {
+        if self.overlays.is_empty() && self.preview.select.is_some() {
+            return KeyContext::PreviewLines;
+        }
         self.overlays
             .last()
             .map_or_else(|| self.mode.into(), |&overlay| overlay.into())

@@ -442,3 +442,71 @@ fn wrapping_breaks_at_spaces_and_cuts_long_words() {
     assert_eq!(wrap("abcdefghij kl", 5), ["abcd…", "kl"]);
     assert!(wrap("", 10).is_empty());
 }
+
+#[test]
+fn a_link_header_shows_its_target() {
+    snapshots("link_header", |s, _| {
+        move_to(s, "current");
+        let mut meta = metadata_of(s, "current", 0, 0);
+        meta.kind = ks_preview::EntryKind::Symlink { to_dir: true };
+        meta.link_target = Some(std::path::PathBuf::from(r"C:\builds\2026-10\release"));
+        show(s, dir_body(), Some(meta));
+    });
+}
+
+#[test]
+fn a_broken_link_header_is_marked_in_the_error_colour() {
+    let theme = theme("ember");
+    let mut s = preview_state(160, 48);
+    move_to(&mut s, "current");
+    let mut meta = metadata_of(&s, "current", 0, 0);
+    meta.link_target = Some(std::path::PathBuf::from(r"C:\gone"));
+    meta.link_broken = true;
+    show(&mut s, PreviewBody::Empty, Some(meta));
+    let out = draw(&s, &theme);
+    assert!(out.contains(r"→ C:\gone"), "{out}");
+}
+
+/// Shows the text preview, starts a selection and moves it.
+fn selecting(s: &mut AppState, theme: &Theme, down: usize) {
+    update(s, Msg::Tick);
+    show(s, text_body(theme), None);
+    key(s, "J");
+    key(s, "V");
+    for _ in 0..down {
+        key(s, "j");
+    }
+}
+
+#[test]
+fn line_selection_highlights_the_rows() {
+    snapshots("line_select", |s, theme| selecting(s, theme, 3));
+}
+
+#[test]
+fn line_selection_extends_upwards_from_the_anchor() {
+    snapshots("line_select_up", |s, theme| {
+        selecting(s, theme, 4);
+        key(s, "k");
+        key(s, "k");
+        key(s, "k");
+        key(s, "k");
+        key(s, "k");
+    });
+}
+
+#[test]
+fn line_selection_needs_a_text_preview_and_esc_leaves_it() {
+    let theme = theme("ember");
+    let mut s = preview_state(120, 32);
+    update(&mut s, Msg::Tick);
+    show(&mut s, hex_body(), None);
+    key(&mut s, "V");
+    assert!(s.preview.select.is_none());
+    show(&mut s, text_body(&theme), None);
+    key(&mut s, "V");
+    assert!(s.preview.select.is_some());
+    assert!(draw(&s, &theme).contains("send to Claude"));
+    key(&mut s, "esc");
+    assert!(s.preview.select.is_none());
+}

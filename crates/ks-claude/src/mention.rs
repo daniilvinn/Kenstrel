@@ -134,6 +134,14 @@ pub fn format_mention_with(
     }
 }
 
+/// One line-range mention with a trailing space, as typed into the prompt: several sends in a
+/// row stay separate mentions and the user can keep typing.
+pub fn format_range_mention(path: &Path, cwd: &Path, start: usize, end: usize) -> String {
+    let mut out = format_mention(path, cwd, Some((start, end)));
+    out.push(' ');
+    out
+}
+
 /// Space-separated mentions with a trailing space (so the user can keep typing).
 pub fn format_mentions<P: AsRef<Path>>(paths: &[P], cwd: &Path) -> String {
     format_mentions_with(paths, cwd, MentionOptions::default())
@@ -156,6 +164,14 @@ pub fn format_mentions_with<P: AsRef<Path>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn range_mentions_end_with_a_space() {
+        let cwd = Path::new(r"C:\work\proj");
+        let a = format_range_mention(Path::new(r"C:\work\proj\a.rs"), cwd, 3, 3);
+        let b = format_range_mention(Path::new(r"C:\work\proj\b c.rs"), cwd, 2, 5);
+        assert_eq!(format!("{a}{b}"), "@a.rs#L3 @\"b c.rs\"#L2-5 ");
+    }
 
     #[test]
     fn relative_and_absolute() {

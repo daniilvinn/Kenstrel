@@ -1,6 +1,5 @@
 ---
 source: crates/ks-ui/src/search/tests.rs
-assertion_line: 613
 expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
@@ -50,7 +49,7 @@ expression: "draw(&s, &theme(name))"
   │ ⠹ 4 matches in 3 files · searched 1,203 · skipped 2 cloud, 1 denied, 5 binary                                                                            │
 ──╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯──
  ›                                                                                                                                           12/13 · 1 selected
-   ‹enter› edit  ‹tab› field  ‹ctrl-r› regex  ‹ctrl-w› word  ‹ctrl-l› list  ‹esc› close
+   ‹enter› edit  ‹tab› field  ‹ctrl-r› regex  ‹ctrl-w› word  ‹ctrl-l› list  ‹alt-m› mark  ‹alt-c› claude  ‹esc› close
 --- styles (row cols fg bg mods) ---
   0   1..26  fg=#a9a29a bg=reset
   0  26..143 fg=#e8e3dc bg=reset bold
@@ -98,8 +97,7 @@ expression: "draw(&s, &theme(name))"
   7 157..158 fg=#8f5c47 bg=reset
   7 158..160 fg=#92c07f bg=reset
   8   2..3   fg=#8f5c47 bg=reset
-  8   3..4   fg=#e8e3dc bg=#2f2a26
-  8   4..5   fg=#d97757 bg=#2f2a26
+  8   3..5   fg=#d97757 bg=#2f2a26
   8   5..9   fg=#a9a29a bg=#2f2a26
   8   9..11  fg=#403a35 bg=#2f2a26
   8  11..23  fg=#e8e3dc bg=#2f2a26
@@ -326,5 +324,9 @@ expression: "draw(&s, &theme(name))"
  47  53..62  fg=#716b64 bg=reset
  47  62..68  fg=#a9a29a bg=reset
  47  68..77  fg=#716b64 bg=reset
- 47  77..80  fg=#a9a29a bg=reset
- 47  80..160 fg=#716b64 bg=reset
+ 47  77..82  fg=#a9a29a bg=reset
+ 47  82..91  fg=#716b64 bg=reset
+ 47  91..96  fg=#a9a29a bg=reset
+ 47  96..107 fg=#716b64 bg=reset
+ 47 107..110 fg=#a9a29a bg=reset
+ 47 110..160 fg=#716b64 bg=reset

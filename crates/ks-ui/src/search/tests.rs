@@ -370,6 +370,24 @@ fn grep_snapshots() {
     }
 }
 
+#[test]
+fn grep_marked_hits_snapshots() {
+    for name in THEMES {
+        for (w, h) in SIZES {
+            let mut s = grep_state(w, h, false);
+            // Mark the highlighted hit (the cursor moves down) and the next one.
+            key(&mut s, "alt-m");
+            key(&mut s, "alt-m");
+            let marks = s.search.grep.as_ref().unwrap().marks.len();
+            assert_eq!(marks, 2);
+            insta::assert_snapshot!(
+                format!("grep_marked_{name}_{w}x{h}"),
+                draw(&s, &theme(name))
+            );
+        }
+    }
+}
+
 fn glob_focused_state(w: u16, h: u16) -> AppState {
     let mut s = grep_state(w, h, false);
     key(&mut s, "ctrl-r");

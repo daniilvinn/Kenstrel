@@ -249,10 +249,8 @@ impl ClaudeHost {
             }
             Effect::ClaudeSendRange { path, start, end } => {
                 if let Some(cwd) = self.pane_cwd() {
-                    self.input(InputOp::Text(ks_claude::mention::format_mention(
-                        &path,
-                        &cwd,
-                        Some((start, end)),
+                    self.input(InputOp::Text(ks_claude::mention::format_range_mention(
+                        &path, &cwd, start, end,
                     )));
                 }
             }

@@ -27,9 +27,18 @@ pub(crate) fn decode(head: &[u8], truncated: bool) -> Decoded {
             None => Decoded::Binary,
         };
     }
-    // UTF-32 LE BOM (FF FE 00 00) is not supported; do not mis-decode it as UTF-16.
-    if head.starts_with(&[0xFF, 0xFE, 0x00, 0x00]) || head.starts_with(&[0x00, 0x00, 0xFE, 0xFF]) {
-        return Decoded::Binary;
+    // UTF-32 BOMs come first: FF FE 00 00 would otherwise pass for UTF-16 LE. A file that
+    // starts like that but is not valid UTF-32 (a UTF-16 text starting with U+0000) stays binary.
+    for (bom, big_endian, encoding) in [
+        ([0xFF, 0xFE, 0x00, 0x00], false, Encoding::Utf32Le),
+        ([0x00, 0x00, 0xFE, 0xFF], true, Encoding::Utf32Be),
+    ] {
+        if let Some(rest) = head.strip_prefix(&bom) {
+            return match decode_utf32(rest, big_endian) {
+                Some(text) => Decoded::Text { text, encoding },
+                None => Decoded::Binary,
+            };
+        }
     }
     if let Some(rest) = head.strip_prefix(&[0xFF, 0xFE]) {
         return Decoded::Text {
@@ -134,6 +143,24 @@ fn sniff_utf16_without_bom(head: &[u8], truncated: bool) -> Option<Decoded> {
             Encoding::Utf16Le
         },
     })
+}
+
+/// UTF-32 text, or `None` when a unit is not a Unicode scalar value. A trailing partial unit
+/// (a cut head) is ignored.
+fn decode_utf32(bytes: &[u8], big_endian: bool) -> Option<String> {
+    bytes
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|c| {
+            let unit = if big_endian {
+                u32::from_be_bytes(*c)
+            } else {
+                u32::from_le_bytes(*c)
+            };
+            char::from_u32(unit)
+        })
+        .collect()
 }
 
 fn decode_utf16(bytes: &[u8], big_endian: bool, truncated: bool) -> String {
@@ -311,9 +338,46 @@ mod tests {
     }
 
     #[test]
-    fn utf32_bom_is_not_utf16() {
+    fn utf32_with_bom_is_decoded_not_taken_for_utf16() {
+        let le: Vec<u8> = std::iter::once(0xFEFF_u32)
+            .chain(
+                "héllo
+wörld 😀"
+                    .chars()
+                    .map(u32::from),
+            )
+            .flat_map(u32::to_le_bytes)
+            .collect();
+        match decode(&le, false) {
+            Decoded::Text { text, encoding } => {
+                assert_eq!(
+                    text,
+                    "héllo
+wörld 😀"
+                );
+                assert_eq!(encoding, Encoding::Utf32Le);
+            }
+            Decoded::Binary => panic!("binary"),
+        }
+        let be: Vec<u8> = std::iter::once(0xFEFF_u32)
+            .chain("abc".chars().map(u32::from))
+            .flat_map(u32::to_be_bytes)
+            .collect();
         assert!(matches!(
-            decode(&[0xFF, 0xFE, 0, 0, b'a', 0, 0, 0], false),
+            decode(&be, false),
+            Decoded::Text {
+                encoding: Encoding::Utf32Be,
+                ..
+            }
+        ));
+        // A cut head ends in a partial unit; it is dropped.
+        assert!(matches!(
+            decode(&le[..le.len() - 2], true),
+            Decoded::Text { .. }
+        ));
+        // Not valid UTF-32 (units above U+10FFFF): still binary.
+        assert!(matches!(
+            decode(&[0xFF, 0xFE, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF], false),
             Decoded::Binary
         ));
     }

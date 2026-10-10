@@ -1,6 +1,5 @@
 ---
 source: crates/ks-ui/src/help.rs
-assertion_line: 256
 expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
@@ -21,10 +20,10 @@ expression: "draw(&s, &theme(name))"
   │   —                   Search contents: toggle whole word                 │
   │   —                   Search contents: switch query/glo…                 │
   │   —                   Search contents: open results as …                 │
+  │   —                   Search contents: mark the hit                      │
   │                                                                          │
   │ Selection                                                                │
-  │   space               Toggle mark                                        │
-──╰──────────────────────────────────────────────────────────── 17-33 / 104 ─╯──
+──╰──────────────────────────────────────────────────────────── 17-33 / 108 ─╯──
  ›                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -110,13 +109,13 @@ expression: "draw(&s, &theme(name))"
  17   6..26  fg=#716b64 bg=reset
  17  26..77  fg=#a9a29a bg=reset
  17  77..80  fg=#8f5c47 bg=reset
- 18   2..80  fg=#8f5c47 bg=reset
- 19   2..4   fg=#8f5c47 bg=reset
- 19   4..77  fg=#d97757 bg=reset bold
- 19  77..80  fg=#8f5c47 bg=reset
- 20   2..6   fg=#8f5c47 bg=reset
- 20   6..26  fg=#e8e3dc bg=reset bold
- 20  26..77  fg=#a9a29a bg=reset
+ 18   2..6   fg=#8f5c47 bg=reset
+ 18   6..26  fg=#716b64 bg=reset
+ 18  26..77  fg=#a9a29a bg=reset
+ 18  77..80  fg=#8f5c47 bg=reset
+ 19   2..80  fg=#8f5c47 bg=reset
+ 20   2..4   fg=#8f5c47 bg=reset
+ 20   4..77  fg=#d97757 bg=reset bold
  20  77..80  fg=#8f5c47 bg=reset
  21   0..2   fg=#403a35 bg=reset
  21   2..64  fg=#8f5c47 bg=reset

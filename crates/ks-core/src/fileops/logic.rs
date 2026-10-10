@@ -1164,6 +1164,7 @@ fn finish_job(state: &mut AppState, effects: &mut Vec<Effect>, done: &JobDone) {
         remove_overlay(state, Overlay::Conflict);
     }
     set_status(state, level, text, effects);
+    crate::preview::invalidate_paths(state, &done.created, &done.removed, effects);
     refresh_after(state, effects, done);
 }
 

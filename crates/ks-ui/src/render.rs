@@ -346,6 +346,12 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::ClaudeChangesClear, "clear"),
             (Action::Cancel, "close"),
         ],
+        (KeyContext::PreviewLines, _) => &[
+            (Action::CursorDown, "down"),
+            (Action::CursorUp, "up"),
+            (Action::PreviewLinesSend, "send to Claude"),
+            (Action::Cancel, "cancel"),
+        ],
         (KeyContext::Visual, _) => &[
             (Action::CursorDown, "down"),
             (Action::CursorUp, "up"),
@@ -394,6 +400,8 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::GrepRegex, "regex"),
             (Action::GrepWholeWord, "word"),
             (Action::GrepToList, "list"),
+            (Action::GrepMark, "mark"),
+            (Action::GrepSendClaude, "claude"),
             (Action::Cancel, "close"),
         ],
         _ => &[(Action::Cancel, "cancel")],

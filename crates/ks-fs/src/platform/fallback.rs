@@ -16,6 +16,11 @@ pub fn list_drives() -> Vec<DriveInfo> {
     vec![root]
 }
 
+/// Owners are only resolved on Windows.
+pub fn file_owner(_path: &Path) -> Option<String> {
+    None
+}
+
 /// Dates are shown in UTC on non-Windows hosts.
 pub fn utc_offset_secs() -> i32 {
     0

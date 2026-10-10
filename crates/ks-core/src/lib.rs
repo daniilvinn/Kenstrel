@@ -28,6 +28,7 @@ pub mod msg;
 mod nav;
 pub mod palette;
 pub mod preview;
+pub mod preview_lines;
 pub mod search;
 pub mod state;
 pub mod tabs;

@@ -63,6 +63,8 @@ pub enum KeyContext {
     Pager,
     Menu,
     ClaudeChanges,
+    /// Line selection in the text preview (`V`).
+    PreviewLines,
 }
 
 impl KeyContext {
@@ -84,6 +86,7 @@ impl KeyContext {
         KeyContext::Pager,
         KeyContext::Menu,
         KeyContext::ClaudeChanges,
+        KeyContext::PreviewLines,
     ];
 
     /// Name used for the `[keymap.<name>]` table in `config.toml`.
@@ -106,6 +109,7 @@ impl KeyContext {
             KeyContext::Pager => "pager",
             KeyContext::Menu => "menu",
             KeyContext::ClaudeChanges => "claude_changes",
+            KeyContext::PreviewLines => "preview_lines",
         }
     }
 

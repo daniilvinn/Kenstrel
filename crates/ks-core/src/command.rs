@@ -178,6 +178,16 @@ const COMMANDS: &[(Action, Category, &str)] = &[
         C::Search,
         "Search contents: show the files with matches as a results list in a new tab.",
     ),
+    (
+        Action::GrepMark,
+        C::Search,
+        "Search contents: mark the highlighted hit so alt-c sends all marked hits to Claude.",
+    ),
+    (
+        Action::GrepSendClaude,
+        C::Claude,
+        "Search contents: send the highlighted hit to the Claude pane as an @path#Lnn mention.",
+    ),
     (Action::PaletteOpen, C::App, "Open the command palette."),
     (
         Action::HelpOpen,
@@ -295,6 +305,16 @@ const COMMANDS: &[(Action, Category, &str)] = &[
         Action::MetadataToggle,
         C::View,
         "Switch the preview between content and metadata.",
+    ),
+    (
+        Action::PreviewSelectLines,
+        C::Claude,
+        "Select lines of the text preview (j/k extend, esc cancels) to send as @path#La-b to Claude.",
+    ),
+    (
+        Action::PreviewLinesSend,
+        C::Claude,
+        "Send the selected preview lines to the Claude pane as an @path#La-b mention.",
     ),
     (
         Action::PreviewScrollDown,

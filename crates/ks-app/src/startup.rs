@@ -7,6 +7,18 @@ use std::path::{Component, Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use ks_core::QuitKind;
 
+static PROCESS_START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+/// Records "now" as the start of the process (first call wins). `run` calls it first thing.
+pub fn mark_process_start() {
+    let _ = PROCESS_START.set(std::time::Instant::now());
+}
+
+/// Time since [`mark_process_start`], if it was called.
+pub fn since_process_start() -> Option<std::time::Duration> {
+    PROCESS_START.get().map(std::time::Instant::elapsed)
+}
+
 /// Picks the directory to open: the CLI argument (a file means its parent), or `cwd`.
 pub fn resolve_start_dir(arg: Option<&Path>, cwd: &Path) -> Result<PathBuf> {
     let Some(arg) = arg else {

@@ -151,6 +151,8 @@ pub enum Encoding {
     Utf8Bom,
     Utf16Le,
     Utf16Be,
+    Utf32Le,
+    Utf32Be,
     /// Not valid UTF-8; decoded lossily (invalid bytes shown as U+FFFD).
     Lossy,
 }
@@ -162,6 +164,8 @@ impl Encoding {
             Encoding::Utf8Bom => "UTF-8 BOM",
             Encoding::Utf16Le => "UTF-16 LE",
             Encoding::Utf16Be => "UTF-16 BE",
+            Encoding::Utf32Le => "UTF-32 LE",
+            Encoding::Utf32Be => "UTF-32 BE",
             Encoding::Lossy => "lossy",
         }
     }

@@ -156,6 +156,10 @@ pub(crate) fn run_action(
             grep::next_field(s);
         }),
         Action::GrepToList => in_grep(state, effects, "Sending results to a list", grep::to_list),
+        Action::GrepMark => in_grep(state, effects, "Marking a hit", grep::toggle_mark),
+        Action::GrepSendClaude => {
+            in_grep(state, effects, "Sending a hit to Claude", grep::send_claude)
+        }
         Action::Accept => match ctx {
             KeyContext::Filter => accept_filter(state),
             KeyContext::Finder => finder::accept(state, effects),

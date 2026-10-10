@@ -126,6 +126,8 @@ pub enum Effect {
     RequestParent { gen: Gen, request: PreviewRequest },
     /// The parent column is gone: cancel its request.
     CancelParent,
+    /// Files were created, replaced or removed by a finished job: drop their cached previews.
+    InvalidatePreview { paths: Vec<PathBuf> },
     /// Start a find-file session (replaces the running one). The runner resolves `scope`
     /// against `cwd`, walks (or serves the walk cache), applies `query` and reports
     /// `Msg::FinderResults` for the window `offset..offset + limit`.

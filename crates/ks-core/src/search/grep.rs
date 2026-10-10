@@ -64,10 +64,19 @@ pub struct GrepState {
     pub selected: usize,
     /// Index into `rows` of the first visible display line.
     pub scroll: usize,
+    /// Marked hits (path, line number) in marking order; `alt-c` sends them all.
+    pub marks: Vec<(std::path::PathBuf, u64)>,
     pub(crate) gen: u64,
 }
 
 impl GrepState {
+    /// Whether the hit on `line_number` of `path` is marked.
+    pub fn is_marked(&self, path: &std::path::Path, line_number: u64) -> bool {
+        self.marks
+            .iter()
+            .any(|(p, l)| p == path && *l == line_number)
+    }
+
     /// The highlighted match: its file and line.
     pub fn current(&self) -> Option<(&FileMatches, &ks_search::LineMatch)> {
         let row = self.rows.get(self.selected)?;
@@ -129,6 +138,7 @@ impl GrepState {
 
     fn clear_results(&mut self) {
         self.files.clear();
+        self.marks.clear();
         self.rows.clear();
         self.stats = GrepStats::default();
         self.capped = false;
@@ -181,6 +191,7 @@ pub(crate) fn open(state: &mut AppState, effects: &mut Vec<Effect>) {
         error: None,
         selected: 0,
         scroll: 0,
+        marks: Vec::new(),
         gen: 0,
     };
     let has_query = !grep.query.is_empty();
@@ -413,6 +424,53 @@ pub(crate) fn accept(state: &mut AppState, effects: &mut Vec<Effect>) {
             path: file.path.clone(),
             line: u32::try_from(line.line_number).ok(),
         });
+    }
+}
+
+/// `alt-m`: toggles the mark of the highlighted hit and moves down.
+pub(crate) fn toggle_mark(state: &mut AppState, _effects: &mut Vec<Effect>) {
+    if let Some(g) = state.search.grep.as_mut() {
+        if let Some((path, line)) = g.current().map(|(f, l)| (f.path.clone(), l.line_number)) {
+            if let Some(at) = g.marks.iter().position(|(p, l)| *p == path && *l == line) {
+                g.marks.remove(at);
+            } else {
+                g.marks.push((path, line));
+            }
+        }
+    }
+    move_selection(state, 1);
+}
+
+/// `alt-c`: send the marked hits (or, with none, the highlighted hit) to the Claude pane as
+/// `@path#L<n>` mentions. Marks whose hit is no longer in the results are skipped.
+pub(crate) fn send_claude(state: &mut AppState, effects: &mut Vec<Effect>) {
+    let Some(g) = state.search.grep.as_ref() else {
+        return;
+    };
+    let mut hits: Vec<(std::path::PathBuf, u64)> = g
+        .marks
+        .iter()
+        .filter(|(p, l)| {
+            g.files
+                .iter()
+                .any(|f| f.path == *p && f.lines.iter().any(|m| m.line_number == *l))
+        })
+        .cloned()
+        .collect();
+    if hits.is_empty() {
+        hits.extend(g.current().map(|(f, l)| (f.path.clone(), l.line_number)));
+    }
+    if hits.is_empty() {
+        return;
+    }
+    if !state.claude.is_running() {
+        crate::claude::not_running(state, effects);
+        return;
+    }
+    close(state, effects);
+    for (path, line) in hits {
+        let line = usize::try_from(line).unwrap_or(usize::MAX);
+        crate::claude::send_range(state, path, line, line, effects);
     }
 }
 

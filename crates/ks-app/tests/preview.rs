@@ -359,3 +359,83 @@ async fn a_changed_file_is_previewed_again() {
     })
     .await;
 }
+
+#[cfg(windows)]
+#[tokio::test(flavor = "multi_thread")]
+async fn the_metadata_view_names_the_owner() {
+    let dir = project();
+    let mut h = Harness::new(dir.path());
+    h.start().await;
+    h.keys("j i");
+    h.until("the metadata view", |s| {
+        s.preview
+            .current
+            .as_deref()
+            .is_some_and(|p| matches!(p.body, PreviewBody::Metadata))
+    })
+    .await;
+    let owner = h
+        .shown()
+        .unwrap()
+        .meta
+        .as_ref()
+        .and_then(|m| m.owner.clone())
+        .expect("an owner on Windows");
+    assert!(!owner.is_empty());
+    eprintln!("owner: {owner}");
+}
+
+/// Job completion -> `Effect::InvalidatePreview` -> `Previewer::invalidate` -> a fresh request.
+/// The file is overwritten with the same size and the same mtime, so only the invalidation (not
+/// the cache key) can tell the previewer that the content changed.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_finished_job_makes_the_pane_show_fresh_content() {
+    use ks_core::fileops::{JobDone, JobMsg, JobStatus, OpKind};
+    use ks_core::JobId;
+
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("note.txt");
+    fs::write(&file, "AAAA").unwrap();
+    let mtime = fs::metadata(&file).unwrap().modified().unwrap();
+    let mut h = Harness::new(dir.path());
+    h.start().await;
+    h.until_shown().await;
+    let first = |h: &Harness| match &h.shown().unwrap().body {
+        PreviewBody::Text(t) => t.lines.first().map(|l| l.text()).unwrap_or_default(),
+        other => panic!("unexpected {other:?}"),
+    };
+    assert_eq!(first(&h), "AAAA");
+
+    fs::write(&file, "BBBB").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_modified(mtime)
+        .unwrap();
+    // Without a job nothing re-requests: the key (path, size, mtime) is unchanged.
+    h.settle(Duration::from_millis(300)).await;
+    assert_eq!(first(&h), "AAAA");
+
+    h.send(Msg::Job(JobMsg::Finished(JobDone {
+        id: JobId(1),
+        kind: OpKind::Copy,
+        status: JobStatus::Done,
+        items_done: 1,
+        items_skipped: 0,
+        bytes_done: 4,
+        errors: Vec::new(),
+        created: vec![file.clone()],
+        removed: Vec::new(),
+        is_undo: false,
+        elapsed_ms: 1,
+    })));
+    h.until("the fresh preview", |s| {
+        s.preview.current.as_deref().is_some_and(|p| match &p.body {
+            PreviewBody::Text(t) => t.lines.first().is_some_and(|l| l.text() == "BBBB"),
+            _ => false,
+        })
+    })
+    .await;
+    assert_eq!(h.arrivals.last(), Some(&false), "not served from the cache");
+}

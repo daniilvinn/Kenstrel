@@ -802,3 +802,36 @@ fn directory_scan_cap_is_flagged() {
     };
     assert!(!d.scan_capped);
 }
+
+#[test]
+fn the_injected_resolver_fills_the_owner_of_metadata_requests_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("o.txt");
+    fs::write(&p, "x").unwrap();
+    let mut opts = PreviewOptions::metadata();
+    opts.owner = Some(OwnerResolver(|_| Some("DOM-user".to_owned())));
+    let pv = build(&p, &opts);
+    assert_eq!(pv.meta.unwrap().owner.as_deref(), Some("DOM-user"));
+    opts.kind = RequestKind::Auto;
+    assert_eq!(build(&p, &opts).meta.unwrap().owner, None);
+    assert_eq!(
+        build(&p, &PreviewOptions::metadata()).meta.unwrap().owner,
+        None
+    );
+}
+
+#[test]
+fn a_stuck_owner_lookup_does_not_hold_the_worker() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("o.txt");
+    fs::write(&p, "x").unwrap();
+    let mut opts = PreviewOptions::metadata();
+    opts.owner = Some(OwnerResolver(|_| {
+        std::thread::sleep(std::time::Duration::from_secs(8));
+        Some("late".to_owned())
+    }));
+    let started = std::time::Instant::now();
+    let pv = build(&p, &opts);
+    assert!(started.elapsed() < std::time::Duration::from_secs(5));
+    assert_eq!(pv.meta.unwrap().owner, None);
+}
