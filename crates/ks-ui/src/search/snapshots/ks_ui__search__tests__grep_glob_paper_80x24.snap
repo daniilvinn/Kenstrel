@@ -68,8 +68,7 @@ expression: text
   7  77..78  fg=#c4623f bg=reset
   7  78..80  fg=#3d7a3a bg=reset
   8   2..3   fg=#c4623f bg=reset
-  8   3..4   fg=#2b2724 bg=#ece5dc
-  8   4..5   fg=#c4623f bg=#ece5dc
+  8   3..5   fg=#c4623f bg=#ece5dc
   8   5..9   fg=#6b645d bg=#ece5dc
   8   9..11  fg=#d4ccc2 bg=#ece5dc
   8  11..23  fg=#2b2724 bg=#ece5dc

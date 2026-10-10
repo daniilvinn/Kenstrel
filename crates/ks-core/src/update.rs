@@ -253,6 +253,9 @@ pub(crate) fn set_status(
 }
 
 pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Effect>) {
+    if crate::preview_lines::handle_action(state, invocation.action, effects) {
+        return;
+    }
     if claude::handle_action(state, invocation.action, effects) {
         return;
     }

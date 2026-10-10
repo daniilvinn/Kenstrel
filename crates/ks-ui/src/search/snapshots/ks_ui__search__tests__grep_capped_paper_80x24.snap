@@ -82,8 +82,7 @@ expression: "draw(&s, &theme(name))"
   9  77..78  fg=#c4623f bg=reset
   9  78..80  fg=#8a6a3f bg=reset
  10   2..3   fg=#c4623f bg=reset
- 10   3..4   fg=#2b2724 bg=#ece5dc
- 10   4..5   fg=#c4623f bg=#ece5dc
+ 10   3..5   fg=#c4623f bg=#ece5dc
  10   5..9   fg=#6b645d bg=#ece5dc
  10   9..11  fg=#d4ccc2 bg=#ece5dc
  10  11..23  fg=#2b2724 bg=#ece5dc

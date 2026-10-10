@@ -78,6 +78,8 @@ actions! {
     GrepWholeWord => "grep.word", "Search contents: toggle whole word";
     GrepNextField => "grep.field", "Search contents: switch query/glob field";
     GrepToList => "grep.to_list", "Search contents: open results as a list";
+    GrepMark => "grep.mark", "Search contents: mark the hit";
+    GrepSendClaude => "grep.send_claude", "Search contents: send the hit to Claude";
     // Selection
     MarkToggle => "mark.toggle", "Toggle mark";
     VisualToggle => "mode.visual", "Visual (range select) mode";
@@ -108,6 +110,8 @@ actions! {
     MetadataToggle => "preview.metadata", "Toggle metadata view";
     PreviewScrollDown => "preview.scroll_down", "Scroll preview down";
     PreviewScrollUp => "preview.scroll_up", "Scroll preview up";
+    PreviewSelectLines => "preview.select_lines", "Select preview lines (visual lines)";
+    PreviewLinesSend => "preview.lines_send", "Send the selected preview lines to Claude";
     // Navigation aids
     BookmarkSet => "bookmark.set", "Set bookmark";
     BookmarkJump => "bookmark.jump", "Jump to bookmark";

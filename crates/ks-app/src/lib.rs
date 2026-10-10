@@ -36,6 +36,7 @@ use crate::terminal::TerminalSession;
 
 /// Runs the TUI to completion.
 pub fn run(cli: &Cli) -> Result<()> {
+    startup::mark_process_start();
     if cli.dump_keymap {
         // Documentation generator: needs no terminal and has no side effects.
         let text = ks_core::docs::keymap_markdown(&ks_core::Keymap::defaults());
@@ -81,12 +82,15 @@ pub fn run(cli: &Cli) -> Result<()> {
     let outcome = {
         // Dropping the session restores the terminal on every path out of this block.
         let mut tui = TerminalSession::enter().context("cannot initialise the terminal")?;
-        // With previews off there is nothing to draw images with: skip the query (up to
-        // 250 ms at start-up). Pressing `w` later falls back to halfblocks.
-        if state.config.preview.enabled {
-            init_images(state.config.preview.image_protocol);
-        }
-        let (events, host) = foreground::PausableEvents::new();
+        // The graphics query (up to 250 ms when the terminal stays silent) runs after the first
+        // frame, see `foreground::PausableEvents::deferred`. With previews off there is nothing
+        // to draw images with: no query at all, and `w` later falls back to halfblocks.
+        let images = state
+            .config
+            .preview
+            .enabled
+            .then_some(state.config.preview.image_protocol);
+        let (events, host) = foreground::PausableEvents::deferred(images);
         runtime.block_on(event_loop::run_with_state(
             tui.terminal(),
             events,
@@ -117,11 +121,11 @@ pub fn run(cli: &Cli) -> Result<()> {
 
 /// Asks the terminal which graphics protocol it speaks and installs the image renderer.
 ///
-/// Runs right after the alternate screen is entered and before the first input is read (the
-/// query's answer arrives on stdin). It waits at most `ks_ui::images::QUERY_TIMEOUT`; a
+/// Runs right after the first frame is drawn and before the first input is read (the
+/// query's answer arrives on stdin; the event stream only starts afterwards). It waits at most `ks_ui::images::QUERY_TIMEOUT`; a
 /// terminal that does not answer gets halfblocks, and `[preview] image_protocol` can force a
 /// protocol (or skip the query with `"halfblocks"`).
-fn init_images(preference: ks_core::config::ImageProtocol) {
+pub(crate) fn init_images(preference: ks_core::config::ImageProtocol) {
     let started = std::time::Instant::now();
     let picker = ks_ui::images::detect_picker(preference);
     tracing::info!(

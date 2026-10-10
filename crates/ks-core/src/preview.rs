@@ -11,7 +11,7 @@
 //! Terminal image protocol state is *not* here: [`PreviewState::image_id`] is only an opaque
 //! handle that changes whenever a different image becomes current.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -156,6 +156,8 @@ struct TargetKey {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ParentKey {
+    /// Bumped by job-completion invalidation, like the main key's `epoch`.
+    epoch: u32,
     path: PathBuf,
     show_hidden: bool,
 }
@@ -186,6 +188,8 @@ pub struct PreviewState {
     /// Bumped when the theme changes: syntax colours are baked into text results, so the
     /// current file is requested again with the new palette.
     pub(crate) theme_epoch: u32,
+    /// Visual-lines selection in the text preview (`V`), see [`crate::preview_lines`].
+    pub select: Option<crate::preview_lines::LineSelect>,
     key: Option<TargetKey>,
     pub(crate) gen: GenCounter,
     parent_key: Option<ParentKey>,
@@ -205,6 +209,7 @@ impl PreviewState {
             image_id: 0,
             parent: None,
             theme_epoch: 0,
+            select: None,
             key: None,
             gen: GenCounter::default(),
             parent_key: None,
@@ -372,6 +377,7 @@ fn request_for(state: &AppState, key: &TargetKey) -> PreviewRequest {
 pub(crate) fn sync(state: &mut AppState, effects: &mut Vec<Effect>) {
     sync_main(state, effects);
     sync_parent(state, effects);
+    crate::preview_lines::validate(state);
     follow_overlay_line(state);
     // A resize changes the visible rows and the hex row width: keep the scroll in range.
     clamp_scroll(state);
@@ -510,6 +516,7 @@ fn sync_main(state: &mut AppState, effects: &mut Vec<Effect>) {
 fn sync_parent(state: &mut AppState, effects: &mut Vec<Effect>) {
     let wanted = if state.pane_widths().has_parent() {
         state.cwd.parent().map(|parent| ParentKey {
+            epoch: state.preview.theme_epoch,
             path: parent.to_owned(),
             show_hidden: state.view.show_hidden,
         })
@@ -553,6 +560,54 @@ fn sync_parent(state: &mut AppState, effects: &mut Vec<Effect>) {
             }
         }
     }
+}
+
+/// A file job finished: previews of the paths it created or removed (and of the directories
+/// holding them) are stale even when size and mtime happen to match. The engine cache is
+/// dropped for them, and the pane asks again when it is showing one of them.
+pub(crate) fn invalidate_paths(
+    state: &mut AppState,
+    created: &[PathBuf],
+    removed: &[PathBuf],
+    effects: &mut Vec<Effect>,
+) {
+    let changed: Vec<&PathBuf> = created.iter().chain(removed).collect();
+    if changed.is_empty() {
+        return;
+    }
+    // The paths themselves and the directories holding them: a directory preview is cached per
+    // directory and its mtime may not move (coarse timestamps, same-size overwrite).
+    let mut paths: Vec<PathBuf> = Vec::new();
+    for p in &changed {
+        for q in std::iter::once(&***p).chain(p.parent()) {
+            if !paths.iter().any(|known| same_path(known, q)) {
+                paths.push(q.to_owned());
+            }
+        }
+    }
+    let related = |shown: &Path| {
+        changed.iter().any(|p| {
+            p.ancestors().any(|a| same_path(a, shown)) || shown.ancestors().any(|a| same_path(a, p))
+        })
+    };
+    let main_affected = state.preview.target.as_deref().is_some_and(related);
+    let parent_affected = state.preview.parent_key.as_ref().is_some_and(|k| {
+        changed
+            .iter()
+            .any(|p| p.parent().is_some_and(|dir| same_path(dir, &k.path)))
+            || related(&k.path)
+    });
+    effects.push(Effect::InvalidatePreview { paths });
+    if main_affected || parent_affected {
+        // A new key makes `sync` request the same file again, past the dropped cache.
+        state.preview.theme_epoch = state.preview.theme_epoch.wrapping_add(1);
+        state.dirty = true;
+    }
+}
+
+/// Path equality as Windows sees it: ASCII case-insensitive.
+fn same_path(a: &Path, b: &Path) -> bool {
+    a == b || a.as_os_str().eq_ignore_ascii_case(b.as_os_str())
 }
 
 /// A main-pane result arrived.
@@ -1067,5 +1122,58 @@ parent_column = true",
         let w = s.pane_widths();
         assert!(w.has_parent());
         assert!(w.list < w.preview, "30% list: {w:?}");
+    }
+
+    #[test]
+    fn a_finished_job_on_the_shown_file_drops_its_cached_preview_and_asks_again() {
+        let mut s = state(120, 30);
+        let first = update(&mut s, Msg::Tick);
+        assert_eq!(requests(&first).len(), 1);
+        let shown = s.cwd.join("a.rs");
+        let mut effects = Vec::new();
+        invalidate_paths(&mut s, std::slice::from_ref(&shown), &[], &mut effects);
+        assert_eq!(
+            effects,
+            vec![Effect::InvalidatePreview {
+                paths: vec![shown.clone(), s.cwd.clone()]
+            }]
+        );
+        let again = update(&mut s, Msg::Tick);
+        assert_eq!(requests(&again).len(), 1, "{again:?}");
+
+        // An unrelated path only drops the cache.
+        let mut effects = Vec::new();
+        let other = s.cwd.join("zzz.rs");
+        invalidate_paths(&mut s, &[other], &[], &mut effects);
+        assert_eq!(effects.len(), 1);
+        assert!(requests(&update(&mut s, Msg::Tick)).is_empty());
+    }
+
+    #[test]
+    fn invalidation_matches_deep_and_differently_cased_paths() {
+        let mut s = state(120, 30);
+        update(&mut s, Msg::Tick);
+        let shown = s.preview.target.clone().expect("a target");
+        // A removed ancestor of the shown path, in another case.
+        let upper = PathBuf::from(shown.parent().unwrap().to_string_lossy().to_uppercase());
+        let epoch = s.preview.theme_epoch;
+        invalidate_paths(&mut s, &[], &[upper], &mut Vec::new());
+        assert_ne!(s.preview.theme_epoch, epoch);
+
+        // A change in the parent column's directory refreshes that column.
+        let mut s = state(160, 40);
+        first_sync(&mut s);
+        key(&mut s, "P");
+        let before = s.preview.parent_key.clone();
+        assert!(before.is_some(), "the parent column is shown");
+        let sibling = s.cwd.parent().unwrap().join("new-dir");
+        invalidate_paths(&mut s, &[sibling], &[], &mut Vec::new());
+        let again = update(&mut s, Msg::Tick);
+        assert!(
+            again
+                .iter()
+                .any(|e| matches!(e, Effect::RequestParent { .. })),
+            "{again:?}"
+        );
     }
 }

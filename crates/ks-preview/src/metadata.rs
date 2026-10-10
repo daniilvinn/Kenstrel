@@ -114,8 +114,8 @@ pub struct FileMetadata {
     pub link_target: Option<PathBuf>,
     /// The link target does not exist.
     pub link_broken: bool,
-    /// Owner name. Always `None`: resolving a SID to a name needs `unsafe` Win32 calls
-    /// (`GetNamedSecurityInfoW`), which this workspace forbids. See the engine notes.
+    /// Owner name (`DOMAIN` + user), filled for metadata requests by the resolver the app injects
+    /// ([`crate::OwnerResolver`]; Win32 calls live in `ks-fs`). `None` when unknown.
     pub owner: Option<String>,
 }
 

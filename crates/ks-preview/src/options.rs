@@ -109,6 +109,29 @@ impl Default for Limits {
     }
 }
 
+/// Resolves the owner of a path for the metadata view (domain and user name). The preview crate
+/// cannot call Win32 itself (no `unsafe`), so the app injects one. Never part of cache keys.
+#[derive(Clone, Copy)]
+pub struct OwnerResolver(pub fn(&std::path::Path) -> Option<String>);
+
+impl std::fmt::Debug for OwnerResolver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("OwnerResolver")
+    }
+}
+
+impl PartialEq for OwnerResolver {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl Eq for OwnerResolver {}
+
+impl Hash for OwnerResolver {
+    fn hash<H: Hasher>(&self, _: &mut H) {}
+}
+
 /// Options for one request.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PreviewOptions {
@@ -120,6 +143,8 @@ pub struct PreviewOptions {
     pub show_hidden: bool,
     /// Syntax highlighting on/off (off gives plain text).
     pub highlight: bool,
+    /// Fills `FileMetadata::owner` for metadata requests.
+    pub owner: Option<OwnerResolver>,
 }
 
 impl Default for PreviewOptions {
@@ -131,6 +156,7 @@ impl Default for PreviewOptions {
             tab_width: 4,
             show_hidden: false,
             highlight: true,
+            owner: None,
         }
     }
 }

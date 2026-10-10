@@ -661,8 +661,12 @@ fn render_grep_rows(frame: &mut Frame, list: Rect, g: &GrepState, theme: &Theme)
                     fill_row(frame, area, theme);
                 }
                 let bg = row_style(selected, theme);
+                let marked = g.is_marked(&file.path, hit.line_number);
                 let mut spans = vec![
-                    Span::raw(" "),
+                    Span::styled(
+                        if marked { MARK_GLYPH } else { " " },
+                        theme.accent_style().patch(bg),
+                    ),
                     Span::styled(
                         if selected { CURSOR_GLYPH } else { " " },
                         theme.accent_style().patch(bg),

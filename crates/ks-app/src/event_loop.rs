@@ -229,6 +229,7 @@ where
     clock.set_missed_tick_behavior(MissedTickBehavior::Skip);
     let mut last_draw: Option<Instant> = None;
     let mut panic_armed = options.panic_after_first_frame;
+    let mut first_frame_done = false;
 
     if let Some(reloader) = reloader {
         let (reloader, side) = (Arc::clone(reloader), side_tx.clone());
@@ -256,6 +257,17 @@ where
                 .context("drawing a frame failed")?;
             state.dirty = false;
             last_draw = Some(Instant::now());
+            if !first_frame_done {
+                first_frame_done = true;
+                tracing::info!(
+                    elapsed_ms = crate::startup::since_process_start()
+                        .map_or(-1, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX)),
+                    "first frame"
+                );
+                if let Some(fg) = foreground.as_mut() {
+                    fg.first_frame_drawn();
+                }
+            }
             // Terminal graphics (Sixel) stay on screen until overpainted: when the image
             // moved or went away, wipe the screen and draw again.
             if ks_ui::images::finish_frame() {

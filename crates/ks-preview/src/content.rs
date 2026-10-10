@@ -75,12 +75,50 @@ pub fn build_preview(
     build_with_meta(path, meta, opts, cancel)
 }
 
+/// How long the metadata view waits for the owner lookup (an unreachable domain controller or
+/// share can block the Win32 call for a long time and it cannot be cancelled).
+const OWNER_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1500);
+
+/// Runs the lookup on a helper thread so the worker stays responsive: gives up (owner unknown)
+/// on timeout or cancellation; a stuck helper thread finishes on its own later.
+fn resolve_owner(
+    resolve: fn(&Path) -> Option<String>,
+    path: &Path,
+    cancel: &CancellationToken,
+) -> Option<String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let target = path.to_path_buf();
+    std::thread::Builder::new()
+        .name("ks-owner-lookup".into())
+        .spawn(move || {
+            let _ = tx.send(resolve(&target));
+        })
+        .ok()?;
+    let deadline = std::time::Instant::now() + OWNER_TIMEOUT;
+    loop {
+        match rx.recv_timeout(std::time::Duration::from_millis(20)) {
+            Ok(owner) => return owner,
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return None,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                if cancel.is_cancelled() || std::time::Instant::now() >= deadline {
+                    return None;
+                }
+            }
+        }
+    }
+}
+
 pub(crate) fn build_with_meta(
     path: &Path,
-    meta: FileMetadata,
+    mut meta: FileMetadata,
     opts: &PreviewOptions,
     cancel: &CancellationToken,
 ) -> Option<Preview> {
+    if opts.kind == RequestKind::Metadata {
+        if let Some(resolve) = opts.owner {
+            meta.owner = resolve_owner(resolve.0, path, cancel);
+        }
+    }
     let body = match build_body(path, &meta, opts, cancel) {
         Ok(b) => b,
         Err(BuildError::Cancelled) => return None,

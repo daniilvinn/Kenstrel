@@ -423,16 +423,46 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme)
         width(&right) + 2
     };
     let name = truncate_middle(&name, total.saturating_sub(right_width), !entry.is_dir);
-    let pad = total.saturating_sub(width(&name) + width(&right));
+    // A link shows where it points, in whatever room the name leaves.
+    let link = link_suffix(
+        state,
+        entry,
+        total.saturating_sub(right_width + width(&name)),
+    );
+    let link_width = link.as_ref().map_or(0, |(text, _)| width(text));
+    let pad = total.saturating_sub(width(&name) + link_width + width(&right));
     let name_style = Style::new().fg(theme.fg).add_modifier(Modifier::BOLD);
+    let link = link.map(|(text, broken)| {
+        let color = if broken { theme.error } else { theme.symlink };
+        Span::styled(text, Style::new().fg(color))
+    });
     let line = Line::from(vec![
         Span::raw(" "),
         Span::styled(name, name_style),
+        link.unwrap_or_else(|| Span::raw("")),
         Span::raw(" ".repeat(pad)),
         Span::styled(right, theme.dim()),
         Span::raw(" "),
     ]);
     frame.render_widget(Paragraph::new(line), area);
+}
+
+/// ` → target` for a symlink or junction whose target is known from the preview result, cut
+/// to `room` cells (nothing when fewer than 6 remain). The flag marks a broken link.
+fn link_suffix(state: &AppState, entry: &Entry, room: usize) -> Option<(String, bool)> {
+    if !entry.is_link() || room < 6 {
+        return None;
+    }
+    let meta = state
+        .preview
+        .current
+        .as_deref()
+        .filter(|p| state.preview.target.as_deref() == Some(p.path.as_path()))?
+        .meta
+        .as_ref()?;
+    let target = sanitize(&meta.link_target.as_ref()?.to_string_lossy());
+    let text = truncate_middle(&target, room - 3, false);
+    Some((format!(" → {text}"), meta.link_broken))
 }
 
 /// `(priority, text)` pairs in display order; a higher priority number is dropped first.
@@ -509,6 +539,11 @@ fn render_content(
     mark: Option<usize>,
 ) {
     let rows = usize::from(area.height);
+    // The overlay's hit line, or the visual-lines selection of the main pane.
+    let marked: Option<(usize, usize)> = mark
+        .map(|m| (m, m))
+        .or_else(|| state.preview.select.as_ref().map(|s| s.range()));
+    let cursor_line = state.preview.select.as_ref().map(|s| s.cursor);
     let cells = usize::from(area.width);
     let scroll = state.preview.scroll;
     let lines: Vec<Line> = match &preview.body {
@@ -518,8 +553,17 @@ fn render_content(
         }
         PreviewBody::Metadata => metadata_lines(preview.meta.as_ref(), state, theme),
         PreviewBody::Empty => vec![Line::from(Span::styled("empty file", theme.muted()))],
-        PreviewBody::Text(text) => text_lines(text, true, (scroll, mark), rows, cells, theme),
-        PreviewBody::Markdown(text) => text_lines(text, false, (scroll, None), rows, cells, theme),
+        PreviewBody::Text(text) => text_lines(
+            text,
+            true,
+            (scroll, marked, cursor_line),
+            rows,
+            cells,
+            theme,
+        ),
+        PreviewBody::Markdown(text) => {
+            text_lines(text, false, (scroll, None, None), rows, cells, theme)
+        }
         PreviewBody::Directory(dir) => dir_lines(dir, state, scroll, rows, cells, theme),
         PreviewBody::Archive(archive) => archive_lines(archive, state, scroll, rows, cells, theme),
         PreviewBody::Binary(binary) => binary_lines(binary, area.width, scroll, rows, theme),
@@ -602,7 +646,7 @@ pub(crate) fn push_clipped(
 fn text_lines(
     text: &TextPreview,
     numbered: bool,
-    (scroll, mark): (usize, Option<usize>),
+    (scroll, mark, cursor): (usize, Option<(usize, usize)>, Option<usize>),
     rows: usize,
     cells: usize,
     theme: &Theme,
@@ -629,12 +673,17 @@ fn text_lines(
             }
             push_clipped(&mut spans, line, body, theme);
             let line = Line::from(spans);
-            if mark == Some(index) {
-                // The content-search hit: the whole row on the selection background.
+            if mark.is_some_and(|(a, b)| (a..=b).contains(&index)) {
+                // The content-search hit or the selected range: whole rows on the selection
+                // background; the moving end of a selection is bold.
                 let pad = (gutter + body).saturating_sub(line.width());
                 let mut line = line;
                 line.spans.push(Span::raw(" ".repeat(pad)));
-                line.style(Style::new().bg(theme.selection_bg))
+                let mut style = Style::new().bg(theme.selection_bg);
+                if cursor == Some(index) {
+                    style = style.add_modifier(Modifier::BOLD);
+                }
+                line.style(style)
             } else {
                 line
             }

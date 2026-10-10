@@ -189,6 +189,16 @@ impl EffectRunner {
                         previewer.cancel();
                     }
                 }
+                Effect::InvalidatePreview { paths } => {
+                    for previewer in [&self.previewer, &self.parent_previewer]
+                        .into_iter()
+                        .flatten()
+                    {
+                        for path in &paths {
+                            previewer.invalidate(path);
+                        }
+                    }
+                }
                 Effect::CancelParent => {
                     if let Some(previewer) = &self.parent_previewer {
                         previewer.cancel();
@@ -437,6 +447,7 @@ impl EffectRunner {
             palette: self.palette,
             limits,
             show_hidden: request.show_hidden,
+            owner: Some(ks_preview::OwnerResolver(ks_fs::file_owner)),
             ..PreviewOptions::default()
         }
     }

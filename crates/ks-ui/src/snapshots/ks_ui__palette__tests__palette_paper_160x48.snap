@@ -1,6 +1,5 @@
 ---
 source: crates/ks-ui/src/palette.rs
-assertion_line: 234
 expression: rendered
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
@@ -15,7 +14,7 @@ expression: rendered
    ◆ new_pass.rs                                                                                                                               0 B     1m ago ?
    ◆ photo_from_phone.jpg                                                                                                                   4.0 MB 2025-02-22
    ◆ pipeline_cache.rs             ╭─ Commands ─────────────────────────────────────────────────────────────────────────────╮               3.3 KB   just now
-  ●◆ swapchain.rs                  │ ›                                                                                 1/95 │               9.8 KB    12m ago
+  ●◆ swapchain.rs                  │ ›                                                                                 1/99 │               9.8 KB    12m ago
  ▌ ◆ vulkan_device.rs              │────────────────────────────────────────────────────────────────────────────────────────│              14.2 KB     3h ago M
    ◆ 日本語のメモ.txt              │▌ Move cursor down                                                              j, down │                220 B     2h ago
                                    │  Move cursor up                                                                  k, up │

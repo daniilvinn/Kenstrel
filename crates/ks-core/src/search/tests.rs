@@ -1190,3 +1190,106 @@ fn a_grep_hit_scrolls_the_preview_to_its_line() {
         s.preview_rows()
     );
 }
+
+// ----- sending a hit to Claude (PLAN 10c) -----
+
+fn start_claude(s: &mut AppState) {
+    use crate::claude::ClaudePreflight;
+    key(s, "c");
+    let generation = s.claude.generation;
+    update(
+        s,
+        Msg::ClaudePreflight {
+            generation,
+            result: ClaudePreflight::Ok,
+        },
+    );
+    update(s, Msg::ClaudeStarted { generation });
+    // Hand the focus back to the explorer.
+    key(s, "ctrl-\\");
+    assert!(s.overlays.is_empty());
+}
+
+#[test]
+fn alt_c_sends_the_hit_to_the_running_pane_and_closes_the_overlay() {
+    let mut s = state_with(&["unrelated"]);
+    start_claude(&mut s);
+    grep_with_two_files(&mut s);
+    key(&mut s, "down");
+    let effects = key(&mut s, "alt-c");
+    let sent = effects.iter().find_map(|e| match e {
+        Effect::ClaudeSendRange { path, start, end } => Some((path.clone(), *start, *end)),
+        _ => None,
+    });
+    let (path, start, end) = sent.expect("a ClaudeSendRange effect");
+    assert!(path.ends_with("b.rs"), "{path:?}");
+    assert_eq!((start, end), (2, 2));
+    assert!(s.search.grep.is_none(), "the overlay is closed");
+    assert_eq!(
+        s.overlays.last(),
+        Some(&Overlay::Claude),
+        "the pane has focus"
+    );
+}
+
+#[test]
+fn alt_c_without_claude_only_shows_a_toast() {
+    let mut s = state_with(&["unrelated"]);
+    grep_with_two_files(&mut s);
+    let effects = key(&mut s, "alt-c");
+    assert!(!effects
+        .iter()
+        .any(|e| matches!(e, Effect::ClaudeSendRange { .. })));
+    assert!(s
+        .status
+        .as_ref()
+        .is_some_and(|st| st.text.contains("Claude is not running")));
+    assert_eq!(
+        s.overlays.last(),
+        Some(&Overlay::Grep),
+        "the search stays open"
+    );
+}
+
+#[test]
+fn marked_hits_are_all_sent_to_claude() {
+    let mut s = state_with(&["unrelated"]);
+    start_claude(&mut s);
+    grep_with_two_files(&mut s);
+    key(&mut s, "alt-m");
+    key(&mut s, "alt-m");
+    let g = s.search.grep.as_ref().unwrap();
+    assert_eq!(g.marks.len(), 2);
+    let effects = key(&mut s, "alt-c");
+    let sent: Vec<_> = effects
+        .iter()
+        .filter_map(|e| match e {
+            Effect::ClaudeSendRange { path, start, end } => Some((path.clone(), *start, *end)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(sent.len(), 2, "{sent:?}");
+    assert!(sent[0].0.ends_with("a.rs") && sent[1].0.ends_with("b.rs"));
+}
+
+#[test]
+fn alt_m_toggles_a_mark() {
+    let mut s = state_with(&["unrelated"]);
+    grep_with_two_files(&mut s);
+    key(&mut s, "alt-m");
+    assert_eq!(s.search.grep.as_ref().unwrap().marks.len(), 1);
+    key(&mut s, "up");
+    key(&mut s, "alt-m");
+    assert!(s.search.grep.as_ref().unwrap().marks.is_empty());
+}
+
+#[test]
+fn a_new_search_drops_the_marks() {
+    let mut s = state_with(&["unrelated"]);
+    grep_with_two_files(&mut s);
+    key(&mut s, "alt-m");
+    assert_eq!(s.search.grep.as_ref().unwrap().marks.len(), 1);
+    let effects = type_text(&mut s, "x");
+    fire_debounce(&mut s, &effects);
+    assert!(s.search.grep.as_ref().unwrap().marks.is_empty());
+}

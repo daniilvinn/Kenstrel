@@ -140,6 +140,7 @@ your editor at that line, `ctrl-l` shows the files with matches as a results lis
 Results are grouped by file, capped at 10,000 matches, and skip binary files, files over 10 MB
 and cloud placeholders (counted in the footer). On terminals 100 columns or wider both overlays
 show a live preview of the highlighted result.
+In the grep overlay `alt-m` marks the highlighted hit and `alt-c` sends the marked hits (or the highlighted one) to the running Claude pane as `@path#Lnn` mentions.
 
 ### File operations
 
@@ -284,6 +285,7 @@ your projects.
 | `g w` | open Claude in a **Windows Terminal split** instead (`wt -w 0 sp -V`). It goes through the same preflight, gets the same MCP server and hook, and strips the variables inside the pane's own command, because a WT pane does not inherit Kestrel's environment |
 | `g r` | resume the last Claude session of this project (`claude --resume`) |
 | `C` | send the marked files (or the file under the cursor) to the running pane as `@` mentions and focus it |
+| `V` | in the text preview: select lines (`j`/`k` extend, `C` or `enter` sends `@path#Lstart-end`, `esc` cancels) |
 | `ctrl-\` | move the keyboard between the explorer and the pane (`[claude] focus_key`) |
 | `alt-=` / `alt--` | grow / shrink the pane (15 % to 85 %) |
 | `g p` | move the pane between the bottom and the right |

@@ -1,6 +1,5 @@
 ---
 source: crates/ks-ui/src/search/tests.rs
-assertion_line: 388
 expression: text
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
@@ -50,7 +49,7 @@ expression: text
   │ ⠹ 4 matches in 3 files · searched 1,203 · skipped 2 cloud, 1 denied, 5 binary                                                                            │
 ──╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯──
  ›                                                                                                                                           12/13 · 1 selected
-   ‹enter› edit  ‹tab› field  ‹ctrl-r› regex  ‹ctrl-w› word  ‹ctrl-l› list  ‹esc› close
+   ‹enter› edit  ‹tab› field  ‹ctrl-r› regex  ‹ctrl-w› word  ‹ctrl-l› list  ‹alt-m› mark  ‹alt-c› claude  ‹esc› close
 --- styles (row cols fg bg mods) ---
   0   1..26  fg=#6b645d bg=reset
   0  26..143 fg=#2b2724 bg=reset bold
@@ -97,8 +96,7 @@ expression: text
   7 157..158 fg=#c4623f bg=reset
   7 158..160 fg=#3d7a3a bg=reset
   8   2..3   fg=#c4623f bg=reset
-  8   3..4   fg=#2b2724 bg=#ece5dc
-  8   4..5   fg=#c4623f bg=#ece5dc
+  8   3..5   fg=#c4623f bg=#ece5dc
   8   5..9   fg=#6b645d bg=#ece5dc
   8   9..11  fg=#d4ccc2 bg=#ece5dc
   8  11..23  fg=#2b2724 bg=#ece5dc
@@ -253,5 +251,9 @@ expression: text
  47  53..62  fg=#958e86 bg=reset
  47  62..68  fg=#6b645d bg=reset
  47  68..77  fg=#958e86 bg=reset
- 47  77..80  fg=#6b645d bg=reset
- 47  80..160 fg=#958e86 bg=reset
+ 47  77..82  fg=#6b645d bg=reset
+ 47  82..91  fg=#958e86 bg=reset
+ 47  91..96  fg=#6b645d bg=reset
+ 47  96..107 fg=#958e86 bg=reset
+ 47 107..110 fg=#6b645d bg=reset
+ 47 110..160 fg=#958e86 bg=reset

@@ -952,14 +952,19 @@ fn selection_paths(state: &AppState) -> Vec<PathBuf> {
         .collect()
 }
 
+/// The toast for a send while no pane runs.
+pub(crate) fn not_running(state: &mut AppState, effects: &mut Vec<Effect>) {
+    status(
+        state,
+        Level::Info,
+        "Claude is not running (press c to open it)",
+        effects,
+    );
+}
+
 fn send_marked(state: &mut AppState, effects: &mut Vec<Effect>) {
     if !state.claude.is_running() {
-        status(
-            state,
-            Level::Info,
-            "Claude is not running (press c to open it)",
-            effects,
-        );
+        not_running(state, effects);
         return;
     }
     let paths = selection_paths(state);

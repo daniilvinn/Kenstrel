@@ -66,6 +66,7 @@ the palette (`Reload config`).
 | — | Search contents: toggle whole word | `grep.word` | Search contents: toggle whole-word matching. |
 | — | Search contents: switch query/glob field | `grep.field` | Search contents: switch between the query and glob fields. |
 | — | Search contents: open results as a list | `grep.to_list` | Search contents: show the files with matches as a results list in a new tab. |
+| — | Search contents: mark the hit | `grep.mark` | Search contents: mark the highlighted hit so alt-c sends all marked hits to Claude. |
 
 ### Selection
 
@@ -126,6 +127,9 @@ the palette (`Reload config`).
 
 | Keys | Command | Id | What it does |
 |---|---|---|---|
+| — | Search contents: send the hit to Claude | `grep.send_claude` | Search contents: send the highlighted hit to the Claude pane as an @path#Lnn mention. |
+| `V` | Select preview lines (visual lines) | `preview.select_lines` | Select lines of the text preview (j/k extend, esc cancels) to send as @path#La-b to Claude. |
+| — | Send the selected preview lines to Claude | `preview.lines_send` | Send the selected preview lines to the Claude pane as an @path#La-b mention. |
 | `c` | Open Claude | `claude.open` | Open Claude Code beside the explorer. |
 | `C` | Send marked files to Claude | `claude.send_marked` | Send the marked files to Claude as @ mentions. |
 | `g r` | Resume last Claude session | `claude.resume` | Resume the last Claude session of this project. |
@@ -228,6 +232,8 @@ the palette (`Reload config`).
 | `tab` | `grep.field` |
 | `backtab` | `grep.field` |
 | `ctrl-l` | `grep.to_list` |
+| `alt-c` | `grep.send_claude` |
+| `alt-m` | `grep.mark` |
 
 ### `palette`
 
@@ -383,3 +389,21 @@ the palette (`Reload config`).
 | `end` | `cursor.bottom` |
 | `X` | `claude.changes_clear` |
 | `d` | `claude.changes_diff` |
+
+### `preview_lines`
+
+| Keys | Command |
+|---|---|
+| `j` | `cursor.down` |
+| `down` | `cursor.down` |
+| `k` | `cursor.up` |
+| `up` | `cursor.up` |
+| `ctrl-d` | `page.half_down` |
+| `ctrl-u` | `page.half_up` |
+| `g g` | `cursor.top` |
+| `G` | `cursor.bottom` |
+| `C` | `preview.lines_send` |
+| `enter` | `preview.lines_send` |
+| `esc` | `cancel` |
+| `ctrl-c` | `cancel` |
+| `V` | `cancel` |

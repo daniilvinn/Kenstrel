@@ -468,3 +468,13 @@ Merged `fix/f4` (README rewrite, `docs/manual-test.md`, example config/theme + t
 - **Gates**: fmt and clippy clean; `cargo test --workspace --no-fail-fast` passes except `ks-app` `fileops::move_undo_and_trash_undo`, which times out waiting for the trashed file to be restored when the whole `fileops` file runs (passes alone). It fails identically on plain main (5b58d42), so it is not caused by this merge (Recycle Bin restore on this machine; not hidden).
 - **README key tables** were verified by f4 at 5b58d42 only; re-check against `docs/keymap.md` after f1/f2/f3 are merged. `docs/keymap.md` untouched by this merge.
 - Open issues are as in `docs/progress/f4.md` (screenshots, workflows never run on GitHub).
+
+## Integration: fix/f1
+
+Merged `fix/f1` (grep send/mark `alt-c`/`alt-m`, preview line selection `V` with the `preview_lines` context, link target header, owner via injected `OwnerResolver`, deferred terminal query thread after the first frame, preview invalidation after jobs, UTF-32) onto main. No textual conflicts, Cargo.lock merged cleanly.
+
+- **AppState guard** (`tabs.rs`): f1 added no `AppState` field (new state lives in `PreviewState` and `GrepState`), so the guard needed no change. The preview line selection is dropped by `preview_lines::validate` on target change.
+- **Event loop**: f2 is not merged yet; re-check the `Foreground::first_frame_drawn` hook and the `ks-terminal-query` thread against f2's event-loop changes (multi-tab watching) when merging f2.
+- **Gates**: fmt, clippy `-D warnings` clean; `cargo test --workspace --no-fail-fast` fully green, including `fileops::move_undo_and_trash_undo` (fixed by f1's `jobs_idle` wait). No `.snap.new` files; `docs/keymap.md` test passes unchanged (f1 already regenerated it).
+- **README**: no default key changed; added the grep `alt-m`/`alt-c` sentence and a `V` row.
+- **Open issues**: as in `docs/progress/f1.md` (directory preview git glyphs/counts and changes-view-in-preview not done; `alt` chords and `V` unverified in a real Windows Terminal; first-frame time must be read from the log on a real run). Palette/help snapshots will conflict with f2/f3 and need regeneration after those merges.

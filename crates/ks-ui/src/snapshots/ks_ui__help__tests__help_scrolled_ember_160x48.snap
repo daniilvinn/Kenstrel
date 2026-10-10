@@ -1,23 +1,23 @@
 ---
 source: crates/ks-ui/src/help.rs
-assertion_line: 256
 expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    ◆ current/            ╭─ Help ─────────────────────────────────────────────────────────────────────────────────────────────────────╮            2025-02-02
    ◆ passes/             │ ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close                                                         │          7     5h ago M
-   ◆ shaders/            │   Y                   Copy path to clipboard              Copy absolute path(s) to the clipboard.          │         12 2025-03-12 !
-   ◆ a_rather_long_file_n│   r                   Rename                              Rename the entry under the cursor.               │    75.2 KB 2025-03-11
-   ◆ build.ps1           │   R                   Bulk rename in editor               Rename many entries by editing their names in y… │     1.9 KB 2025-03-05
-   ◆ descriptors.rs      │   a                   Create file or directory            Create a file; a trailing slash creates a direc… │     6.1 KB  yesterday +
-   ◆ mod.rs              │   d                   Move to Recycle Bin                 Move the entries to the Recycle Bin.             │      412 B 2024-02-08
-   ◆ new_pass.rs         │   D                   Delete permanently                  Delete the entries for good after typed confirm… │        0 B     1m ago ?
-   ◆ photo_from_phone.jpg│   u                   Undo last file operation            Undo the last rename, move, create or trash.     │     4.0 MB 2025-02-22
-   ◆ pipeline_cache.rs   │   o                   Open with default app               Open with the default application.               │     3.3 KB   just now
-  ●◆ swapchain.rs        │   O                   Open with...                        Choose which application opens the file.         │     9.8 KB    12m ago
- ▌ ◆ vulkan_device.rs    │   e                   Open in editor                      Open in your editor.                             │    14.2 KB     3h ago M
-   ◆ 日本語のメモ.txt    │   !                   Run shell command                   Run a shell command in this directory.           │      220 B     2h ago
+   ◆ shaders/            │   p                   Paste                               Paste copied or cut entries into this directory. │         12 2025-03-12 !
+   ◆ a_rather_long_file_n│   Y                   Copy path to clipboard              Copy absolute path(s) to the clipboard.          │    75.2 KB 2025-03-11
+   ◆ build.ps1           │   r                   Rename                              Rename the entry under the cursor.               │     1.9 KB 2025-03-05
+   ◆ descriptors.rs      │   R                   Bulk rename in editor               Rename many entries by editing their names in y… │     6.1 KB  yesterday +
+   ◆ mod.rs              │   a                   Create file or directory            Create a file; a trailing slash creates a direc… │      412 B 2024-02-08
+   ◆ new_pass.rs         │   d                   Move to Recycle Bin                 Move the entries to the Recycle Bin.             │        0 B     1m ago ?
+   ◆ photo_from_phone.jpg│   D                   Delete permanently                  Delete the entries for good after typed confirm… │     4.0 MB 2025-02-22
+   ◆ pipeline_cache.rs   │   u                   Undo last file operation            Undo the last rename, move, create or trash.     │     3.3 KB   just now
+  ●◆ swapchain.rs        │   o                   Open with default app               Open with the default application.               │     9.8 KB    12m ago
+ ▌ ◆ vulkan_device.rs    │   O                   Open with...                        Choose which application opens the file.         │    14.2 KB     3h ago M
+   ◆ 日本語のメモ.txt    │   e                   Open in editor                      Open in your editor.                             │      220 B     2h ago
+                         │   !                   Run shell command                   Run a shell command in this directory.           │
                          │                                                                                                            │
                          │ View                                                                                                       │
                          │   .                   Toggle hidden files                 Show or hide hidden files.                       │
@@ -42,13 +42,12 @@ expression: "draw(&s, &theme(name))"
                          │   ctrl-w              Close tab                           Close the current tab.                           │
                          │                                                                                                            │
                          │ Claude Code                                                                                                │
+                         │   —                   Search contents: send the hit to …  Search contents: send the highlighted hit to th… │
+                         │   V                   Select preview lines (visual line…  Select lines of the text preview (j/k extend, e… │
+                         │   —                   Send the selected preview lines t…  Send the selected preview lines to the Claude p… │
                          │   c                   Open Claude                         Open Claude Code beside the explorer.            │
                          │   C                   Send marked files to Claude         Send the marked files to Claude as @ mentions.   │
-                         │   g r                 Resume last Claude session          Resume the last Claude session of this project.  │
-                         │   g w                 Open Claude in Windows Terminal s…  Open Claude in a Windows Terminal split pane.    │
-                         │   ctrl-\              Toggle focus between explorer and…  Move the keyboard between the explorer and the … │
-                         │   g X                 Close Claude pane                   Close the Claude pane and end its session proce… │
-─────────────────────────╰────────────────────────────────────────────────────────────────────────────────────────────── 41-81 / 104 ─╯─────────────────────────
+─────────────────────────╰────────────────────────────────────────────────────────────────────────────────────────────── 41-81 / 108 ─╯─────────────────────────
  ›                                                                                                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -189,14 +188,14 @@ expression: "draw(&s, &theme(name))"
  14 134..141 fg=#8f5c47 bg=reset
  14 141..151 fg=#a9a29a bg=reset
  14 151..160 fg=#716b64 bg=reset
- 15  25..160 fg=#8f5c47 bg=reset
- 16  25..27  fg=#8f5c47 bg=reset
- 16  27..134 fg=#d97757 bg=reset bold
- 16 134..160 fg=#8f5c47 bg=reset
- 17  25..29  fg=#8f5c47 bg=reset
- 17  29..49  fg=#e8e3dc bg=reset bold
- 17  49..85  fg=#a9a29a bg=reset
- 17  85..134 fg=#716b64 bg=reset
+ 15  25..29  fg=#8f5c47 bg=reset
+ 15  29..49  fg=#e8e3dc bg=reset bold
+ 15  49..85  fg=#a9a29a bg=reset
+ 15  85..134 fg=#716b64 bg=reset
+ 15 134..160 fg=#8f5c47 bg=reset
+ 16  25..160 fg=#8f5c47 bg=reset
+ 17  25..27  fg=#8f5c47 bg=reset
+ 17  27..134 fg=#d97757 bg=reset bold
  17 134..160 fg=#8f5c47 bg=reset
  18  25..29  fg=#8f5c47 bg=reset
  18  29..49  fg=#e8e3dc bg=reset bold
@@ -243,14 +242,14 @@ expression: "draw(&s, &theme(name))"
  26  49..85  fg=#a9a29a bg=reset
  26  85..134 fg=#716b64 bg=reset
  26 134..160 fg=#8f5c47 bg=reset
- 27  25..160 fg=#8f5c47 bg=reset
- 28  25..27  fg=#8f5c47 bg=reset
- 28  27..134 fg=#d97757 bg=reset bold
- 28 134..160 fg=#8f5c47 bg=reset
- 29  25..29  fg=#8f5c47 bg=reset
- 29  29..49  fg=#e8e3dc bg=reset bold
- 29  49..85  fg=#a9a29a bg=reset
- 29  85..134 fg=#716b64 bg=reset
+ 27  25..29  fg=#8f5c47 bg=reset
+ 27  29..49  fg=#e8e3dc bg=reset bold
+ 27  49..85  fg=#a9a29a bg=reset
+ 27  85..134 fg=#716b64 bg=reset
+ 27 134..160 fg=#8f5c47 bg=reset
+ 28  25..160 fg=#8f5c47 bg=reset
+ 29  25..27  fg=#8f5c47 bg=reset
+ 29  27..134 fg=#d97757 bg=reset bold
  29 134..160 fg=#8f5c47 bg=reset
  30  25..29  fg=#8f5c47 bg=reset
  30  29..49  fg=#e8e3dc bg=reset bold
@@ -263,12 +262,12 @@ expression: "draw(&s, &theme(name))"
  31  85..134 fg=#716b64 bg=reset
  31 134..160 fg=#8f5c47 bg=reset
  32  25..29  fg=#8f5c47 bg=reset
- 32  29..49  fg=#716b64 bg=reset
+ 32  29..49  fg=#e8e3dc bg=reset bold
  32  49..85  fg=#a9a29a bg=reset
  32  85..134 fg=#716b64 bg=reset
  32 134..160 fg=#8f5c47 bg=reset
  33  25..29  fg=#8f5c47 bg=reset
- 33  29..49  fg=#e8e3dc bg=reset bold
+ 33  29..49  fg=#716b64 bg=reset
  33  49..85  fg=#a9a29a bg=reset
  33  85..134 fg=#716b64 bg=reset
  33 134..160 fg=#8f5c47 bg=reset
@@ -287,17 +286,17 @@ expression: "draw(&s, &theme(name))"
  36  49..85  fg=#a9a29a bg=reset
  36  85..134 fg=#716b64 bg=reset
  36 134..160 fg=#8f5c47 bg=reset
- 37  25..160 fg=#8f5c47 bg=reset
- 38  25..27  fg=#8f5c47 bg=reset
- 38  27..134 fg=#d97757 bg=reset bold
- 38 134..160 fg=#8f5c47 bg=reset
- 39  25..29  fg=#8f5c47 bg=reset
- 39  29..49  fg=#e8e3dc bg=reset bold
- 39  49..85  fg=#a9a29a bg=reset
- 39  85..134 fg=#716b64 bg=reset
+ 37  25..29  fg=#8f5c47 bg=reset
+ 37  29..49  fg=#e8e3dc bg=reset bold
+ 37  49..85  fg=#a9a29a bg=reset
+ 37  85..134 fg=#716b64 bg=reset
+ 37 134..160 fg=#8f5c47 bg=reset
+ 38  25..160 fg=#8f5c47 bg=reset
+ 39  25..27  fg=#8f5c47 bg=reset
+ 39  27..134 fg=#d97757 bg=reset bold
  39 134..160 fg=#8f5c47 bg=reset
  40  25..29  fg=#8f5c47 bg=reset
- 40  29..49  fg=#e8e3dc bg=reset bold
+ 40  29..49  fg=#716b64 bg=reset
  40  49..85  fg=#a9a29a bg=reset
  40  85..134 fg=#716b64 bg=reset
  40 134..160 fg=#8f5c47 bg=reset
@@ -307,7 +306,7 @@ expression: "draw(&s, &theme(name))"
  41  85..134 fg=#716b64 bg=reset
  41 134..160 fg=#8f5c47 bg=reset
  42  25..29  fg=#8f5c47 bg=reset
- 42  29..49  fg=#e8e3dc bg=reset bold
+ 42  29..49  fg=#716b64 bg=reset
  42  49..85  fg=#a9a29a bg=reset
  42  85..134 fg=#716b64 bg=reset
  42 134..160 fg=#8f5c47 bg=reset
