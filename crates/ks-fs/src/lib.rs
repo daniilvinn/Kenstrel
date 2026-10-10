@@ -1,4 +1,5 @@
-//! Kestrel file system layer: directory listing, drives, watching and git status.
+//! Kestrel file system layer: directory listing, drives, watching, git status, file operations
+//! ([`ops`]: background jobs, conflicts, undo) and launching ([`launch`]: clipboard, open, editor, shell).
 //!
 //! Everything here is blocking or async work that runs off the UI thread; `ks-app`'s effect
 //! runner calls it and reports results to the core as messages.
@@ -6,7 +7,9 @@
 pub mod attrs;
 pub mod children;
 pub mod git;
+pub mod launch;
 pub mod listing;
+pub mod ops;
 mod platform;
 pub mod watcher;
 

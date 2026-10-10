@@ -18,6 +18,11 @@ print_stderr = "warn"
 
 [dependencies]
 ks-core.workspace = true
+arboard = "3.6.1"
+open = "5.4.4"
+tempfile.workspace = true
+thiserror.workspace = true
+trash = "5.2.9"
 dunce.workspace = true
 notify.workspace = true
 notify-debouncer-full.workspace = true
