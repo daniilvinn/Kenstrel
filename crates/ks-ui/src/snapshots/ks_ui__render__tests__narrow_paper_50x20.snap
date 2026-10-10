@@ -21,7 +21,7 @@ expression: rendered
 
 ──────────────────────────────────────────────────
  ›                             12/13 · 1 selected
-   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden…
+   ‹l› open  ‹:› commands  ‹?› help  ‹q› quit
 --- styles (row cols fg bg mods) ---
   0   1..19  fg=#6b645d bg=reset
   0  19..33  fg=#2b2724 bg=reset bold
@@ -68,10 +68,10 @@ expression: rendered
  18  31..50  fg=#6b645d bg=reset
  19   3..4   fg=#958e86 bg=reset
  19   4..5   fg=#6b645d bg=reset
- 19   5..16  fg=#958e86 bg=reset
- 19  16..17  fg=#6b645d bg=reset
- 19  17..26  fg=#958e86 bg=reset
- 19  26..31  fg=#6b645d bg=reset
- 19  31..40  fg=#958e86 bg=reset
- 19  40..41  fg=#6b645d bg=reset
- 19  41..50  fg=#958e86 bg=reset
+ 19   5..14  fg=#958e86 bg=reset
+ 19  14..15  fg=#6b645d bg=reset
+ 19  15..28  fg=#958e86 bg=reset
+ 19  28..29  fg=#6b645d bg=reset
+ 19  29..38  fg=#958e86 bg=reset
+ 19  38..39  fg=#6b645d bg=reset
+ 19  39..50  fg=#958e86 bg=reset

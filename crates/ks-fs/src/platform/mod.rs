@@ -52,6 +52,22 @@ mod tests {
         assert_eq!(offset % 900, 0, "zones are multiples of 15 minutes");
     }
 
+    #[test]
+    fn own_pid_is_alive_and_an_exited_child_is_not() {
+        assert!(pid_alive(std::process::id()));
+        let program = if cfg!(windows) { "cmd" } else { "true" };
+        let mut cmd = std::process::Command::new(program);
+        if cfg!(windows) {
+            cmd.args(["/c", "exit", "0"]);
+        }
+        let mut child = cmd.spawn().unwrap();
+        let pid = child.id();
+        child.wait().unwrap();
+        if cfg!(any(windows, target_os = "linux")) {
+            assert!(!pid_alive(pid));
+        }
+    }
+
     #[cfg(windows)]
     #[test]
     fn reparse_tag_of_a_plain_directory_is_none() {

@@ -1,6 +1,5 @@
 ---
 source: crates/ks-ui/src/search/tests.rs
-assertion_line: 78
 expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
@@ -50,7 +49,7 @@ expression: "draw(&s, &theme(name))"
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  › /rs                                                                                                                                         1/8 · 1 selected
-   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹/› filter  ‹ctrl-p› find  ‹ctrl-f› search  ‹:› commands  ‹?› help  ‹q› quit
 --- styles (row cols fg bg mods) ---
   0   1..26  fg=#a9a29a bg=reset
   0  26..143 fg=#e8e3dc bg=reset bold
@@ -124,4 +123,14 @@ expression: "draw(&s, &theme(name))"
  47  52..55  fg=#a9a29a bg=reset
  47  55..66  fg=#716b64 bg=reset
  47  66..67  fg=#a9a29a bg=reset
- 47  67..160 fg=#716b64 bg=reset
+ 47  67..78  fg=#716b64 bg=reset
+ 47  78..84  fg=#a9a29a bg=reset
+ 47  84..93  fg=#716b64 bg=reset
+ 47  93..99  fg=#a9a29a bg=reset
+ 47  99..110 fg=#716b64 bg=reset
+ 47 110..111 fg=#a9a29a bg=reset
+ 47 111..124 fg=#716b64 bg=reset
+ 47 124..125 fg=#a9a29a bg=reset
+ 47 125..134 fg=#716b64 bg=reset
+ 47 134..135 fg=#a9a29a bg=reset
+ 47 135..160 fg=#716b64 bg=reset

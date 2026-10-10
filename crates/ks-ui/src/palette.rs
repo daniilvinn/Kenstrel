@@ -32,7 +32,8 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
         frame.render_widget(Paragraph::new(Span::styled(line, theme.bold_accent())), row);
         return;
     }
-    let inner = framed(frame, rect, palette.page.title(), None, true, theme);
+    let hint = footer_hint(usize::from(rect.width));
+    let inner = framed(frame, rect, palette.page.title(), hint, true, theme);
     if inner.height < 3 {
         return;
     }
@@ -87,6 +88,18 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
         }
         frame.render_widget(Paragraph::new(line), rect);
     }
+}
+
+/// The key hint in the bottom border, the longest variant that fits the box.
+fn footer_hint(box_width: usize) -> Option<&'static str> {
+    // Border corners, the dashes around the text and the title side need about 8 columns.
+    let room = box_width.saturating_sub(8);
+    [
+        "ctrl-n/ctrl-p move · enter run · esc close",
+        "ctrl-n/p move · esc close",
+    ]
+    .into_iter()
+    .find(|text| width(text) <= room)
 }
 
 fn render_input(frame: &mut Frame, area: Rect, palette: &PaletteState, theme: &Theme) {

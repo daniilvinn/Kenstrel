@@ -182,6 +182,46 @@ fn bulk_state(w: u16, h: u16) -> AppState {
     s
 }
 
+fn bulk_invalid_state(w: u16, h: u16) -> AppState {
+    let mut s = listing_state(w, h);
+    s.fileops.confirm = Some(ConfirmDialog {
+        title: "Bulk rename: 2 problems found".into(),
+        lines: vec![
+            "line 2: duplicate name `same.txt`".into(),
+            "line 5: name is empty".into(),
+            "Your edits are kept: enter reopens the file, esc discards it.".into(),
+        ],
+        more: 0,
+        danger: true,
+        token: None,
+        typed: PromptInput::new(),
+        mismatch: false,
+        action: Some(ConfirmAction::BulkReedit(ks_core::fileops::BulkRetry {
+            dir: PathBuf::from("/tmp"),
+            names: vec![],
+            file: PathBuf::from("/tmp/x"),
+        })),
+        accept_label: "edit again".into(),
+    });
+    s.overlays.push(Overlay::Confirm);
+    s
+}
+
+/// `descriptors.rs` and the directory `shaders` wait in the cut register; `swapchain.rs` is
+/// marked as well as cut (the mark wins the glyph).
+fn cut_state(w: u16, h: u16) -> AppState {
+    let mut s = listing_state(w, h);
+    let cwd = s.cwd.clone();
+    s.fileops.register = Some(Register {
+        paths: ["descriptors.rs", "shaders", "swapchain.rs"]
+            .iter()
+            .map(|n| cwd.join(n))
+            .collect(),
+        cut: true,
+    });
+    s
+}
+
 fn menu_state(w: u16, h: u16, open_with: bool) -> AppState {
     let mut s = listing_state(w, h);
     let item = |label: &str, hotkey: char| MenuItem {
@@ -290,6 +330,24 @@ fn confirm_overlay_snapshots() {
         confirm_state(w, h, "yes", true)
     });
     snap("confirm_bulk", bulk_state);
+    snap("confirm_bulk_invalid", bulk_invalid_state);
+}
+
+#[test]
+fn cut_entries_are_dimmed_and_flagged() {
+    snap("list_cut", cut_state);
+    let text = text_of(&cut_state(80, 24));
+    let flagged = |name: &str| {
+        text.lines()
+            .find(|l| l.contains(name))
+            .is_some_and(|l| l.contains('×'))
+    };
+    assert!(flagged("descriptors.rs") && flagged("shaders"));
+    assert!(!flagged("mod.rs"));
+    // a copy (yank) does not dim anything
+    let mut s = cut_state(80, 24);
+    s.fileops.register.as_mut().unwrap().cut = false;
+    assert!(!text_of(&s).contains('×'));
 }
 
 #[test]

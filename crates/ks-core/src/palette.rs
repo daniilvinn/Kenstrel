@@ -230,13 +230,20 @@ pub fn visible_rows(size: Size) -> usize {
 }
 
 /// Bindings of `action` with exactly this fixed argument in the normal keymap.
+/// Commands that exist only in another context (finder, pager, ...) show their keys labelled
+/// with it, e.g. `ctrl-r (finder)`.
 fn keys_of(keymap: &Keymap, action: Action, arg: Option<char>) -> Vec<String> {
-    keymap
+    let normal: Vec<String> = keymap
         .bindings(KeyContext::Normal)
         .iter()
         .filter(|b| b.action == action && b.arg == arg)
         .map(|b| b.keys_display())
-        .collect()
+        .collect();
+    if normal.is_empty() {
+        crate::help::contextual_keys(keymap, action, arg)
+    } else {
+        normal
+    }
 }
 
 /// All command entries. `Switch to tab` is expanded to one entry per tab number.
@@ -889,5 +896,16 @@ pub(crate) mod tests {
         assert!(effects.iter().any(
             |e| matches!(e, Effect::SetTheme { name, announce: false } if *name == Config::default().theme)
         ));
+    }
+
+    #[test]
+    fn contextual_commands_show_the_binding_of_their_own_context() {
+        let keymap = Keymap::defaults();
+        assert_eq!(
+            keys_of(&keymap, Action::FinderScope, None),
+            ["ctrl-r (finder)"]
+        );
+        assert_eq!(keys_of(&keymap, Action::GrepRegex, None), ["ctrl-r (grep)"]);
+        assert_eq!(keys_of(&keymap, Action::CursorDown, None), ["j", "down"]);
     }
 }

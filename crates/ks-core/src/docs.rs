@@ -34,7 +34,10 @@ sequence, the value a command id from the tables below:
 ```
 
 Contexts: `normal`, `visual` (inherits `normal`), `prompt`, `filter`, `finder`, `grep`,
-`palette`, `help`, `confirm`, `jobs`, `claude`. Binding a prefix (`g`) removes the longer
+`palette`, `help`, `confirm`, `jobs`, `claude`, `bookmarks`, `jump`, `conflict`, `pager`,
+`menu`, `claude_changes`; each one is listed below under \"Other contexts\". In the help
+overlay and the palette a command that only exists in one of them shows its key with the
+context, for example `ctrl-r (finder)`. Binding a prefix (`g`) removes the longer
 defaults that start with it (`g g`, `g h`, ...); the status line tells you when that
 happens. Key names: single characters, `space`, `enter`, `esc`, `tab`, `backspace`,
 `delete`, `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `f1`..`f12`,
@@ -89,13 +92,18 @@ pub fn keymap_markdown(keymap: &Keymap) -> String {
             None => String::new(),
         };
         let _ = writeln!(out, "### `{ctx}`{note}\n");
-        out.push_str("| Keys | Command |\n|---|---|\n");
+        out.push_str("| Keys | Command | Id |\n|---|---|---|\n");
         for binding in bindings {
             let target = match binding.arg {
                 Some(arg) => format!("`{}:{arg}`", binding.action.id()),
                 None => format!("`{}`", binding.action.id()),
             };
-            let _ = writeln!(out, "| `{}` | {target} |", binding.keys_display());
+            let _ = writeln!(
+                out,
+                "| `{}` | {} | {target} |",
+                binding.keys_display(),
+                binding.action.title()
+            );
         }
         out.push('\n');
     }
@@ -139,6 +147,13 @@ mod tests {
             assert!(text.contains(&format!("`{}`", info.id)), "{}", info.id);
         }
         assert!(text.contains("### `palette`"));
+        for ctx in KeyContext::ALL {
+            // every context is documented in the intro and has a table of its own
+            assert!(text.contains(&format!("`{}`", ctx.name())), "{ctx}");
+            if *ctx != KeyContext::Normal {
+                assert!(text.contains(&format!("### `{}`", ctx.name())), "{ctx}");
+            }
+        }
         assert!(text.contains("| `1-9` |"), "digit bindings collapse");
         assert!(text.ends_with("|\n"));
     }

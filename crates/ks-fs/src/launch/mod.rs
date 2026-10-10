@@ -13,6 +13,7 @@
 pub mod clipboard;
 pub mod editor;
 pub mod open;
+pub mod registry;
 pub mod shell;
 
 pub use clipboard::{
@@ -22,7 +23,10 @@ pub use editor::{
     build_open_command, find_in_path, resolve_editor, run_foreground, spawn_detached,
     split_command_line, CommandSpec, Editor, Env, SystemEnv,
 };
-pub use open::{launch_handler, open_default, open_with_handlers, OpenHandler};
+pub use open::{
+    launch_handler, open_default, open_with_handlers, open_with_handlers_for,
+    open_with_handlers_for_all, OpenHandler,
+};
 pub use shell::{
     resolve_shell, spawn_shell, ShellEvent, ShellHandle, ShellId, ShellProgram, ShellRequest,
     ShellStream,

@@ -1,6 +1,5 @@
 ---
 source: crates/ks-ui/src/render.rs
-assertion_line: 652
 expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
@@ -34,23 +33,23 @@ expression: "draw(&s, &theme(name))"
 
 
 
-                                                                                                                   ╭─ g ──────────────────────────────────────╮
-                                                                                                                   │ g  Jump to top                           │
-                                                                                                                   │ h  Go to home directory                  │
-                                                                                                                   │ d  Go to Downloads                       │
-                                                                                                                   │ D  Go to Desktop                         │
-                                                                                                                   │ c  Go to config directory                │
-                                                                                                                   │ /  Go to This PC (drives)                │
-                                                                                                                   │ j  Jobs overlay                          │
-                                                                                                                   │ r  Resume last Claude session            │
-                                                                                                                   │ w  Open Claude in Windows Terminal split │
-                                                                                                                   │ a  Claude changes                        │
-                                                                                                                   │ X  Close Claude pane                     │
-                                                                                                                   │ p  Move Claude pane (bottom / right)     │
-                                                                                                                   ╰──────────────────────────────────────────╯
+                                                                                                                                ╭─ g ─────────────────────────╮
+                                                                                                                                │ g  Jump to top              │
+                                                                                                                                │ h  Go to home directory     │
+                                                                                                                                │ d  Go to Downloads          │
+                                                                                                                                │ D  Go to Desktop            │
+                                                                                                                                │ c  Go to config directory   │
+                                                                                                                                │ /  Go to This PC (drives)   │
+                                                                                                                                │ j  Jobs overlay             │
+                                                                                                                                │ r  Resume Claude session    │
+                                                                                                                                │ w  Claude in terminal split │
+                                                                                                                                │ a  Claude changes           │
+                                                                                                                                │ X  Close Claude pane        │
+                                                                                                                                │ p  Move Claude pane         │
+                                                                                                                                ╰─────────────────────────────╯
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ›                                                                                                                                        g  12/13 · 1 selected
-   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹/› filter  ‹ctrl-p› find  ‹ctrl-f› search  ‹:› commands  ‹?› help  ‹q› quit
 --- styles (row cols fg bg mods) ---
   0   1..26  fg=#a9a29a bg=reset
   0  26..143 fg=#e8e3dc bg=reset bold
@@ -119,58 +118,58 @@ expression: "draw(&s, &theme(name))"
  14   5..141 fg=#e8e3dc bg=reset
  14 141..151 fg=#a9a29a bg=reset
  14 151..160 fg=#716b64 bg=reset
- 31 115..118 fg=#403a35 bg=reset
- 31 118..120 fg=#d97757 bg=reset bold
- 31 120..160 fg=#403a35 bg=reset
- 32 115..117 fg=#403a35 bg=reset
- 32 117..120 fg=#d97757 bg=reset bold
- 32 120..158 fg=#a9a29a bg=reset
+ 31 128..131 fg=#403a35 bg=reset
+ 31 131..133 fg=#d97757 bg=reset bold
+ 31 133..160 fg=#403a35 bg=reset
+ 32 128..130 fg=#403a35 bg=reset
+ 32 130..133 fg=#d97757 bg=reset bold
+ 32 133..158 fg=#a9a29a bg=reset
  32 158..160 fg=#403a35 bg=reset
- 33 115..117 fg=#403a35 bg=reset
- 33 117..120 fg=#d97757 bg=reset bold
- 33 120..158 fg=#a9a29a bg=reset
+ 33 128..130 fg=#403a35 bg=reset
+ 33 130..133 fg=#d97757 bg=reset bold
+ 33 133..158 fg=#a9a29a bg=reset
  33 158..160 fg=#403a35 bg=reset
- 34 115..117 fg=#403a35 bg=reset
- 34 117..120 fg=#d97757 bg=reset bold
- 34 120..158 fg=#a9a29a bg=reset
+ 34 128..130 fg=#403a35 bg=reset
+ 34 130..133 fg=#d97757 bg=reset bold
+ 34 133..158 fg=#a9a29a bg=reset
  34 158..160 fg=#403a35 bg=reset
- 35 115..117 fg=#403a35 bg=reset
- 35 117..120 fg=#d97757 bg=reset bold
- 35 120..158 fg=#a9a29a bg=reset
+ 35 128..130 fg=#403a35 bg=reset
+ 35 130..133 fg=#d97757 bg=reset bold
+ 35 133..158 fg=#a9a29a bg=reset
  35 158..160 fg=#403a35 bg=reset
- 36 115..117 fg=#403a35 bg=reset
- 36 117..120 fg=#d97757 bg=reset bold
- 36 120..158 fg=#a9a29a bg=reset
+ 36 128..130 fg=#403a35 bg=reset
+ 36 130..133 fg=#d97757 bg=reset bold
+ 36 133..158 fg=#a9a29a bg=reset
  36 158..160 fg=#403a35 bg=reset
- 37 115..117 fg=#403a35 bg=reset
- 37 117..120 fg=#d97757 bg=reset bold
- 37 120..158 fg=#a9a29a bg=reset
+ 37 128..130 fg=#403a35 bg=reset
+ 37 130..133 fg=#d97757 bg=reset bold
+ 37 133..158 fg=#a9a29a bg=reset
  37 158..160 fg=#403a35 bg=reset
- 38 115..117 fg=#403a35 bg=reset
- 38 117..120 fg=#d97757 bg=reset bold
- 38 120..158 fg=#a9a29a bg=reset
+ 38 128..130 fg=#403a35 bg=reset
+ 38 130..133 fg=#d97757 bg=reset bold
+ 38 133..158 fg=#a9a29a bg=reset
  38 158..160 fg=#403a35 bg=reset
- 39 115..117 fg=#403a35 bg=reset
- 39 117..120 fg=#d97757 bg=reset bold
- 39 120..158 fg=#a9a29a bg=reset
+ 39 128..130 fg=#403a35 bg=reset
+ 39 130..133 fg=#d97757 bg=reset bold
+ 39 133..158 fg=#a9a29a bg=reset
  39 158..160 fg=#403a35 bg=reset
- 40 115..117 fg=#403a35 bg=reset
- 40 117..120 fg=#d97757 bg=reset bold
- 40 120..158 fg=#a9a29a bg=reset
+ 40 128..130 fg=#403a35 bg=reset
+ 40 130..133 fg=#d97757 bg=reset bold
+ 40 133..158 fg=#a9a29a bg=reset
  40 158..160 fg=#403a35 bg=reset
- 41 115..117 fg=#403a35 bg=reset
- 41 117..120 fg=#d97757 bg=reset bold
- 41 120..158 fg=#a9a29a bg=reset
+ 41 128..130 fg=#403a35 bg=reset
+ 41 130..133 fg=#d97757 bg=reset bold
+ 41 133..158 fg=#a9a29a bg=reset
  41 158..160 fg=#403a35 bg=reset
- 42 115..117 fg=#403a35 bg=reset
- 42 117..120 fg=#d97757 bg=reset bold
- 42 120..158 fg=#a9a29a bg=reset
+ 42 128..130 fg=#403a35 bg=reset
+ 42 130..133 fg=#d97757 bg=reset bold
+ 42 133..158 fg=#a9a29a bg=reset
  42 158..160 fg=#403a35 bg=reset
- 43 115..117 fg=#403a35 bg=reset
- 43 117..120 fg=#d97757 bg=reset bold
- 43 120..158 fg=#a9a29a bg=reset
+ 43 128..130 fg=#403a35 bg=reset
+ 43 130..133 fg=#d97757 bg=reset bold
+ 43 133..158 fg=#a9a29a bg=reset
  43 158..160 fg=#403a35 bg=reset
- 44 115..160 fg=#403a35 bg=reset
+ 44 128..160 fg=#403a35 bg=reset
  45   0..160 fg=#403a35 bg=reset
  46   1..141 fg=#d97757 bg=reset bold
  46 141..160 fg=#a9a29a bg=reset
@@ -186,4 +185,14 @@ expression: "draw(&s, &theme(name))"
  47  52..55  fg=#a9a29a bg=reset
  47  55..66  fg=#716b64 bg=reset
  47  66..67  fg=#a9a29a bg=reset
- 47  67..160 fg=#716b64 bg=reset
+ 47  67..78  fg=#716b64 bg=reset
+ 47  78..84  fg=#a9a29a bg=reset
+ 47  84..93  fg=#716b64 bg=reset
+ 47  93..99  fg=#a9a29a bg=reset
+ 47  99..110 fg=#716b64 bg=reset
+ 47 110..111 fg=#a9a29a bg=reset
+ 47 111..124 fg=#716b64 bg=reset
+ 47 124..125 fg=#a9a29a bg=reset
+ 47 125..134 fg=#716b64 bg=reset
+ 47 134..135 fg=#a9a29a bg=reset
+ 47 135..160 fg=#716b64 bg=reset

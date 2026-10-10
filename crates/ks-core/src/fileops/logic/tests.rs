@@ -4,6 +4,7 @@ use std::time::SystemTime;
 use super::*;
 use crate::config::Config;
 use crate::entry::Entry;
+use crate::fileops::BulkRetry;
 use crate::fileops::{
     BulkPlanResult, ConflictInfo, ForegroundSpec, ItemMeta, JobDone, JobProgress,
 };
@@ -743,11 +744,16 @@ fn open_with_lists_handlers_from_the_runner() {
     let mut s = state();
     cursor_to(&mut s, "a.txt");
     let effects = keys(&mut s, "O");
-    assert_eq!(effects, vec![Effect::ListOpenHandlers { path: p("a.txt") }]);
+    assert_eq!(
+        effects,
+        vec![Effect::ListOpenHandlers {
+            paths: vec![p("a.txt")]
+        }]
+    );
     update(
         &mut s,
         Msg::OpenHandlers {
-            path: p("a.txt"),
+            paths: vec![p("a.txt")],
             names: vec!["Notepad".into(), "VS Code".into()],
         },
     );
@@ -756,7 +762,7 @@ fn open_with_lists_handlers_from_the_runner() {
     assert_eq!(
         effects,
         vec![Effect::OpenWith {
-            path: p("a.txt"),
+            paths: vec![p("a.txt")],
             handler: "VS Code".into()
         }]
     );
@@ -921,7 +927,8 @@ fn bulk_rename_collects_marked_names_or_everything() {
                 "a.txt".into(),
                 "b.tar.gz".into(),
                 "c.rs".into()
-            ]
+            ],
+            reuse: None,
         }],
         "hidden .env is not shown and so not renamed"
     );
@@ -1007,6 +1014,7 @@ fn invalid_bulk_rename_shows_problems_and_cannot_be_confirmed() {
         &mut s,
         Msg::BulkPlanned(BulkPlanResult::Invalid {
             problems: vec!["line 2: duplicate name `x`".into()],
+            retry: None,
         }),
     );
     let effects = keys(&mut s, "enter");
@@ -1208,4 +1216,67 @@ fn printable_keys_never_reach_the_keymap_from_any_text_input() {
         resolves(&keys(&mut s, "ctrl-u")).is_empty(),
         "nothing answered"
     );
+}
+
+#[test]
+fn open_with_acts_on_every_mark() {
+    let mut s = state();
+    keys(&mut s, "v j");
+    let effects = keys(&mut s, "O");
+    let [Effect::ListOpenHandlers { paths }] = effects.as_slice() else {
+        panic!("{effects:?}");
+    };
+    assert_eq!(paths.len(), 2);
+    update(
+        &mut s,
+        Msg::OpenHandlers {
+            paths: paths.clone(),
+            names: vec!["Notepad".into()],
+        },
+    );
+    assert_eq!(s.fileops.menu.as_ref().unwrap().title, "Open 2 items with");
+    let effects = keys(&mut s, "1");
+    let [Effect::OpenWith { paths: opened, .. }] = effects.as_slice() else {
+        panic!("{effects:?}");
+    };
+    assert_eq!(opened, paths);
+    assert_eq!(s.view.marks_count(), 0, "marks are consumed");
+}
+
+#[test]
+fn invalid_bulk_rename_with_a_kept_file_reopens_or_discards_it() {
+    let retry = BulkRetry {
+        dir: PathBuf::from("/work/proj"),
+        names: vec!["a.txt".into()],
+        file: PathBuf::from("/tmp/kestrel-bulk-rename-1.txt"),
+    };
+    let invalid = |retry: &BulkRetry| {
+        Msg::BulkPlanned(BulkPlanResult::Invalid {
+            problems: vec!["line 1: empty name".into()],
+            retry: Some(retry.clone()),
+        })
+    };
+    let mut s = state();
+    update(&mut s, invalid(&retry));
+    let confirm = s.fileops.confirm.as_ref().unwrap();
+    assert_eq!(confirm.accept_label, "edit again");
+    assert!(confirm.lines.last().unwrap().contains("kept"));
+    let effects = keys(&mut s, "enter");
+    assert_eq!(
+        effects,
+        vec![Effect::BulkRenameEdit {
+            dir: retry.dir.clone(),
+            names: retry.names.clone(),
+            reuse: Some(retry.file.clone()),
+        }]
+    );
+    assert!(s.overlays.is_empty());
+
+    update(&mut s, invalid(&retry));
+    let effects = keys(&mut s, "esc");
+    assert!(effects.contains(&Effect::BulkRenameDiscard {
+        file: retry.file.clone()
+    }));
+    assert!(s.overlays.is_empty());
+    assert_eq!(status(&s), "Bulk rename discarded");
 }

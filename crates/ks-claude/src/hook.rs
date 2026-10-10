@@ -80,7 +80,7 @@ pub fn run_hook_with(stdin: impl Read, ipc_name: Option<&str>) -> i32 {
             file_path: h.file_path,
         };
         if let Err(e) = call_blocking(name, &req, FORWARD_TIMEOUT) {
-            tracing::debug!("hook forward failed: {e}");
+            tracing::warn!("hook forward failed: {e}");
         }
     }));
     let _ = result;

@@ -1,6 +1,5 @@
 ---
 source: crates/ks-ui/src/palette.rs
-assertion_line: 234
 expression: rendered
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
@@ -38,8 +37,8 @@ expression: rendered
                                    │  Command palette                                                                     : │
                                    │  Help                                                                                ? │
                                    │  Jobs overlay                                                                      g j │
-                                   │  Cancel selected job                                                                   │
-                                   ╰────────────────────────────────────────────────────────────────────────────────────────╯
+                                   │  Cancel selected job                                          x (jobs), ctrl-c (pager) │
+                                   ╰─────────────────────────────────────────── ctrl-n/ctrl-p move · enter run · esc close ─╯
 
 
 
@@ -217,9 +216,12 @@ expression: rendered
  34 120..124 fg=#958e86 bg=reset
  34 124..160 fg=#c4623f bg=reset
  35  35..38  fg=#c4623f bg=reset
- 35  38..124 fg=#2b2724 bg=reset
+ 35  38..99  fg=#2b2724 bg=reset
+ 35  99..124 fg=#958e86 bg=reset
  35 124..160 fg=#c4623f bg=reset
- 36  35..160 fg=#c4623f bg=reset
+ 36  35..80  fg=#c4623f bg=reset
+ 36  80..123 fg=#958e86 bg=reset
+ 36 123..160 fg=#c4623f bg=reset
  45   0..160 fg=#d4ccc2 bg=reset
  46   1..141 fg=#c4623f bg=reset bold
  46 141..160 fg=#6b645d bg=reset

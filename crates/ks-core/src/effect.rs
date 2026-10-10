@@ -85,10 +85,14 @@ pub enum Effect {
     OpenDefault { path: PathBuf },
     /// Open in the editor, at `line` when given. Terminal editors suspend the TUI.
     OpenInEditor { path: PathBuf, line: Option<u32> },
-    /// Look up the programs `path` can be opened with, answered by `Msg::OpenHandlers`.
-    ListOpenHandlers { path: PathBuf },
-    /// Open `path` with the handler of that name.
-    OpenWith { path: PathBuf, handler: String },
+    /// Look up the programs the (first of the) `paths` can be opened with, answered by
+    /// `Msg::OpenHandlers`. `paths` are the marked entries, or the cursor entry.
+    ListOpenHandlers { paths: Vec<PathBuf> },
+    /// Open every one of `paths` with the handler of that name.
+    OpenWith {
+        paths: Vec<PathBuf>,
+        handler: String,
+    },
     /// Put the paths on the clipboard.
     CopyPaths {
         paths: Vec<PathBuf>,
@@ -103,8 +107,15 @@ pub enum Effect {
     },
     /// Kill the shell command with this id.
     CancelShell(u64),
-    /// Write the names to a temp file and open the editor on it (bulk rename).
-    BulkRenameEdit { dir: PathBuf, names: Vec<String> },
+    /// Write the names to a temp file and open the editor on it (bulk rename). With `reuse` the
+    /// kept edit file of an invalid attempt is opened again instead of writing a new one.
+    BulkRenameEdit {
+        dir: PathBuf,
+        names: Vec<String>,
+        reuse: Option<PathBuf>,
+    },
+    /// Delete the kept edit file of an abandoned bulk rename.
+    BulkRenameDiscard { file: PathBuf },
     /// Validate the edited bulk-rename file, answering `Msg::BulkPlanned`; the file is
     /// deleted. `error` is set when the editor could not run.
     BulkRenamePlan {

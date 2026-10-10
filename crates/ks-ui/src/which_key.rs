@@ -8,7 +8,7 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use ks_core::keymap::{Continuation, ContinuationTarget, KeyPattern};
-use ks_core::AppState;
+use ks_core::{Action, AppState};
 
 use crate::popup::framed;
 use crate::text::{truncate_end, width};
@@ -26,6 +26,17 @@ pub fn key_label(key: KeyPattern) -> String {
     }
 }
 
+/// The popup is narrow, so a few long command titles have a shorter form here. Together with
+/// the key column every row then fits half of an 80-column terminal.
+fn popup_title(action: Action) -> &'static str {
+    match action {
+        Action::ClaudeSplit => "Claude in terminal split",
+        Action::ClaudePosition => "Move Claude pane",
+        Action::ClaudeResume => "Resume Claude session",
+        other => other.title(),
+    }
+}
+
 fn entries(state: &AppState) -> Vec<(String, String, bool)> {
     state
         .keymap
@@ -33,7 +44,7 @@ fn entries(state: &AppState) -> Vec<(String, String, bool)> {
         .iter()
         .map(|c: &Continuation| match c.target {
             ContinuationTarget::Action(action) => {
-                (key_label(c.key), action.title().to_owned(), false)
+                (key_label(c.key), popup_title(action).to_owned(), false)
             }
             ContinuationTarget::Group => (key_label(c.key), "more…".to_owned(), true),
         })
@@ -173,6 +184,18 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn no_popup_title_is_cut_at_80_columns() {
+        for h in [12u16, 24] {
+            let text = draw(&pending(80, h, &['g']), &theme("ember"));
+            for title in ["Claude in terminal split", "Move Claude pane"] {
+                assert!(text.contains(title), "height {h}:\n{text}");
+            }
+            let popup_cut = text.lines().any(|l| l.contains('│') && l.contains('…'));
+            assert!(!popup_cut, "height {h}:\n{text}");
         }
     }
 

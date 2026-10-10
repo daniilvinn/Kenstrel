@@ -36,7 +36,9 @@ windows = { workspace = true, features = [
     "Win32_Storage_FileSystem",
     "Win32_System_Time",
     "Win32_System_Diagnostics_Debug",
+    "Win32_System_Threading",
 ] }
+winreg = "0.56.0"
 
 [dev-dependencies]
 tempfile.workspace = true

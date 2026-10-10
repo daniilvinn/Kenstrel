@@ -8,11 +8,15 @@ use std::path::{Path, PathBuf};
 
 use ks_core::{DriveInfo, DriveKind};
 use windows::core::PCWSTR;
+use windows::Win32::Foundation::{CloseHandle, ERROR_ACCESS_DENIED};
 use windows::Win32::Storage::FileSystem::{
     FindClose, FindFirstFileW, GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDrives,
     GetVolumeInformationW, WIN32_FIND_DATAW,
 };
 use windows::Win32::System::Diagnostics::Debug::{SetThreadErrorMode, SEM_FAILCRITICALERRORS};
+use windows::Win32::System::Threading::{
+    GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows::Win32::System::Time::{GetTimeZoneInformation, TIME_ZONE_INFORMATION};
 
 use crate::attrs::win;
@@ -139,4 +143,21 @@ pub fn utc_offset_secs() -> i32 {
             tz.StandardBias
         };
     -bias * 60
+}
+
+/// Whether a process with this id is currently running. Conservative: when the process cannot
+/// be queried for another reason than "it does not exist" it counts as alive.
+pub fn pid_alive(pid: u32) -> bool {
+    const STILL_ACTIVE: u32 = 259;
+    // SAFETY: plain value arguments; the returned handle is closed below.
+    let handle = match unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) } {
+        Ok(handle) => handle,
+        Err(err) => return err.code() == ERROR_ACCESS_DENIED.to_hresult(),
+    };
+    let mut code = 0u32;
+    // SAFETY: `handle` is a valid process handle and `code` a valid out-pointer.
+    let queried = unsafe { GetExitCodeProcess(handle, &mut code) }.is_ok();
+    // SAFETY: `handle` came from `OpenProcess` and is closed exactly once.
+    let _ = unsafe { CloseHandle(handle) };
+    !queried || code == STILL_ACTIVE
 }

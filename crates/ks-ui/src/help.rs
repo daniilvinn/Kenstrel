@@ -91,10 +91,15 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
                 Span::raw(" "),
                 Span::styled(category.title().to_owned(), theme.bold_accent()),
             ]),
+            HelpLine::Subheading(name) => Line::from(vec![
+                Span::raw("   "),
+                Span::styled(format!("in {name}"), theme.muted()),
+            ]),
             HelpLine::Entry {
                 keys,
                 title,
                 description,
+                ..
             } => entry_line(
                 keys,
                 title,

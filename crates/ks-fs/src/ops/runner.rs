@@ -111,7 +111,7 @@ impl Runner {
     }
 
     pub fn error(&mut self, path: &Path, err: impl std::fmt::Display) {
-        tracing::debug!(path = %path.display(), error = %err, "item error");
+        tracing::warn!(path = %path.display(), error = %err, "item error");
         self.errors.push(ItemError {
             path: path.to_path_buf(),
             message: err.to_string(),
