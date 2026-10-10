@@ -680,4 +680,20 @@ keywrd = \"#000000\"
         assert_eq!(theme.name, "paper");
         assert!(problem.is_none());
     }
+
+    #[test]
+    fn the_documented_example_theme_is_valid() {
+        // docs/theme.example.toml is shown in the README; it must keep parsing and must
+        // define every token and syntax key.
+        let example = include_str!("../../../docs/theme.example.toml");
+        let theme = Theme::parse("example", example, ColorDepth::TrueColor, true).unwrap();
+        assert_eq!(theme.accent, Color::Rgb(0x6a, 0xa5, 0xd9));
+        let file: ThemeFile = toml::from_str(example).unwrap();
+        assert!(
+            file.colors.missing().is_empty(),
+            "{:?}",
+            file.colors.missing()
+        );
+        assert!(file.syntax.keyword.is_some() && file.syntax.punctuation.is_some());
+    }
 }

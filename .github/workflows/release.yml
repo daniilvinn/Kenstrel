@@ -1,0 +1,63 @@
+name: Release
+
+# Builds ks.exe for a version tag (git tag v0.1.0 && git push origin v0.1.0) and attaches
+# it to a GitHub release. The build job runs fmt, clippy and tests first and the release is only
+# published if they pass.
+
+on:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: ks.exe (windows-latest)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test --workspace --locked
+        env:
+          INSTA_UPDATE: "no"
+      - name: Build
+        run: cargo build --release -p ks-app --locked
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "ks-${{ github.ref_name }}-windows-x86_64"
+          New-Item -ItemType Directory -Path $name | Out-Null
+          Copy-Item target/release/ks.exe $name/
+          Copy-Item README.md, docs/keymap.md, docs/config.example.toml, docs/theme.example.toml $name/
+          Compress-Archive -Path "$name/*" -DestinationPath "$name.zip"
+          (Get-FileHash "$name.zip" -Algorithm SHA256).Hash.ToLower() + "  $name.zip" | Out-File "$name.zip.sha256" -Encoding ascii
+          "ASSET_ZIP=$name.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ks-windows-x86_64
+          path: |
+            target/release/ks.exe
+            ${{ env.ASSET_ZIP }}
+            ${{ env.ASSET_ZIP }}.sha256
+          if-no-files-found: error
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/release/ks.exe
+            ${{ env.ASSET_ZIP }}
+            ${{ env.ASSET_ZIP }}.sha256
+          generate_release_notes: true
