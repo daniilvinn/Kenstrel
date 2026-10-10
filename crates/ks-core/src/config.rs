@@ -138,6 +138,20 @@ impl Default for LayoutConfig {
     }
 }
 
+/// Whether the editor runs inside the terminal (so the TUI must be suspended while it runs).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EditorTerminal {
+    /// Decide by the program name: vim, nvim, hx, nano, micro, ... are terminal editors,
+    /// everything else (code, notepad, ...) is a GUI editor started detached.
+    #[default]
+    Auto,
+    /// Always suspend the TUI and run the editor attached to the terminal.
+    Always,
+    /// Never suspend; start the editor detached.
+    Never,
+}
+
 /// Command templates for external editors. `{file}` and `{line}` are substituted.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -147,6 +161,8 @@ pub struct EditorConfig {
     pub open: String,
     /// Command to open a file at a line (content search hits).
     pub open_at_line: String,
+    /// Terminal or GUI editor; see [`EditorTerminal`].
+    pub terminal: EditorTerminal,
 }
 
 impl Default for EditorConfig {
@@ -154,6 +170,7 @@ impl Default for EditorConfig {
         Self {
             open: String::new(),
             open_at_line: "code -g {file}:{line}".to_owned(),
+            terminal: EditorTerminal::Auto,
         }
     }
 }
@@ -238,6 +255,27 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn editor_terminal_parses_and_rejects_unknown_values() {
+        for (text, want) in [
+            ("auto", EditorTerminal::Auto),
+            ("always", EditorTerminal::Always),
+            ("never", EditorTerminal::Never),
+        ] {
+            let config = Config::from_toml(&format!(
+                "[editor]
+terminal = \"{text}\""
+            ))
+            .unwrap();
+            assert_eq!(config.editor.terminal, want);
+        }
+        assert!(Config::from_toml(
+            "[editor]
+terminal = \"sometimes\""
+        )
+        .is_err());
+    }
 
     #[test]
     fn empty_file_is_the_default_config() {

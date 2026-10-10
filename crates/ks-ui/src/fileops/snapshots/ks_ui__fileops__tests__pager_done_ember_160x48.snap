@@ -1,0 +1,157 @@
+---
+source: crates/ks-ui/src/fileops/tests.rs
+expression: "draw(&state, &theme(theme_name))"
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+──╭─ $ cargo build --release ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮──
+  │    Compiling crate-0 v0.0.0                                                                                                                              │
+  │    Compiling crate-1 v0.1.0                                                                                                                              │M
+  │    Compiling crate-2 v0.2.0                                                                                                                              │!
+  │ warning: unused variable `x3` in src/renderer/very/long/path/to/a/module_with_a_long_name.rs                                                             │
+  │    Compiling crate-4 v0.4.0                                                                                                                              │
+  │    Compiling crate-5 v0.5.0                                                                                                                              │+
+  │    Compiling crate-6 v0.6.0                                                                                                                              │
+  │    Compiling crate-7 v0.7.0                                                                                                                              │?
+  │    Compiling crate-8 v0.8.0                                                                                                                              │
+  │    Compiling crate-9 v0.9.0                                                                                                                              │
+  │ warning: unused variable `x10` in src/renderer/very/long/path/to/a/module_with_a_long_name.rs                                                            │
+ ▌│    Compiling crate-11 v0.11.0                                                                                                                            │M
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │                                                                                                                                                          │
+  │ exit 101  1-12/12  ‹j/k› scroll  ‹g/G› top/end  ‹esc› close                                                                                              │
+──╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯──
+ ›                                                                                                                                           12/13 · 1 selected
+   ‹esc› cancel
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..143 fg=#e8e3dc bg=reset bold
+  0 143..148 fg=#a9a29a bg=reset bold
+  0 148..151 fg=#a9a29a bg=reset
+  0 151..154 fg=#92c07f bg=reset
+  0 154..157 fg=#e5b567 bg=reset
+  0 157..160 fg=#c9a27f bg=reset
+  1   0..2   fg=#403a35 bg=reset
+  1   2..5   fg=#e8707a bg=reset
+  1   5..29  fg=#e8e3dc bg=reset bold
+  1  29..158 fg=#e8707a bg=reset
+  1 158..160 fg=#403a35 bg=reset
+  2   2..7   fg=#e8707a bg=reset
+  2   7..157 fg=#e8e3dc bg=reset
+  2 157..160 fg=#e8707a bg=reset
+  3   2..7   fg=#e8707a bg=reset
+  3   7..157 fg=#e8e3dc bg=reset
+  3 157..158 fg=#e8707a bg=reset
+  3 158..160 fg=#e5b567 bg=reset
+  4   2..7   fg=#e8707a bg=reset
+  4   7..157 fg=#e8e3dc bg=reset
+  4 157..158 fg=#e8707a bg=reset
+  4 158..160 fg=#625c56 bg=reset
+  5   2..4   fg=#e8707a bg=reset
+  5   4..157 fg=#e5b567 bg=reset
+  5 157..160 fg=#e8707a bg=reset
+  6   2..7   fg=#e8707a bg=reset
+  6   7..157 fg=#e8e3dc bg=reset
+  6 157..160 fg=#e8707a bg=reset
+  7   2..7   fg=#e8707a bg=reset
+  7   7..157 fg=#e8e3dc bg=reset
+  7 157..158 fg=#e8707a bg=reset
+  7 158..160 fg=#92c07f bg=reset
+  8   2..7   fg=#e8707a bg=reset
+  8   7..157 fg=#e8e3dc bg=reset
+  8 157..160 fg=#e8707a bg=reset
+  9   2..7   fg=#e8707a bg=reset
+  9   7..157 fg=#e8e3dc bg=reset
+  9 157..158 fg=#e8707a bg=reset
+  9 158..160 fg=#c9a27f bg=reset
+ 10   2..7   fg=#e8707a bg=reset
+ 10   7..157 fg=#e8e3dc bg=reset
+ 10 157..160 fg=#e8707a bg=reset
+ 11   2..7   fg=#e8707a bg=reset
+ 11   7..157 fg=#e8e3dc bg=reset
+ 11 157..160 fg=#e8707a bg=reset
+ 12   2..4   fg=#e8707a bg=reset
+ 12   4..157 fg=#e5b567 bg=reset
+ 12 157..160 fg=#e8707a bg=reset
+ 13   0..1   fg=#e8e3dc bg=#2f2a26
+ 13   1..2   fg=#d97757 bg=#2f2a26
+ 13   2..7   fg=#e8707a bg=reset
+ 13   7..157 fg=#e8e3dc bg=reset
+ 13 157..158 fg=#e8707a bg=reset
+ 13 158..159 fg=#e5b567 bg=#2f2a26
+ 13 159..160 fg=#e8e3dc bg=#2f2a26
+ 14   2..160 fg=#e8707a bg=reset
+ 15   2..160 fg=#e8707a bg=reset
+ 16   2..160 fg=#e8707a bg=reset
+ 17   2..160 fg=#e8707a bg=reset
+ 18   2..160 fg=#e8707a bg=reset
+ 19   2..160 fg=#e8707a bg=reset
+ 20   2..160 fg=#e8707a bg=reset
+ 21   2..160 fg=#e8707a bg=reset
+ 22   2..160 fg=#e8707a bg=reset
+ 23   2..160 fg=#e8707a bg=reset
+ 24   2..160 fg=#e8707a bg=reset
+ 25   2..160 fg=#e8707a bg=reset
+ 26   2..160 fg=#e8707a bg=reset
+ 27   2..160 fg=#e8707a bg=reset
+ 28   2..160 fg=#e8707a bg=reset
+ 29   2..160 fg=#e8707a bg=reset
+ 30   2..160 fg=#e8707a bg=reset
+ 31   2..160 fg=#e8707a bg=reset
+ 32   2..160 fg=#e8707a bg=reset
+ 33   2..160 fg=#e8707a bg=reset
+ 34   2..160 fg=#e8707a bg=reset
+ 35   2..160 fg=#e8707a bg=reset
+ 36   2..160 fg=#e8707a bg=reset
+ 37   2..160 fg=#e8707a bg=reset
+ 38   2..160 fg=#e8707a bg=reset
+ 39   2..160 fg=#e8707a bg=reset
+ 40   2..160 fg=#e8707a bg=reset
+ 41   2..160 fg=#e8707a bg=reset
+ 42   2..160 fg=#e8707a bg=reset
+ 43   2..160 fg=#e8707a bg=reset
+ 44   2..14  fg=#e8707a bg=reset
+ 44  14..23  fg=#a9a29a bg=reset
+ 44  23..24  fg=#716b64 bg=reset
+ 44  24..27  fg=#a9a29a bg=reset
+ 44  27..38  fg=#716b64 bg=reset
+ 44  38..41  fg=#a9a29a bg=reset
+ 44  41..53  fg=#716b64 bg=reset
+ 44  53..56  fg=#a9a29a bg=reset
+ 44  56..157 fg=#716b64 bg=reset
+ 44 157..160 fg=#e8707a bg=reset
+ 45   0..2   fg=#403a35 bg=reset
+ 45   2..158 fg=#e8707a bg=reset
+ 45 158..160 fg=#403a35 bg=reset
+ 46   1..141 fg=#d97757 bg=reset bold
+ 46 141..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..7   fg=#a9a29a bg=reset
+ 47   7..160 fg=#716b64 bg=reset

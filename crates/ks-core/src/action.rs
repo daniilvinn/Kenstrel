@@ -67,6 +67,7 @@ actions! {
     HelpOpen => "help.open", "Help";
     JobsOpen => "jobs.open", "Jobs overlay";
     JobCancel => "job.cancel", "Cancel selected job";
+    JobsClear => "jobs.clear", "Clear finished jobs";
     // Selection
     MarkToggle => "mark.toggle", "Toggle mark";
     VisualToggle => "mode.visual", "Visual (range select) mode";

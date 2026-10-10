@@ -11,6 +11,8 @@ use std::path::PathBuf;
 
 use ks_core::{Effect, Gen, Level, Msg, TimerKind};
 use ks_fs::DirWatcher;
+
+use crate::fileops::{EditorSettings, FileOpsRunner};
 use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
@@ -31,16 +33,40 @@ pub struct EffectRunner {
     shutdown: CancellationToken,
     timers: HashMap<TimerKind, CancellationToken>,
     slots: HashMap<Slot, CancellationToken>,
+    /// Jobs, shell runs and launching (P6).
+    fileops: FileOpsRunner,
 }
 
 impl EffectRunner {
     pub fn new(tx: Sender<Msg>) -> Self {
+        let shutdown = CancellationToken::new();
         Self {
+            fileops: FileOpsRunner::new(tx.clone(), shutdown.child_token()),
             tx,
-            shutdown: CancellationToken::new(),
+            shutdown,
             timers: HashMap::new(),
             slots: HashMap::new(),
         }
+    }
+
+    /// Applies the parts of the config the runner needs (the `[editor]` table). Call again
+    /// after a config reload.
+    pub fn configure(&mut self, config: &ks_core::Config) {
+        self.fileops
+            .configure(EditorSettings::from_config(&config.editor));
+    }
+
+    /// Replaces the clipboard that `Y` writes to (tests).
+    pub fn set_clipboard(
+        &mut self,
+        clipboard: impl ks_fs::launch::clipboard::Clipboard + Send + 'static,
+    ) {
+        self.fileops.set_clipboard(clipboard);
+    }
+
+    /// The job engine (tests, diagnostics).
+    pub fn jobs(&self) -> &ks_fs::ops::JobManager {
+        self.fileops.manager()
     }
 
     /// Starts the given effects. Must be called from within a tokio runtime.
@@ -78,12 +104,19 @@ impl EffectRunner {
                 }
                 Effect::GitStatus { gen, dir } => self.git_status(gen, dir),
                 Effect::CountChildren { gen, dir, names } => self.count_children(gen, dir, names),
+                // The event loop owns the terminal and runs foreground programs itself.
+                Effect::RunForeground { .. } => {
+                    tracing::warn!("RunForeground reached the effect runner");
+                }
+                // File operations, shell runs and launching (P6).
+                other => self.fileops.handle(other),
             }
         }
     }
 
     /// Cancels everything still running.
     pub fn shutdown(&mut self) {
+        self.fileops.shutdown();
         self.shutdown.cancel();
         self.timers.clear();
         self.slots.clear();

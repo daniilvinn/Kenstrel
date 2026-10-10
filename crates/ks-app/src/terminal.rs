@@ -62,6 +62,19 @@ pub fn restore() {
     }
 }
 
+/// Hands the terminal to a foreground program: leaves the alternate screen, shows the cursor
+/// and disables raw mode, but keeps the panic hook armed (`ACTIVE` stays set).
+pub fn suspend() {
+    let _ = execute!(io::stdout(), LeaveAlternateScreen, Show);
+    let _ = disable_raw_mode();
+}
+
+/// Takes the terminal back after [`suspend`]. The caller must redraw everything.
+pub fn resume() -> io::Result<()> {
+    enable_raw_mode()?;
+    execute!(io::stdout(), EnterAlternateScreen)
+}
+
 /// Installs a panic hook that first runs `cleanup` (restoring the terminal), then logs the
 /// panic with a backtrace, then chains to the previous hook, which prints it to stderr.
 ///

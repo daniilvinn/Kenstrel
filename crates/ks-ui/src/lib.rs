@@ -1,5 +1,6 @@
 //! Kestrel UI: theme tokens and the ratatui rendering of an [`AppState`](ks_core::AppState).
 
+pub mod fileops;
 pub mod format;
 pub mod icons;
 pub mod list;

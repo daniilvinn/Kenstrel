@@ -7,6 +7,7 @@ use std::time::SystemTime;
 
 use crate::config::Config;
 use crate::drives::DrivesView;
+use crate::fileops::FileOps;
 use crate::generation::{Gen, GenCounter};
 use crate::git::GitSnapshot;
 use crate::key::KeyChord;
@@ -116,6 +117,8 @@ pub struct AppState {
     pub drives: DrivesView,
     /// Git status of `cwd`, when it is inside a repository.
     pub git: Option<GitSnapshot>,
+    /// File operations: yank register, jobs table, dialogs, pager (P6).
+    pub fileops: FileOps,
     pub(crate) history: History,
     /// Where the cursor was in directories left earlier (by entry name).
     pub(crate) cursor_memory: HashMap<PathBuf, OsString>,
@@ -155,6 +158,7 @@ impl AppState {
             show_drives: false,
             drives: DrivesView::default(),
             git: None,
+            fileops: FileOps::default(),
             history: History::default(),
             cursor_memory: HashMap::new(),
             nav: None,

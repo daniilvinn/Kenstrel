@@ -32,6 +32,12 @@ pub enum Overlay {
     Confirm,
     Jobs,
     Claude,
+    /// A job waits for an answer to "destination exists" (P6).
+    Conflict,
+    /// The `!` command output pager (P6).
+    Pager,
+    /// A small choice list: `Y` copy-as, `O` open-with (P6).
+    Menu,
 }
 
 /// Selects which keymap table handles a key press.
@@ -48,6 +54,9 @@ pub enum KeyContext {
     Confirm,
     Jobs,
     Claude,
+    Conflict,
+    Pager,
+    Menu,
 }
 
 impl KeyContext {
@@ -63,6 +72,9 @@ impl KeyContext {
         KeyContext::Confirm,
         KeyContext::Jobs,
         KeyContext::Claude,
+        KeyContext::Conflict,
+        KeyContext::Pager,
+        KeyContext::Menu,
     ];
 
     /// Name used for the `[keymap.<name>]` table in `config.toml`.
@@ -79,6 +91,9 @@ impl KeyContext {
             KeyContext::Confirm => "confirm",
             KeyContext::Jobs => "jobs",
             KeyContext::Claude => "claude",
+            KeyContext::Conflict => "conflict",
+            KeyContext::Pager => "pager",
+            KeyContext::Menu => "menu",
         }
     }
 
@@ -130,6 +145,9 @@ impl From<Overlay> for KeyContext {
             Overlay::Confirm => KeyContext::Confirm,
             Overlay::Jobs => KeyContext::Jobs,
             Overlay::Claude => KeyContext::Claude,
+            Overlay::Conflict => KeyContext::Conflict,
+            Overlay::Pager => KeyContext::Pager,
+            Overlay::Menu => KeyContext::Menu,
         }
     }
 }

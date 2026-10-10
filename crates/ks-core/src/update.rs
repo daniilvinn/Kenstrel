@@ -8,6 +8,7 @@ use std::time::Duration;
 use crate::action::Action;
 use crate::config::SortKey;
 use crate::effect::Effect;
+use crate::fileops;
 use crate::keymap::{Invocation, Resolution};
 use crate::mode::Mode;
 use crate::msg::{Msg, TimerKind};
@@ -64,6 +65,16 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::ChildCounts { gen, counts } => nav::on_child_counts(state, gen, counts),
         Msg::DirChanged { gen } => nav::on_dir_changed(state, &mut effects, gen),
         Msg::GitStatus { gen, snapshot } => nav::on_git_status(state, gen, snapshot),
+        Msg::Job(job) => fileops::on_job(state, job, &mut effects),
+        Msg::Shell(shell) => fileops::on_shell(state, shell),
+        Msg::Foreground(request) => fileops::on_foreground_request(state, request, &mut effects),
+        Msg::ForegroundDone { id, error } => {
+            fileops::on_foreground_done(state, id, error, &mut effects);
+        }
+        Msg::OpenHandlers { path, names } => {
+            fileops::on_open_handlers(state, path, names, &mut effects);
+        }
+        Msg::BulkPlanned(result) => fileops::on_bulk_planned(state, result, &mut effects),
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
@@ -74,6 +85,10 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
 }
 
 fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Effect>) {
+    // Text entry and dialog hot keys of the file operations come before the keymap.
+    if state.pending.is_empty() && fileops::intercept_key(state, key, effects) {
+        return;
+    }
     let ctx = state.key_context();
     match state.keymap.resolve(ctx, &state.pending, key) {
         Resolution::Action(invocation) => {
@@ -157,9 +172,12 @@ pub(crate) fn set_status(
 }
 
 fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Effect>) {
+    if fileops::handle_action(state, &invocation, effects) {
+        return;
+    }
     match invocation.action {
-        Action::Quit => state.quit = Some(QuitKind::Exit),
-        Action::QuitCd => state.quit = Some(QuitKind::ChangeDir),
+        Action::Quit => fileops::request_quit(state, QuitKind::Exit),
+        Action::QuitCd => fileops::request_quit(state, QuitKind::ChangeDir),
         Action::Cancel => cancel(state),
         Action::CursorDown => nav::move_cursor(state, 1),
         Action::CursorUp => nav::move_cursor(state, -1),
@@ -355,10 +373,10 @@ mod tests {
     #[test]
     fn unimplemented_actions_report_instead_of_failing_silently() {
         let mut s = state();
-        let effects = key(&mut s, "y");
+        let effects = key(&mut s, "z");
         let status = s.status.as_ref().unwrap();
         assert_eq!(status.level, Level::Info);
-        assert_eq!(status.text, "Copy is not available yet");
+        assert_eq!(status.text, "Frecency jump is not available yet");
         assert!(matches!(
             effects.as_slice(),
             [Effect::StartTimer {

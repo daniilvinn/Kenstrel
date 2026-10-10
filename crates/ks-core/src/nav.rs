@@ -167,8 +167,9 @@ pub(crate) fn enter(state: &mut AppState, effects: &mut Vec<Effect>) {
         let target = state.cwd.join(&entry.name);
         visit(state, effects, Location::Dir(target), None);
     } else {
-        let text = format!("{} is not available yet", Action::Open.title());
-        set_status(state, Level::Info, text, effects);
+        effects.push(Effect::OpenDefault {
+            path: state.cwd.join(&entry.name),
+        });
     }
 }
 
@@ -244,6 +245,23 @@ pub(crate) fn go_place(state: &mut AppState, effects: &mut Vec<Effect>, action: 
 fn refresh(state: &mut AppState, effects: &mut Vec<Effect>) {
     let cwd = state.cwd.clone();
     request(state, effects, Location::Dir(cwd), NavKind::Refresh, None);
+}
+
+/// Re-lists the displayed directory, unless a real navigation is in flight: that one lists
+/// afresh anyway and a refresh would replace it. Used after file operations.
+pub(crate) fn refresh_if_idle(state: &mut AppState, effects: &mut Vec<Effect>) {
+    if !can_refresh(state) {
+        return;
+    }
+    refresh(state, effects);
+}
+
+/// Whether [`refresh_if_idle`] would issue a listing.
+pub(crate) fn can_refresh(state: &AppState) -> bool {
+    state
+        .nav
+        .as_ref()
+        .is_none_or(|p| matches!(p.kind, NavKind::Refresh))
 }
 
 // ----- results -----
@@ -900,11 +918,16 @@ mod tests {
     }
 
     #[test]
-    fn entering_a_file_reports_instead_of_navigating() {
+    fn entering_a_file_opens_it_instead_of_navigating() {
         let mut w = project_world();
         w.key("G l");
         assert_eq!(w.cwd(), Path::new("/home/me"));
-        assert!(w.status().contains("not available yet"), "{}", w.status());
+        assert_eq!(
+            w.effects_of(
+                |e| matches!(e, Effect::OpenDefault { path } if path == Path::new("/home/me/notes.txt"))
+            ),
+            1
+        );
     }
 
     #[test]
