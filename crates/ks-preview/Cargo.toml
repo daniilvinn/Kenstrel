@@ -9,4 +9,15 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "ico", "tiff"] }
+lru = "0.18.5"
+syntect = { version = "5.3.0", default-features = false, features = ["parsing", "regex-fancy"] }
+thiserror.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+two-face = { version = "0.5.2", default-features = false, features = ["syntect-fancy"] }
+unicode-width.workspace = true
+zip = { version = "9.0.1", default-features = false, features = ["deflate"] }
 
+[dev-dependencies]
+tempfile.workspace = true
