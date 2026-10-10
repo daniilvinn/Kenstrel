@@ -9,4 +9,22 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+tokio-util.workspace = true
+tracing.workspace = true
+crossbeam-channel = "0.5.17"
+grep-matcher = "0.1.9"
+grep-regex = "0.1.14"
+grep-searcher = "0.1.17"
+ignore = "0.4.33"
+nucleo = "0.5.0"
+parking_lot = "0.12.5"
+regex-syntax = "0.8.11"
 
+[dev-dependencies]
+criterion = "0.8.2"
+tempfile.workspace = true
+
+
+[[bench]]
+name = "search"
+harness = false
