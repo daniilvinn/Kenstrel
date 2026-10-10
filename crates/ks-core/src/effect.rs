@@ -8,8 +8,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::aids::StateFile;
+use crate::fileops::{ConflictAnswer, ForegroundSpec, JobRequest, PathFormatKind};
 use crate::generation::Gen;
 use crate::msg::TimerKind;
+use crate::state::JobId;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Effect {
@@ -54,4 +56,61 @@ pub enum Effect {
     LoadNavData,
     /// Atomically replace a state file with `contents`. Writes are applied in order.
     WriteState { file: StateFile, contents: String },
+    // ----- file operations (P6) -----
+    /// Start a job (copy, move, trash, delete, bulk rename). `keep_both` answers conflicts
+    /// with `name (1).ext` instead of asking.
+    SubmitJob {
+        request: JobRequest,
+        keep_both: bool,
+    },
+    /// Rename `from` to `new_name` (a bare name, validated by the runner).
+    Rename { from: PathBuf, new_name: String },
+    /// Create what `input` describes below `base` (`a/b.txt`; a trailing `/` makes a folder).
+    Create { base: PathBuf, input: String },
+    /// Undo the last file operation.
+    Undo,
+    /// Cancel a job.
+    CancelJob(JobId),
+    /// Answer the conflict prompt of `job`.
+    ResolveConflict {
+        job: JobId,
+        answer: ConflictAnswer,
+        apply_to_all: bool,
+    },
+    /// Open with the default application (`o`, `enter` on a file).
+    OpenDefault { path: PathBuf },
+    /// Open in the editor, at `line` when given. Terminal editors suspend the TUI.
+    OpenInEditor { path: PathBuf, line: Option<u32> },
+    /// Look up the programs `path` can be opened with, answered by `Msg::OpenHandlers`.
+    ListOpenHandlers { path: PathBuf },
+    /// Open `path` with the handler of that name.
+    OpenWith { path: PathBuf, handler: String },
+    /// Put the paths on the clipboard.
+    CopyPaths {
+        paths: Vec<PathBuf>,
+        format: PathFormatKind,
+        cwd: PathBuf,
+    },
+    /// Run a shell command, streaming `Msg::Shell` events tagged with `id`.
+    RunShell {
+        id: u64,
+        command: String,
+        cwd: PathBuf,
+    },
+    /// Kill the shell command with this id.
+    CancelShell(u64),
+    /// Write the names to a temp file and open the editor on it (bulk rename).
+    BulkRenameEdit { dir: PathBuf, names: Vec<String> },
+    /// Validate the edited bulk-rename file, answering `Msg::BulkPlanned`; the file is
+    /// deleted. `error` is set when the editor could not run.
+    BulkRenamePlan {
+        dir: PathBuf,
+        names: Vec<String>,
+        file: PathBuf,
+        error: Option<String>,
+    },
+    /// Suspend the TUI, run the program attached to the terminal, restore the TUI and force a
+    /// full redraw, then deliver `Msg::ForegroundDone { id }`. Handled by the event loop
+    /// (it owns the terminal), not by the effect runner.
+    RunForeground { id: u64, spec: ForegroundSpec },
 }

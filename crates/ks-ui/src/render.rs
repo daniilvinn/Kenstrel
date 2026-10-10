@@ -59,6 +59,8 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
     crate::palette::render(frame, state, theme);
     crate::help::render(frame, state, theme);
     crate::navaids::render_overlays(frame, state, theme);
+    // Overlays are drawn last, over everything.
+    crate::fileops::render_overlays(frame, state, theme);
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
@@ -168,7 +170,7 @@ fn render_rule(frame: &mut Frame, area: Rect, theme: &Theme) {
     );
 }
 
-fn spinner_glyph(state: &AppState) -> &'static str {
+pub(crate) fn spinner_glyph(state: &AppState) -> &'static str {
     let frames = if state.config.icons == IconSet::Ascii {
         ASCII_SPINNER
     } else {
@@ -196,6 +198,9 @@ fn list_status(state: &AppState) -> Vec<String> {
     if !state.show_drives && state.view.marks_count() > 0 {
         parts.push(format!("{} selected", state.view.marks_count()));
     }
+    if let Some(register) = crate::fileops::register_segment(state) {
+        parts.push(register);
+    }
     if state.view.loading || state.is_navigating() {
         parts.push("loading…".to_owned());
     }
@@ -211,6 +216,10 @@ fn add<'a>(segments: &mut Vec<Span<'a>>, span: Span<'a>) {
 }
 
 fn render_prompt(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
+    // Rename / create / shell take over the whole line while they are open.
+    if crate::fileops::render_input_prompt(frame, area, state, theme) {
+        return;
+    }
     let left = Line::from(vec![
         Span::raw(" "),
         Span::styled(PROMPT_GLYPH, theme.bold_accent()),
@@ -232,10 +241,12 @@ fn render_prompt(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme)
     }
 
     let list = list_status(state).join(" · ");
-    let jobs = state.has_running_jobs().then(|| {
-        let count = state.jobs.len();
-        let label = if count == 1 { "job" } else { "jobs" };
-        format!("{} {count} {label}", spinner_glyph(state))
+    let jobs = crate::fileops::job_segment(state).or_else(|| {
+        state.has_running_jobs().then(|| {
+            let count = state.jobs.len();
+            let label = if count == 1 { "job" } else { "jobs" };
+            format!("{} {count} {label}", spinner_glyph(state))
+        })
     });
 
     if let Some(status) = &state.status {

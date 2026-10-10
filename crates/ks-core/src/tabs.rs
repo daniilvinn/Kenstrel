@@ -158,6 +158,9 @@ fn classify_state_fields(state: &AppState) {
         utc_offset_secs: _,
         tabs: _,
         aids: _,
+        // Yank register, job table, prompt and dialogs: one set for the whole app. Marks live in
+        // `view` and so are per tab.
+        fileops: _,
         palette: _,
         help: _,
         themes: _,

@@ -1,6 +1,7 @@
 //! Everything that can happen to the app, as plain data.
 
 use std::ffi::OsString;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 use crate::aids::LoadedNavData;
@@ -8,6 +9,7 @@ use crate::config::Config;
 use crate::drives::DriveInfo;
 use crate::entry::Entry;
 use crate::error::FsError;
+use crate::fileops::{BulkPlanResult, ForegroundRequest, JobMsg, ShellMsg};
 use crate::generation::Gen;
 use crate::git::GitSnapshot;
 use crate::key::KeyChord;
@@ -98,4 +100,23 @@ pub enum Msg {
     ThemeApplied(String),
     /// Bookmarks and frecency read from the state directory (`Effect::LoadNavData`).
     NavDataLoaded(Box<LoadedNavData>),
+    // ----- file operations (P6) -----
+    /// An event of the job engine (progress, conflict prompt, result).
+    Job(JobMsg),
+    /// An event of a `!` shell command.
+    Shell(ShellMsg),
+    /// The runner asks to suspend the terminal and run a program in the foreground.
+    Foreground(ForegroundRequest),
+    /// The foreground program ended (`error` is set when it could not run or failed).
+    ForegroundDone {
+        id: u64,
+        error: Option<String>,
+    },
+    /// The programs `O` can open `path` with.
+    OpenHandlers {
+        path: PathBuf,
+        names: Vec<String>,
+    },
+    /// The edited bulk-rename file was validated.
+    BulkPlanned(BulkPlanResult),
 }

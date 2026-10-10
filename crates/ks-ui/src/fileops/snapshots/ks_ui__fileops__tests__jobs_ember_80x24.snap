@@ -1,0 +1,107 @@
+---
+source: crates/ks-ui/src/fileops/tests.rs
+expression: "draw(&state, &theme(theme_name))"
+---
+ ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────
+   ◆ current/
+   ◆ passes/                                                                7 M
+   ◆ shaders/                                                              12 !
+   ◆ a_rather_long_file_name_that_must_be_cut_in_the_middle…_row.rs   75.2 KB
+  ╭─ Jobs · 4 running ───────────────────────────────────────────────────────╮
+  │   ⠸ Copying 3 items               █████░░░░░░░  42%  112.5 MB/s     0:12 │+
+  │ ▌ ⠸ Moving photos                                    scanning 1204 files │
+  │   ? Copying report.docx                          waiting for your answer │?
+  │   ○ Moving archive.zip                                                   │
+  │   ✓ Moved to Recycle Bin: 2 items · u to undo                            │
+  │   ✗ 1 failed: a.bin: Access is denied.                                   │
+ ▌│   ⊘ Deleting cancelled (4 done)                                          │M
+  │                                                                          │
+  │ ‹j/k› move  ‹x› cancel job  ‹esc› close                                  │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ›                                            12/13 · 1 selected · ⠸ 4 jobs 42%
+   ‹esc› cancel
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..63  fg=#e8e3dc bg=reset bold
+  0  63..68  fg=#a9a29a bg=reset bold
+  0  68..71  fg=#a9a29a bg=reset
+  0  71..74  fg=#92c07f bg=reset
+  0  74..77  fg=#e5b567 bg=reset
+  0  77..80  fg=#c9a27f bg=reset
+  1   0..80  fg=#403a35 bg=reset
+  2   3..5   fg=#7fa8c9 bg=reset
+  2   5..80  fg=#b799d9 bg=reset
+  3   3..76  fg=#7fa8c9 bg=reset
+  3  76..78  fg=#a9a29a bg=reset
+  3  78..80  fg=#e5b567 bg=reset
+  4   3..75  fg=#7fa8c9 bg=reset
+  4  75..78  fg=#a9a29a bg=reset
+  4  78..80  fg=#625c56 bg=reset
+  5   3..5   fg=#a9a29a bg=reset
+  5   5..70  fg=#e8e3dc bg=reset
+  5  70..80  fg=#a9a29a bg=reset
+  6   2..5   fg=#8f5c47 bg=reset
+  6   5..22  fg=#e8e3dc bg=reset bold
+  6  22..80  fg=#8f5c47 bg=reset
+  7   2..6   fg=#8f5c47 bg=reset
+  7   6..8   fg=#d97757 bg=reset
+  7   8..38  fg=#e8e3dc bg=reset
+  7  38..43  fg=#d97757 bg=reset
+  7  43..52  fg=#716b64 bg=reset
+  7  52..77  fg=#a9a29a bg=reset
+  7  77..78  fg=#8f5c47 bg=reset
+  7  78..80  fg=#92c07f bg=reset
+  8   2..4   fg=#8f5c47 bg=reset
+  8   4..8   fg=#d97757 bg=reset
+  8   8..57  fg=#e8e3dc bg=reset
+  8  57..77  fg=#a9a29a bg=reset
+  8  77..80  fg=#8f5c47 bg=reset
+  9   2..6   fg=#8f5c47 bg=reset
+  9   6..8   fg=#d97757 bg=reset bold
+  9   8..53  fg=#e8e3dc bg=reset
+  9  53..77  fg=#d97757 bg=reset
+  9  77..78  fg=#8f5c47 bg=reset
+  9  78..80  fg=#c9a27f bg=reset
+ 10   2..6   fg=#8f5c47 bg=reset
+ 10   6..8   fg=#716b64 bg=reset
+ 10   8..77  fg=#e8e3dc bg=reset
+ 10  77..80  fg=#8f5c47 bg=reset
+ 11   2..6   fg=#8f5c47 bg=reset
+ 11   6..8   fg=#92c07f bg=reset
+ 11   8..77  fg=#a9a29a bg=reset
+ 11  77..80  fg=#8f5c47 bg=reset
+ 12   2..6   fg=#8f5c47 bg=reset
+ 12   6..77  fg=#e8707a bg=reset
+ 12  77..80  fg=#8f5c47 bg=reset
+ 13   0..1   fg=#e8e3dc bg=#2f2a26
+ 13   1..2   fg=#d97757 bg=#2f2a26
+ 13   2..6   fg=#8f5c47 bg=reset
+ 13   6..77  fg=#e5b567 bg=reset
+ 13  77..78  fg=#8f5c47 bg=reset
+ 13  78..79  fg=#e5b567 bg=#2f2a26
+ 13  79..80  fg=#e8e3dc bg=#2f2a26
+ 14   2..80  fg=#8f5c47 bg=reset
+ 15   2..4   fg=#8f5c47 bg=reset
+ 15   4..5   fg=#716b64 bg=reset
+ 15   5..8   fg=#a9a29a bg=reset
+ 15   8..17  fg=#716b64 bg=reset
+ 15  17..18  fg=#a9a29a bg=reset
+ 15  18..33  fg=#716b64 bg=reset
+ 15  33..36  fg=#a9a29a bg=reset
+ 15  36..77  fg=#716b64 bg=reset
+ 15  77..80  fg=#8f5c47 bg=reset
+ 16   2..80  fg=#8f5c47 bg=reset
+ 21   0..80  fg=#403a35 bg=reset
+ 22   1..46  fg=#d97757 bg=reset bold
+ 22  46..65  fg=#a9a29a bg=reset
+ 22  65..67  fg=#716b64 bg=reset
+ 22  67..80  fg=#d97757 bg=reset
+ 23   3..4   fg=#716b64 bg=reset
+ 23   4..7   fg=#a9a29a bg=reset
+ 23   7..80  fg=#716b64 bg=reset

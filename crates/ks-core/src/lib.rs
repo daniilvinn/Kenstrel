@@ -14,6 +14,7 @@ pub mod drives;
 pub mod effect;
 pub mod entry;
 pub mod error;
+pub mod fileops;
 pub mod frecency;
 pub mod generation;
 pub mod git;

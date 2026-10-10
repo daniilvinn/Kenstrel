@@ -34,6 +34,12 @@ pub enum Overlay {
     Claude,
     Bookmarks,
     Jump,
+    /// A job waits for an answer to "destination exists" (P6).
+    Conflict,
+    /// The `!` command output pager (P6).
+    Pager,
+    /// A small choice list: `Y` copy-as, `O` open-with (P6).
+    Menu,
 }
 
 /// Selects which keymap table handles a key press.
@@ -52,6 +58,9 @@ pub enum KeyContext {
     Claude,
     Bookmarks,
     Jump,
+    Conflict,
+    Pager,
+    Menu,
 }
 
 impl KeyContext {
@@ -69,6 +78,9 @@ impl KeyContext {
         KeyContext::Claude,
         KeyContext::Bookmarks,
         KeyContext::Jump,
+        KeyContext::Conflict,
+        KeyContext::Pager,
+        KeyContext::Menu,
     ];
 
     /// Name used for the `[keymap.<name>]` table in `config.toml`.
@@ -87,6 +99,9 @@ impl KeyContext {
             KeyContext::Claude => "claude",
             KeyContext::Bookmarks => "bookmarks",
             KeyContext::Jump => "jump",
+            KeyContext::Conflict => "conflict",
+            KeyContext::Pager => "pager",
+            KeyContext::Menu => "menu",
         }
     }
 
@@ -140,6 +155,9 @@ impl From<Overlay> for KeyContext {
             Overlay::Claude => KeyContext::Claude,
             Overlay::Bookmarks => KeyContext::Bookmarks,
             Overlay::Jump => KeyContext::Jump,
+            Overlay::Conflict => KeyContext::Conflict,
+            Overlay::Pager => KeyContext::Pager,
+            Overlay::Menu => KeyContext::Menu,
         }
     }
 }

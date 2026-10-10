@@ -146,6 +146,11 @@ const COMMANDS: &[(Action, Category, &str)] = &[
         "Cancel the selected job in the jobs overlay.",
     ),
     (
+        Action::JobsClear,
+        C::App,
+        "Drop finished jobs from the jobs overlay.",
+    ),
+    (
         Action::MarkToggle,
         C::Selection,
         "Mark or unmark the entry under the cursor.",

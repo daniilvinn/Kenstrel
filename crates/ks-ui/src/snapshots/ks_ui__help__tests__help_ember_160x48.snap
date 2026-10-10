@@ -48,7 +48,7 @@ expression: "draw(&opened(w, h), &theme(name))"
                          │   o                   Open with default app               Open with the default application.               │
                          │   O                   Open with...                        Choose which application opens the file.         │
                          │   e                   Open in editor                      Open in your editor.                             │
-─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 81 ─╯─────────────────────────
+─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 82 ─╯─────────────────────────
  ›                                                                                                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---

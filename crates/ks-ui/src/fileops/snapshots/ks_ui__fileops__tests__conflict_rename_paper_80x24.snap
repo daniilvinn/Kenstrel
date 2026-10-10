@@ -1,0 +1,97 @@
+---
+source: crates/ks-ui/src/fileops/tests.rs
+expression: "draw(&state, &theme(theme_name))"
+---
+ ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────
+   ◆ current/
+   ◆ passes/                                                                7 M
+   ◆ shaders/                                                              12 !
+   ◆ a_rather_long_file_name_that_must_be_cut_in_the_middle…_row.rs   75.2 KB
+  ╭─ Already exists ─────────────────────────────────────────────────────────╮
+  │ report.final.docx already exists                                         │+
+  │ in /home/me/projects/omniforce/src/renderer                              │
+  │                                                                          │?
+  │ existing    1.0 MB   2025-03-05                                          │
+  │ incoming    2.3 MB   3h ago                                              │
+  │                                                                          │
+ ▌│ rename › report.final.docx                                               │M
+  │                                                                          │
+  │                                                                          │
+  │ ‹enter› use this name  ‹esc› back                                        │
+  ╰──────────────────────────────────────────────────────────────────────────╯
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ›                                                           12/13 · 1 selected
+   ‹esc› cancel
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..63  fg=#2b2724 bg=reset bold
+  0  63..68  fg=#6b645d bg=reset bold
+  0  68..71  fg=#6b645d bg=reset
+  0  71..74  fg=#3d7a3a bg=reset
+  0  74..77  fg=#a86f12 bg=reset
+  0  77..80  fg=#8a6a3f bg=reset
+  1   0..80  fg=#d4ccc2 bg=reset
+  2   3..5   fg=#2f6690 bg=reset
+  2   5..80  fg=#7a4fa3 bg=reset
+  3   3..76  fg=#2f6690 bg=reset
+  3  76..78  fg=#6b645d bg=reset
+  3  78..80  fg=#a86f12 bg=reset
+  4   3..75  fg=#2f6690 bg=reset
+  4  75..78  fg=#6b645d bg=reset
+  4  78..80  fg=#a39c94 bg=reset
+  5   3..5   fg=#6b645d bg=reset
+  5   5..70  fg=#2b2724 bg=reset
+  5  70..80  fg=#6b645d bg=reset
+  6   2..5   fg=#a86f12 bg=reset
+  6   5..20  fg=#2b2724 bg=reset bold
+  6  20..80  fg=#a86f12 bg=reset
+  7   2..4   fg=#a86f12 bg=reset
+  7   4..22  fg=#2b2724 bg=reset bold
+  7  22..77  fg=#6b645d bg=reset
+  7  77..78  fg=#a86f12 bg=reset
+  7  78..80  fg=#3d7a3a bg=reset
+  8   2..4   fg=#a86f12 bg=reset
+  8   4..77  fg=#958e86 bg=reset
+  8  77..80  fg=#a86f12 bg=reset
+  9   2..78  fg=#a86f12 bg=reset
+  9  78..80  fg=#8a6a3f bg=reset
+ 10   2..4   fg=#a86f12 bg=reset
+ 10   4..16  fg=#958e86 bg=reset
+ 10  16..77  fg=#6b645d bg=reset
+ 10  77..80  fg=#a86f12 bg=reset
+ 11   2..4   fg=#a86f12 bg=reset
+ 11   4..16  fg=#958e86 bg=reset
+ 11  16..77  fg=#6b645d bg=reset
+ 11  77..80  fg=#a86f12 bg=reset
+ 12   2..80  fg=#a86f12 bg=reset
+ 13   0..1   fg=#2b2724 bg=#ece5dc
+ 13   1..2   fg=#c4623f bg=#ece5dc
+ 13   2..4   fg=#a86f12 bg=reset
+ 13   4..11  fg=#6b645d bg=reset
+ 13  11..13  fg=#c4623f bg=reset bold
+ 13  13..25  fg=#2b2724 bg=reset
+ 13  25..26  fg=#2b2724 bg=reset reverse
+ 13  26..77  fg=#2b2724 bg=reset
+ 13  77..78  fg=#a86f12 bg=reset
+ 13  78..79  fg=#a86f12 bg=#ece5dc
+ 13  79..80  fg=#2b2724 bg=#ece5dc
+ 14   2..80  fg=#a86f12 bg=reset
+ 15   2..80  fg=#a86f12 bg=reset
+ 16   2..4   fg=#a86f12 bg=reset
+ 16   4..5   fg=#958e86 bg=reset
+ 16   5..10  fg=#6b645d bg=reset
+ 16  10..28  fg=#958e86 bg=reset
+ 16  28..31  fg=#6b645d bg=reset
+ 16  31..77  fg=#958e86 bg=reset
+ 16  77..80  fg=#a86f12 bg=reset
+ 17   2..80  fg=#a86f12 bg=reset
+ 21   0..80  fg=#d4ccc2 bg=reset
+ 22   1..61  fg=#c4623f bg=reset bold
+ 22  61..80  fg=#6b645d bg=reset
+ 23   3..4   fg=#958e86 bg=reset
+ 23   4..7   fg=#6b645d bg=reset
+ 23   7..80  fg=#958e86 bg=reset

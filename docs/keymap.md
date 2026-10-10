@@ -128,6 +128,7 @@ the palette (`Reload config`).
 | `?` | Help | `help.open` | Show all key bindings and commands. |
 | `g j` | Jobs overlay | `jobs.open` | Show running background jobs. |
 | — | Cancel selected job | `job.cancel` | Cancel the selected job in the jobs overlay. |
+| — | Clear finished jobs | `jobs.clear` | Drop finished jobs from the jobs overlay. |
 | `esc` | Cancel / close | `cancel` | Close the top overlay, leave the mode, clear marks. |
 | — | Accept / confirm | `accept` | Confirm in prompts and overlays. |
 | — | Reload config | `config.reload` | Re-read config.toml, the keymap and the theme. |
@@ -227,6 +228,13 @@ the palette (`Reload config`).
 | `esc` | `cancel` |
 | `q` | `cancel` |
 | `x` | `job.cancel` |
+| `c` | `jobs.clear` |
+| `j` | `cursor.down` |
+| `k` | `cursor.up` |
+| `down` | `cursor.down` |
+| `up` | `cursor.up` |
+| `g g` | `cursor.top` |
+| `G` | `cursor.bottom` |
 
 ### `bookmarks`
 
@@ -256,3 +264,42 @@ the palette (`Reload config`).
 | `up` | `cursor.up` |
 | `ctrl-p` | `cursor.up` |
 | `ctrl-k` | `cursor.up` |
+
+### `conflict`
+
+| Keys | Command |
+|---|---|
+| `esc` | `cancel` |
+| `ctrl-c` | `cancel` |
+| `enter` | `accept` |
+
+### `pager`
+
+| Keys | Command |
+|---|---|
+| `esc` | `cancel` |
+| `q` | `cancel` |
+| `ctrl-c` | `job.cancel` |
+| `j` | `cursor.down` |
+| `k` | `cursor.up` |
+| `down` | `cursor.down` |
+| `up` | `cursor.up` |
+| `g g` | `cursor.top` |
+| `G` | `cursor.bottom` |
+| `ctrl-d` | `page.half_down` |
+| `ctrl-u` | `page.half_up` |
+| `pagedown` | `page.half_down` |
+| `pageup` | `page.half_up` |
+
+### `menu`
+
+| Keys | Command |
+|---|---|
+| `esc` | `cancel` |
+| `q` | `cancel` |
+| `ctrl-c` | `cancel` |
+| `enter` | `accept` |
+| `j` | `cursor.down` |
+| `k` | `cursor.up` |
+| `down` | `cursor.down` |
+| `up` | `cursor.up` |

@@ -6,7 +6,7 @@ expression: rendered
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────
    ◆ current/   ╭─ Commands ───────────────────────────────────╮
-   ◆ passes/    │ ›                                       1/74 │            7 M
+   ◆ passes/    │ ›                                       1/75 │            7 M
    ◆ shaders/   │──────────────────────────────────────────────│           12 !
    ◆ a_rather_lo│▌ Move cursor down                    j, down │.rs   75.2 KB
    ◆ build.ps1  │  Move cursor up                        k, up │       1.9 KB

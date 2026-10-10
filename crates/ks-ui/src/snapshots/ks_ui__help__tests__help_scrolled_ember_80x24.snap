@@ -24,7 +24,7 @@ expression: "draw(&s, &theme(name))"
   │   p                   Paste                                              │
   │   Y                   Copy path to clipboard                             │
   │   r                   Rename                                             │
-──╰───────────────────────────────────────────────────────────── 17-33 / 81 ─╯──
+──╰───────────────────────────────────────────────────────────── 17-33 / 82 ─╯──
  ›                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---

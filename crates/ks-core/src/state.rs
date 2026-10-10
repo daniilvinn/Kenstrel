@@ -8,6 +8,7 @@ use std::time::SystemTime;
 use crate::aids::NavAids;
 use crate::config::Config;
 use crate::drives::DrivesView;
+use crate::fileops::FileOps;
 use crate::generation::{Gen, GenCounter};
 use crate::git::GitSnapshot;
 use crate::help::HelpState;
@@ -130,6 +131,8 @@ pub struct AppState {
     pub help: HelpState,
     /// Names of the themes that can be switched to (built-ins and user files).
     pub themes: Vec<String>,
+    /// File operations: yank register, jobs table, dialogs, pager (P6).
+    pub fileops: FileOps,
     pub(crate) history: History,
     /// Where the cursor was in directories left earlier (by entry name).
     pub(crate) cursor_memory: HashMap<PathBuf, OsString>,
@@ -174,6 +177,7 @@ impl AppState {
             palette: PaletteState::default(),
             help: HelpState::default(),
             themes: Vec::new(),
+            fileops: FileOps::default(),
             history: History::default(),
             cursor_memory: HashMap::new(),
             nav: None,

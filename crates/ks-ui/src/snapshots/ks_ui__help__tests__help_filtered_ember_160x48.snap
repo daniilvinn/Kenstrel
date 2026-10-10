@@ -6,7 +6,7 @@ expression: "draw(&s, &theme(name))"
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    ◆ current/            ╭─ Help ─────────────────────────────────────────────────────────────────────────────────────────────────────╮            2025-02-02
-   ◆ passes/             │ / sort                                                                                            34 shown │          7     5h ago M
+   ◆ passes/             │ / sort                                                                                            35 shown │          7     5h ago M
    ◆ shaders/            │ Navigation                                                                                                 │         12 2025-03-12 !
    ◆ a_rather_long_file_n│   j, down             Move cursor down                    Move the cursor one row down.                    │    75.2 KB 2025-03-11
    ◆ build.ps1           │   k, up               Move cursor up                      Move the cursor one row up.                      │     1.9 KB 2025-03-05
@@ -48,7 +48,7 @@ expression: "draw(&s, &theme(name))"
                          │                                                                                                            │
                          │ Claude Code                                                                                                │
                          │   C                   Send marked files to Claude         Send the marked files to Claude as @ mentions.   │
-─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 47 ─╯─────────────────────────
+─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 48 ─╯─────────────────────────
  ›                                                                                                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---

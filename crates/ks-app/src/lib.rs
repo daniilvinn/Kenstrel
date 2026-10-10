@@ -6,6 +6,8 @@
 pub mod cli;
 pub mod effects;
 pub mod event_loop;
+pub mod fileops;
+pub mod foreground;
 pub mod input;
 pub mod logging;
 pub mod paths;
@@ -19,7 +21,6 @@ pub mod terminal;
 use std::io::IsTerminal;
 
 use anyhow::{bail, Context, Result};
-use crossterm::event::EventStream;
 use ks_core::Size;
 use ks_ui::ColorDepth;
 
@@ -75,14 +76,16 @@ pub fn run(cli: &Cli) -> Result<()> {
     let outcome = {
         // Dropping the session restores the terminal on every path out of this block.
         let mut tui = TerminalSession::enter().context("cannot initialise the terminal")?;
+        let (events, host) = foreground::PausableEvents::new();
         runtime.block_on(event_loop::run_with_state(
             tui.terminal(),
-            EventStream::new(),
+            events,
             &mut state,
             &session.theme,
             LoopOptions {
                 startup: session.startup,
                 panic_after_first_frame: cli.debug_panic,
+                foreground: Some(Box::new(host)),
             },
             Some(Reloader::new(paths.clone(), depth)),
             Some(paths.state_dir().to_owned()),

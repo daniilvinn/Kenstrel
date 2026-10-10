@@ -9,6 +9,7 @@ use crate::action::Action;
 use crate::aids;
 use crate::config::SortKey;
 use crate::effect::Effect;
+use crate::fileops;
 use crate::keymap::{Invocation, Resolution};
 use crate::mode::{Mode, Overlay};
 use crate::msg::{Msg, TimerKind};
@@ -86,6 +87,16 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             state.config.theme = name;
             state.dirty = true;
         }
+        Msg::Job(job) => fileops::on_job(state, job, &mut effects),
+        Msg::Shell(shell) => fileops::on_shell(state, shell),
+        Msg::Foreground(request) => fileops::on_foreground_request(state, request, &mut effects),
+        Msg::ForegroundDone { id, error } => {
+            fileops::on_foreground_done(state, id, error, &mut effects);
+        }
+        Msg::OpenHandlers { path, names } => {
+            fileops::on_open_handlers(state, path, names, &mut effects);
+        }
+        Msg::BulkPlanned(result) => fileops::on_bulk_planned(state, result, &mut effects),
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
@@ -101,6 +112,10 @@ fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Eff
         && state.help.filtering
         && help::on_filter_key(state, key)
     {
+        return;
+    }
+    // Text entry and dialog hot keys of the file operations come before the keymap.
+    if state.pending.is_empty() && fileops::intercept_key(state, key, effects) {
         return;
     }
     let ctx = state.key_context();
@@ -201,14 +216,17 @@ pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: 
     if handled {
         return;
     }
+    if fileops::handle_action(state, &invocation, effects) {
+        return;
+    }
     match invocation.action {
         Action::PaletteOpen => palette::open(state),
         Action::HelpOpen => help::open(state),
         Action::ThemeSwitch => palette::open_page(state, palette::Page::Themes),
         Action::IconsSwitch => palette::open_page(state, palette::Page::Icons),
         Action::ConfigReload => effects.push(Effect::ReloadConfig),
-        Action::Quit => state.quit = Some(QuitKind::Exit),
-        Action::QuitCd => state.quit = Some(QuitKind::ChangeDir),
+        Action::Quit => fileops::request_quit(state, QuitKind::Exit),
+        Action::QuitCd => fileops::request_quit(state, QuitKind::ChangeDir),
         Action::Cancel => cancel(state),
         Action::CursorDown if aids::owns_overlay(state) => aids::move_selection(state, 1),
         Action::CursorUp if aids::owns_overlay(state) => aids::move_selection(state, -1),
@@ -441,10 +459,10 @@ mod tests {
     #[test]
     fn unimplemented_actions_report_instead_of_failing_silently() {
         let mut s = state();
-        let effects = key(&mut s, "y");
+        let effects = key(&mut s, "s");
         let status = s.status.as_ref().unwrap();
         assert_eq!(status.level, Level::Info);
-        assert_eq!(status.text, "Copy is not available yet");
+        assert_eq!(status.text, "Search file contents is not available yet");
         assert!(matches!(
             effects.as_slice(),
             [Effect::StartTimer {

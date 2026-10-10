@@ -1,0 +1,121 @@
+---
+source: crates/ks-ui/src/fileops/tests.rs
+expression: "draw(&state, &theme(theme_name))"
+---
+ ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
+──╭─ $ cargo build --release ────────────────────────────────────────────────╮──
+  │    Compiling crate-42 v0.42.0                                            │
+  │    Compiling crate-43 v0.43.0                                            │M
+  │    Compiling crate-44 v0.44.0                                            │!
+  │ warning: unused variable `x45` in src/renderer/very/long/path/to/a/modu… │
+  │    Compiling crate-46 v0.46.0                                            │
+  │    Compiling crate-47 v0.47.0                                            │+
+  │    Compiling crate-48 v0.48.0                                            │
+  │    Compiling crate-49 v0.49.0                                            │?
+  │    Compiling crate-50 v0.50.0                                            │
+  │    Compiling crate-51 v0.51.0                                            │
+  │ warning: unused variable `x52` in src/renderer/very/long/path/to/a/modu… │
+ ▌│    Compiling crate-53 v0.53.0                                            │M
+  │    Compiling crate-54 v0.54.0                                            │
+  │    Compiling crate-55 v0.55.0                                            │
+  │    Compiling crate-56 v0.56.0                                            │
+  │    Compiling crate-57 v0.57.0                                            │
+  │    Compiling crate-58 v0.58.0                                            │
+  │ warning: unused variable `x59` in src/renderer/very/long/path/to/a/modu… │
+  │ running  43-60/60  ‹ctrl-c› stop  ‹j/k› scroll  ‹esc› close              │
+──╰──────────────────────────────────────────────────────────────────────────╯──
+ ›                                                           12/13 · 1 selected
+   ‹esc› cancel
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..63  fg=#2b2724 bg=reset bold
+  0  63..68  fg=#6b645d bg=reset bold
+  0  68..71  fg=#6b645d bg=reset
+  0  71..74  fg=#3d7a3a bg=reset
+  0  74..77  fg=#a86f12 bg=reset
+  0  77..80  fg=#8a6a3f bg=reset
+  1   0..2   fg=#d4ccc2 bg=reset
+  1   2..5   fg=#c4623f bg=reset
+  1   5..29  fg=#2b2724 bg=reset bold
+  1  29..78  fg=#c4623f bg=reset
+  1  78..80  fg=#d4ccc2 bg=reset
+  2   2..7   fg=#c4623f bg=reset
+  2   7..77  fg=#2b2724 bg=reset
+  2  77..80  fg=#c4623f bg=reset
+  3   2..7   fg=#c4623f bg=reset
+  3   7..77  fg=#2b2724 bg=reset
+  3  77..78  fg=#c4623f bg=reset
+  3  78..80  fg=#a86f12 bg=reset
+  4   2..7   fg=#c4623f bg=reset
+  4   7..77  fg=#2b2724 bg=reset
+  4  77..78  fg=#c4623f bg=reset
+  4  78..80  fg=#a39c94 bg=reset
+  5   2..4   fg=#c4623f bg=reset
+  5   4..77  fg=#a86f12 bg=reset
+  5  77..80  fg=#c4623f bg=reset
+  6   2..7   fg=#c4623f bg=reset
+  6   7..77  fg=#2b2724 bg=reset
+  6  77..80  fg=#c4623f bg=reset
+  7   2..7   fg=#c4623f bg=reset
+  7   7..77  fg=#2b2724 bg=reset
+  7  77..78  fg=#c4623f bg=reset
+  7  78..80  fg=#3d7a3a bg=reset
+  8   2..7   fg=#c4623f bg=reset
+  8   7..77  fg=#2b2724 bg=reset
+  8  77..80  fg=#c4623f bg=reset
+  9   2..7   fg=#c4623f bg=reset
+  9   7..77  fg=#2b2724 bg=reset
+  9  77..78  fg=#c4623f bg=reset
+  9  78..80  fg=#8a6a3f bg=reset
+ 10   2..7   fg=#c4623f bg=reset
+ 10   7..77  fg=#2b2724 bg=reset
+ 10  77..80  fg=#c4623f bg=reset
+ 11   2..7   fg=#c4623f bg=reset
+ 11   7..77  fg=#2b2724 bg=reset
+ 11  77..80  fg=#c4623f bg=reset
+ 12   2..4   fg=#c4623f bg=reset
+ 12   4..77  fg=#a86f12 bg=reset
+ 12  77..80  fg=#c4623f bg=reset
+ 13   0..1   fg=#2b2724 bg=#ece5dc
+ 13   1..2   fg=#c4623f bg=#ece5dc
+ 13   2..7   fg=#c4623f bg=reset
+ 13   7..77  fg=#2b2724 bg=reset
+ 13  77..78  fg=#c4623f bg=reset
+ 13  78..79  fg=#a86f12 bg=#ece5dc
+ 13  79..80  fg=#2b2724 bg=#ece5dc
+ 14   2..7   fg=#c4623f bg=reset
+ 14   7..77  fg=#2b2724 bg=reset
+ 14  77..80  fg=#c4623f bg=reset
+ 15   2..7   fg=#c4623f bg=reset
+ 15   7..77  fg=#2b2724 bg=reset
+ 15  77..80  fg=#c4623f bg=reset
+ 16   2..7   fg=#c4623f bg=reset
+ 16   7..77  fg=#2b2724 bg=reset
+ 16  77..80  fg=#c4623f bg=reset
+ 17   2..7   fg=#c4623f bg=reset
+ 17   7..77  fg=#2b2724 bg=reset
+ 17  77..80  fg=#c4623f bg=reset
+ 18   2..7   fg=#c4623f bg=reset
+ 18   7..77  fg=#2b2724 bg=reset
+ 18  77..80  fg=#c4623f bg=reset
+ 19   2..4   fg=#c4623f bg=reset
+ 19   4..77  fg=#a86f12 bg=reset
+ 19  77..80  fg=#c4623f bg=reset
+ 20   2..13  fg=#c4623f bg=reset
+ 20  13..23  fg=#6b645d bg=reset
+ 20  23..24  fg=#958e86 bg=reset
+ 20  24..30  fg=#6b645d bg=reset
+ 20  30..39  fg=#958e86 bg=reset
+ 20  39..42  fg=#6b645d bg=reset
+ 20  42..53  fg=#958e86 bg=reset
+ 20  53..56  fg=#6b645d bg=reset
+ 20  56..77  fg=#958e86 bg=reset
+ 20  77..80  fg=#c4623f bg=reset
+ 21   0..2   fg=#d4ccc2 bg=reset
+ 21   2..78  fg=#c4623f bg=reset
+ 21  78..80  fg=#d4ccc2 bg=reset
+ 22   1..61  fg=#c4623f bg=reset bold
+ 22  61..80  fg=#6b645d bg=reset
+ 23   3..4   fg=#958e86 bg=reset
+ 23   4..7   fg=#6b645d bg=reset
+ 23   7..80  fg=#958e86 bg=reset

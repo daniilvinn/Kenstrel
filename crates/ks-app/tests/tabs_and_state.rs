@@ -302,6 +302,7 @@ async fn the_event_loop_saves_state_on_exit() {
         LoopOptions {
             startup: vec![Msg::Start],
             panic_after_first_frame: false,
+            foreground: None,
         },
         None,
         Some(state_dir.path().to_owned()),

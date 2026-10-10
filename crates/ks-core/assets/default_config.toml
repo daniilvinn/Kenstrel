@@ -36,6 +36,9 @@
 # then "code", then "notepad".
 # open = ""
 # open_at_line = "code -g {file}:{line}"
+# "auto" runs known terminal editors (vim, nvim, hx, nano, micro, ...) inside the terminal
+# and starts everything else (code, notepad, ...) detached; "always" / "never" force it.
+# terminal = "auto"
 
 [ui]
 # which_key_delay_ms = 300

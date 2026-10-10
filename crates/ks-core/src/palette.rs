@@ -640,10 +640,10 @@ pub(crate) mod tests {
     fn unimplemented_commands_report_not_available() {
         let mut s = state();
         key(&mut s, ":");
-        type_text(&mut s, "bulk");
+        type_text(&mut s, "contents");
         key(&mut s, "enter");
         let status = s.status.as_ref().unwrap();
-        assert_eq!(status.text, "Bulk rename in editor is not available yet");
+        assert_eq!(status.text, "Search file contents is not available yet");
     }
 
     #[test]

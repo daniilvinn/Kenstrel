@@ -392,3 +392,19 @@ Merged `phase/p7` (tabs, bookmarks, frecency, shell init) onto main (with P5). R
 - **Registry**: `bookmark.list` and `bookmark.delete` had no `COMMANDS` row (the registry test caught it); both added under "Tabs and bookmarks", so they appear in the palette, help and `docs/keymap.md` (regenerated). The other P7 actions already had rows.
 - **UI**: render order is palette, help, then bookmark/jump overlays; hint lines for the Bookmarks and Jump contexts live next to P5's Palette/Help ones. Snapshots changed only by the new commands/counts (palette `1/74`, help `/81`, two extra rows in the help view) and the `m`/`'` pending prefix now shows P5's which-key popup; all re-accepted after inspection.
 - `Cargo.lock`: took ours and let cargo regenerate (no changes needed).
+
+## Integration: phase/p6
+
+Merged `phase/p6` (file operations) onto main (P5 + P7). Resolution decisions:
+
+- **Overlays and key routing** (`update::on_key` / `run_action`): order is help filter field, then P6's `intercept_key` (typed-confirm text, conflict/menu hot keys, prompt text; it only acts when the top overlay is Confirm/Conflict/Menu, or no overlay and a P6 prompt is open, so palette/help/bookmark/jump text entry is untouched), then keymap resolution for the top overlay's context. In `run_action`, P5's palette/help handlers run first, then P6's `fileops::handle_action` (which only claims its own overlays and the file actions), then the rest. `Conflict`, `Pager`, `Menu` were added to `Overlay`/`KeyContext` next to P5's `Bookmarks`/`Jump`; their default bindings live in the same keymap table.
+- **Quit**: `Action::Quit`/`QuitCd` go through `fileops::request_quit` (Confirm when jobs run); `Msg::Interrupt` still quits at once.
+- **Event loop**: P6's `apply` is folded into P5's `dispatch` (now generic over the backend, takes the foreground host and terminal). `Effect::RunForeground` is handled there, after flushing the earlier effects of the batch to the runner; everything else still goes to `EffectRunner::run` (P6's catch-all `fileops.handle`). `run_foreground` returns the `ForegroundDone` message that is queued next. `LoopOptions` keeps P6's `foreground` field; `lib.rs` uses `PausableEvents` with `run_with_state`.
+- **Config reload**: `dispatch` calls `EffectRunner::configure` after `Msg::ConfigReloaded` so `[editor]` changes reach the runner (P6 open issue).
+- **Tab state** (`tabs.rs` guard): `fileops` (yank register, job table, prompt, dialogs, pager) is app-global; marks are in `view` and therefore per tab; a yank can be pasted into any tab. The P6 logic reads `state.view`/`state.cwd`/`state.show_drives`, which are the active tab's values after the swap, so no accessors were needed. Job completion refreshes whichever tab is active.
+- **Registry**: `jobs.clear` had no `COMMANDS` row (registry test caught it); added under App. `docs/keymap.md` regenerated (new contexts, new row). No other P6 action was missing.
+- **Effects**: P6's `Effect::OpenDefault`/`OpenInEditor` kept as the owner's definitions; P5/P7 effects (`SetTheme`, `ReloadConfig`, `LoadNavData`, `WriteState`) coexist in `EffectRunner::run`.
+- **"Not available yet" tests**: P6 used `z`, which P7 binds. Now `s` (search file contents, owned by the P3/P4 track) in `update.rs`, `palette.rs` and `event_loop.rs`; the P3/P4 merge must pick another unimplemented action (e.g. `c` Claude until P10).
+- **Snapshots**: only help and palette snapshots changed (one more command: counts 74 to 75, 81 to 82, filtered `sort` 34 to 35, and the "Clear finished jobs" help row); accepted.
+- `Cargo.lock`: took ours; cargo needed no change.
+- Not verifiable here: terminal suspend/resume with nvim/hx in Windows Terminal (manual check still open, see `docs/progress/p6.md`).

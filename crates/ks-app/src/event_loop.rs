@@ -4,6 +4,7 @@
 //! tests with a `TestBackend` and a scripted event stream.
 
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -18,6 +19,7 @@ use tokio::sync::mpsc;
 use tokio::time::{interval, interval_at, sleep, Instant, MissedTickBehavior};
 
 use crate::effects::EffectRunner;
+use crate::foreground::Foreground;
 use crate::input::translate_event;
 use crate::reload::Reloader;
 
@@ -37,6 +39,8 @@ pub struct LoopOptions {
     pub startup: Vec<Msg>,
     /// Panic right after the first frame (`--debug-panic`).
     pub panic_after_first_frame: bool,
+    /// Runs programs attached to the terminal (terminal editors); `None` in headless runs.
+    pub foreground: Option<Box<dyn Foreground>>,
 }
 
 /// Runs until the state requests quit, returning how. Config reloads, theme switches and
@@ -70,17 +74,25 @@ enum Side {
 /// Applies `msg` and everything it leads to. Effects that change the application itself
 /// (reloading the config, switching the theme) are started here, on blocking threads,
 /// because the result needs the loop's theme; the rest go to the effect runner.
-fn dispatch(
+fn dispatch<B: Backend>(
     state: &mut AppState,
     reloader: Option<&Arc<Reloader>>,
     side: &mpsc::UnboundedSender<Side>,
     runner: &mut EffectRunner,
+    foreground: &mut Option<Box<dyn Foreground>>,
+    terminal: &mut Terminal<B>,
     msg: Msg,
 ) {
     let mut queue = VecDeque::from([msg]);
     while let Some(msg) = queue.pop_front() {
         let mut for_runner = Vec::new();
-        for effect in update(state, msg) {
+        let reloaded = matches!(msg, Msg::ConfigReloaded { .. });
+        let effects = update(state, msg);
+        if reloaded {
+            // `[editor]` settings live in the runner.
+            runner.configure(&state.config);
+        }
+        for effect in effects {
             match effect {
                 Effect::ReloadConfig => match reloader {
                     Some(reloader) => {
@@ -112,6 +124,11 @@ fn dispatch(
                     }
                     None => queue.push_back(unavailable("Theme switching")),
                 },
+                Effect::RunForeground { id, spec } => {
+                    // Earlier effects of this batch start before the terminal is handed over.
+                    runner.run(std::mem::take(&mut for_runner));
+                    queue.push_back(run_foreground(state, foreground, terminal, id, &spec));
+                }
                 other => for_runner.push(other),
             }
         }
@@ -190,6 +207,8 @@ where
     if let Some(dir) = state_dir {
         runner.set_state_dir(dir);
     }
+    runner.configure(&state.config);
+    let mut foreground = options.foreground;
     spawn_interrupt_listener(tx);
     let mut events = std::pin::pin!(events);
 
@@ -207,7 +226,15 @@ where
         });
     }
     for msg in options.startup {
-        dispatch(state, reloader, &side_tx, &mut runner, msg);
+        dispatch(
+            state,
+            reloader,
+            &side_tx,
+            &mut runner,
+            &mut foreground,
+            terminal,
+            msg,
+        );
     }
 
     let outcome = loop {
@@ -254,7 +281,15 @@ where
         let mut next = first;
         loop {
             if let Some(msg) = next {
-                dispatch(state, reloader, &side_tx, &mut runner, msg);
+                dispatch(
+                    state,
+                    reloader,
+                    &side_tx,
+                    &mut runner,
+                    &mut foreground,
+                    terminal,
+                    msg,
+                );
             }
             match rx.try_recv() {
                 Ok(msg) => next = Some(msg),
@@ -273,14 +308,69 @@ where
     Ok(outcome)
 }
 
+/// Runs a program attached to the terminal: the TUI is suspended, the program runs, the TUI
+/// comes back with a full redraw, and the result is the `Msg::ForegroundDone` to apply next.
+fn run_foreground<B: Backend>(
+    state: &mut AppState,
+    foreground: &mut Option<Box<dyn Foreground>>,
+    terminal: &mut Terminal<B>,
+    id: u64,
+    spec: &ks_core::fileops::ForegroundSpec,
+) -> Msg {
+    let guard = ForegroundGuard::enter();
+    let outcome = match foreground.as_mut() {
+        Some(host) => host.run(spec),
+        None => Err("no terminal available to run programs in the foreground".to_owned()),
+    };
+    drop(guard);
+    let error = match outcome {
+        Ok(Some(0) | None) => None,
+        Ok(Some(code)) => Some(format!("{} exited with code {code}", spec.program)),
+        Err(error) => Some(error),
+    };
+    // The screen was left behind; draw everything again.
+    if let Err(error) = terminal.clear() {
+        tracing::warn!(%error, "cannot clear the terminal after a foreground program");
+    }
+    state.dirty = true;
+    Msg::ForegroundDone { id, error }
+}
+
 /// Forwards process-level interrupts (ctrl-c outside raw mode, console control events) as a
 /// message. In raw mode ctrl-c is an ordinary key event and is handled by the keymap.
+///
+/// Interrupts that arrive while a foreground program owns the console are meant for that
+/// program (the console is in cooked mode then, so the control event reaches us too) and are
+/// ignored.
 fn spawn_interrupt_listener(tx: mpsc::Sender<Msg>) {
     tokio::spawn(async move {
-        if tokio::signal::ctrl_c().await.is_ok() {
+        while tokio::signal::ctrl_c().await.is_ok() {
+            if FOREGROUND_ACTIVE.load(Ordering::SeqCst) {
+                continue;
+            }
             let _ = tx.send(Msg::Interrupt).await;
+            break;
         }
     });
+}
+
+/// True while a foreground program runs; see [`spawn_interrupt_listener`].
+static FOREGROUND_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Marks a foreground run for as long as it lives, also when the host panics.
+struct ForegroundGuard;
+
+impl ForegroundGuard {
+    fn enter() -> Self {
+        FOREGROUND_ACTIVE.store(true, Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for ForegroundGuard {
+    fn drop(&mut self) {
+        FOREGROUND_ACTIVE.store(false, Ordering::SeqCst);
+    }
 }
 
 #[cfg(test)]
@@ -321,6 +411,7 @@ mod tests {
         LoopOptions {
             startup: Vec::new(),
             panic_after_first_frame: false,
+            foreground: None,
         }
     }
 
@@ -368,11 +459,11 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn key_releases_do_not_double_fire() {
         let mut state = state();
-        // `y` (press + release) then `q`. The release must be ignored, so exactly one
+        // `s` (press + release) then `q`. The release must be ignored, so exactly one
         // "not available" notice is produced and the loop still quits on `q`.
         let events = vec![
-            key('y', KeyEventKind::Press),
-            key('y', KeyEventKind::Release),
+            key('s', KeyEventKind::Press),
+            key('s', KeyEventKind::Release),
             key('q', KeyEventKind::Press),
             key('q', KeyEventKind::Release),
         ];
@@ -380,7 +471,7 @@ mod tests {
         assert_eq!(result.unwrap(), QuitKind::Exit);
         assert_eq!(
             state.status.as_ref().unwrap().text,
-            "Copy is not available yet"
+            "Search file contents is not available yet"
         );
     }
 
@@ -402,6 +493,7 @@ mod tests {
                 text: "config.toml: bad".into(),
             }],
             panic_after_first_frame: false,
+            foreground: None,
         };
         let (result, terminal) =
             drive(vec![key('q', KeyEventKind::Press)], &mut state, options).await;
@@ -418,6 +510,7 @@ mod tests {
                 text: "hello".into(),
             }],
             panic_after_first_frame: false,
+            foreground: None,
         };
         let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
         let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
@@ -442,6 +535,15 @@ mod tests {
             sleep(Duration::from_millis(550)).await;
             key('q', KeyEventKind::Press)
         })
+        // Quitting with a running job asks first; accept.
+        .chain(stream::once(async {
+            Ok(Event::Key(KeyEvent {
+                code: KeyCode::Enter,
+                modifiers: KeyModifiers::NONE,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            }))
+        }))
         .chain(stream::pending());
         run(&mut terminal, events, &mut state, &theme, options())
             .await
@@ -465,6 +567,119 @@ mod tests {
         assert_eq!(idle.spinner_frame, 0, "no ticks without running jobs");
     }
 
+    /// Records what it was asked to run and answers with a canned outcome.
+    struct FakeHost {
+        runs: std::sync::Arc<std::sync::Mutex<Vec<ks_core::fileops::ForegroundSpec>>>,
+        outcome: Result<Option<i32>, String>,
+    }
+
+    impl Foreground for FakeHost {
+        fn run(&mut self, spec: &ks_core::fileops::ForegroundSpec) -> Result<Option<i32>, String> {
+            self.runs.lock().unwrap().push(spec.clone());
+            self.outcome.clone()
+        }
+    }
+
+    /// `e` on a file with a terminal editor: the loop suspends (host), runs the editor on
+    /// the file, redraws, and reports a failing exit code.
+    async fn edit_with_host(outcome: Result<Option<i32>, String>) -> (AppState, Vec<String>) {
+        let dir = tempfile::tempdir().unwrap();
+        let mut state = state();
+        state.cwd = dir.path().to_owned();
+        state.config.editor.open = "notepad".into();
+        state.config.editor.terminal = ks_core::config::EditorTerminal::Always;
+        let rows = state.viewport_height();
+        state
+            .view
+            .push_chunk(vec![ks_core::Entry::file("a.txt", 1)], rows);
+        state.view.finish_loading();
+
+        let runs = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let host = FakeHost {
+            runs: runs.clone(),
+            outcome,
+        };
+        let waiting = runs.clone();
+        let events = stream::iter([key('e', KeyEventKind::Press)])
+            .chain(stream::once(async move {
+                for _ in 0..100 {
+                    if !waiting.lock().unwrap().is_empty() {
+                        break;
+                    }
+                    sleep(Duration::from_millis(50)).await;
+                }
+                // Give the message that follows the foreground run time to be processed.
+                sleep(Duration::from_millis(200)).await;
+                key('q', KeyEventKind::Press)
+            }))
+            .chain(stream::pending());
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
+        let options = LoopOptions {
+            startup: Vec::new(),
+            panic_after_first_frame: false,
+            foreground: Some(Box::new(host)),
+        };
+        let result = run(&mut terminal, events, &mut state, &theme, options).await;
+        assert_eq!(result.unwrap(), QuitKind::Exit);
+        let programs = runs
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|spec| format!("{} {}", spec.program, spec.args.join(" ")))
+            .collect();
+        drop(dir);
+        (state, programs)
+    }
+
+    #[tokio::test]
+    async fn terminal_editor_runs_through_the_foreground_host() {
+        let (state, runs) = edit_with_host(Ok(Some(0))).await;
+        assert_eq!(runs.len(), 1, "{runs:?}");
+        assert!(runs[0].contains("a.txt"), "{runs:?}");
+        assert!(state.status.is_none(), "{:?}", state.status);
+    }
+
+    #[tokio::test]
+    async fn foreground_failures_reach_the_status_line() {
+        let (state, runs) = edit_with_host(Ok(Some(3))).await;
+        assert_eq!(runs.len(), 1);
+        let text = state.status.unwrap().text;
+        assert!(
+            text.contains("Editor failed") && text.contains("code 3"),
+            "{text}"
+        );
+
+        let (state, _) = edit_with_host(Err("cannot run vim: not found".into())).await;
+        assert!(state.status.unwrap().text.contains("not found"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn without_a_host_foreground_programs_are_refused() {
+        let mut state = state();
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let mut runner = crate::effects::EffectRunner::new(tokio::sync::mpsc::channel(8).0);
+        let mut host: Option<Box<dyn Foreground>> = None;
+        let request = ks_core::fileops::ForegroundRequest {
+            spec: ks_core::fileops::ForegroundSpec {
+                program: "vim".into(),
+                args: vec![],
+            },
+            purpose: ks_core::fileops::ForegroundPurpose::Editor,
+        };
+        let (side, _side_rx) = mpsc::unbounded_channel::<Side>();
+        dispatch(
+            &mut state,
+            None,
+            &side,
+            &mut runner,
+            &mut host,
+            &mut terminal,
+            Msg::Foreground(request),
+        );
+        assert!(state.status.unwrap().text.contains("no terminal available"));
+    }
+
     #[tokio::test(start_paused = true)]
     #[should_panic(expected = "--debug-panic")]
     async fn debug_panic_fires_after_the_first_frame() {
@@ -472,6 +687,7 @@ mod tests {
         let options = LoopOptions {
             startup: Vec::new(),
             panic_after_first_frame: true,
+            foreground: None,
         };
         let _ = drive(vec![], &mut state, options).await;
     }
