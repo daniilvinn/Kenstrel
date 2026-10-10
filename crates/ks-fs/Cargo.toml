@@ -9,4 +9,14 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+arboard = "3.6.1"
+dunce.workspace = true
+open = "5.4.4"
+thiserror.workspace = true
+tokio-util.workspace = true
+trash = "5.2.9"
+tempfile.workspace = true
+tracing.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
