@@ -165,8 +165,8 @@ Working notes for the implementation of [PLAN.md](PLAN.md). One section per phas
   (`Action::ConfigReload`); generating `docs/keymap.md` plus a drift test against
   `DEFAULT_BINDINGS`; the full hint-line set of PLAN sections 4.1/4.2 (grows with P1 to P5 as
   the actions become real).
-- **Deferred to P1**: an update-level test that the captured `m <char>` argument reaches its
-  handler (`run_action` ignores `Invocation::arg` until marks/bookmarks exist; the keymap tests
+- **Deferred to P7** (was P1): an update-level test that the captured `m <char>` argument reaches
+  its handler (`run_action` ignores `Invocation::arg` until bookmarks exist; the keymap tests
   already cover the capture).
 - Start path is made absolute and lexically normalised, not canonicalised, so junctions and
   symlinks stay as typed. `--cwd-file` fails with an error for non-Unicode directory names.
@@ -180,3 +180,203 @@ Workspace: `ks-core`, `ks-ui` (path). External: `anyhow`, `clap` (derive), `cros
 `tokio` (rt-multi-thread, macros, sync, time, signal; `test-util` for tests), `tokio-util`, `toml`,
 `tracing`, `tracing-appender`, `tracing-subscriber` (env-filter, fmt), `unicode-width`; dev:
 `insta`, `tempfile`.
+
+## P1: Navigation
+
+### Done
+
+- **Module boundaries.** `ks-core` owns the data and the rules (no I/O): `entry` (entry model,
+  natural-sort key, comparators), `view` (`DirView`: sorted entries, hidden filter, cursor, marks,
+  visual mode), `cursor`, `drives`, `git` (snapshot + per-child lookup), `layout` (body height,
+  shared with the renderer), `nav` (navigation transactions, history, listing results, marks,
+  sort), `error`. `ks-fs` does the I/O (listing, attributes, drives, watcher, git, child
+  counts) and depends on `ks-core` for the types; `ks-app`'s effect runner connects them.
+- **Listing** (`ks-fs::listing`): `read_dir` + `DirEntry::metadata`, run in `spawn_blocking` under a
+  cancellation token, results as `Msg::ListingChunk`/`ListingFinished` tagged with a generation.
+  First chunk after 1000 entries (or 60 ms), later chunks of 5000; `blocking_send` gives
+  backpressure. Entry model: name (`OsString`, so non-Unicode names stay addressable), kind
+  (file/dir/symlink/junction), `is_dir` (links to directories), size, mtime, attributes (hidden,
+  system, read-only, cloud placeholder = `OFFLINE | RECALL_ON_OPEN | RECALL_ON_DATA_ACCESS`,
+  exec), lazily filled child count. Junctions are told apart from symlinks by their reparse tag
+  (`FindFirstFileW`, only for entries that are links). `link_target()` reads a link target on
+  demand. Nothing in a listing ever opens a file, so cloud placeholders are never hydrated.
+  Unreadable or vanished entries are skipped; an unreadable directory is an `FsError` shown in the
+  status line.
+- **Sorting**: precomputed natural key (digit runs compare by value, case-insensitive), then exact
+  name as a tie-break, so the order is total. Keys name/size/mtime/ext, `reverse`, `dirs_first`.
+  `S` is a which-key menu: `S n`, `S s`, `S m`, `S e`; choosing the active key again reverses.
+- **Navigation as a transaction**: asking for a directory lists it under a new generation; the old
+  view stays until the first chunk arrives, then the move is committed (history, per-directory
+  cursor memory, watcher, git). A failed move changes nothing but the status line and leaves no
+  history. Stale generations are dropped everywhere. Vanished current directory: climbs to the
+  nearest existing parent with a notice. `h` at a drive root opens "This PC"; `l` on a drive
+  enters it; cursor placed on the directory you came from (and on the drive of the previous
+  directory).
+- Keys: `j k down up`, `gg G home end`, `ctrl-d/u pagedown/pageup` (half page, viewport moves with
+  the cursor), `h l enter left right backspace`, `ctrl-o` / `tab` (history), `~ g h g d g D g c g /`,
+  `.` hidden toggle (hidden/system attributes and dotfiles), `space` mark (moves down), `v` visual
+  range (extends and shrinks with the cursor, `esc`/`v` leaves it with the marks applied),
+  `ctrl-a` mark all / none, `esc` unwinds overlay, mode, marks, status. `enter` on a file reports
+  that opening arrives later (P6).
+- **Drives view** (`ks-fs::platform`, the only `unsafe` in the workspace): `GetLogicalDrives`,
+  `GetDriveTypeW`, `GetVolumeInformationW`, `GetDiskFreeSpaceExW` with
+  `SEM_FAILCRITICALERRORS` so empty drives never raise a system dialog. Rendered with label, file
+  system, usage bar (accent, warning from 85 %, error from 95 %) and `free of total`; columns drop
+  as the terminal narrows. Non-Windows hosts list `/`.
+- **Watcher** (`notify` 8 + `notify-debouncer-full` 0.7, 100 ms debounce, non-recursive): any
+  event on a direct child re-lists the directory; the refresh is buffered and swapped in
+  atomically, keeping the cursor on its entry by name, pruning marks of vanished names and
+  carrying child counts over. Setup runs in `spawn_blocking`; a failure becomes a status warning.
+- **Git** (`ks-fs::git`): `git --no-optional-locks -C <dir> status --porcelain=v2 -z --branch
+  --ignored=traditional` and `rev-parse --show-prefix`, run concurrently under `tokio::process`
+  with `kill_on_drop` (cancelled when superseded) and `CREATE_NO_WINDOW`. Parser handles headers,
+  ordinary/renamed (extra path record)/copied/unmerged/untracked/ignored records and paths with
+  spaces. States: Modified `M`, Added `+`, Renamed `R`, Deleted `D`, Untracked `?`, Ignored `!`,
+  Conflict `U`; directories show the highest-priority state below them (ignored entries do not
+  taint parents), and a directory inside a collapsed untracked/ignored directory inherits it.
+  Triggered on entering a directory and, debounced by 300 ms, on watcher events (only while the
+  directory is in a repository). Header: `main ↑1 ↓2 +staged ~modified ?untracked Uconflicts`, or a
+  check mark when clean.
+- **UI** (`ks-ui`): virtualized list (only the viewport rows are built; a test renders 100k
+  entries), columns icon / name (middle truncation keeps the extension, width-correct for
+  CJK) / size or child count / modified time (from 90 columns) / git glyph; `▌` cursor + selection
+  background, `●` marks with accent name, dir/exec/symlink/hidden/cloud styles. Icon sets nerd /
+  unicode / ascii by special name, extension, then kind. Breadcrumb with `~` and `…`, git summary
+  on the right. Prompt line right side `pos/total · visual · N selected · loading… · ⠹ N jobs`.
+  Hint line per mode. Sizes hide under 60 columns. `format.rs`: `human_size` (base 1000/1024,
+  carries 1023.96 KB to 1.0 MB) and `relative_time` (`just now`, `3m ago`, `5h ago`, `yesterday`,
+  then `2025-03-14`; calendar based with the local UTC offset), both pure and tested.
+- **Clock**: `Msg::Clock` every 30 s carries "now" and the UTC offset (`GetTimeZoneInformation`),
+  so relative times age without `update` doing I/O.
+- **Tests**: `ks-core` 123 (entry/sort, view, cursor, drives, git aggregation, and `nav::tests`:
+  end-to-end `update` runs against a fake file system with a mini effect runner), `ks-fs` 39
+  (real temp dirs, a real git repository, real junction via `mklink /J`, watcher timing, real
+  drives), `ks-ui` 59 (snapshots, formatting, icons), `ks-app` 53 + `tests/navigation.rs`
+  (real runner + real directory: keyboard navigation, external create/delete/rename with the
+  cursor kept, marks across refresh, vanished directory, drives, git follow-up, 100k budget).
+  Snapshots at 80x24 and 160x48 in both themes for the main screen, prompt/status, which-key and
+  the drives view, plus 60x20 / 50x20 narrow, 50x12 drives, visual mode and the unicode / ascii
+  icon sets (Nerd glyphs are private-use characters, so the dump shows them as `◆`; the icon
+  tests cover which glyph is chosen).
+
+### Performance (budget: first rows < 150 ms, complete < 1 s for 100k entries)
+
+Measured by `cargo test -p ks-app [--release] --test navigation a_directory_of_100k -- --ignored
+--nocapture` (100,000 empty files in a fresh temp directory, warm cache, NTFS, SSD; from
+`Msg::Start` until the sorted list is in `AppState`, real effect runner):
+
+| Build | First rows | Complete and sorted |
+|---|---|---|
+| release | 10 ms | 83 ms |
+| debug | 28 ms | 479 ms |
+
+Other measured latencies: external file creation visible in the list 110 ms (watcher debounce is
+100 ms); `notify` notification alone 125 ms; tracked-file edit to updated git glyph 446 ms
+(debounce 300 ms + git).
+
+### Deviations
+
+1. **Data model in `ks-core`.** `Msg` has to carry entries, so the entry/view/git/drive types live
+   in `ks-core` (still no I/O) and `ks-fs` depends on it. PLAN 3.2 listed "listing, metadata,
+   sorting" under `ks-fs`; the I/O is there, the pure sort/data parts are in core.
+2. **`ks-fs` does not inherit `[workspace.lints]`.** The Win32 calls need `unsafe`, and a workspace
+   `forbid` cannot be relaxed for one module. Its manifest repeats the other workspace lints with
+   `unsafe_code = "deny"`, and only `platform/win32.rs` has `#![allow(unsafe_code)]`.
+3. **Streaming threshold**: chunks start after 1000 entries (first) and then 5000, so directories
+   up to 1000 entries arrive as one chunk. The plan says "over 5k"; starting earlier only helps.
+4. **Sort details**: natural sort is case-insensitive on every platform, not only Windows. Size
+   and mtime sort largest/newest first by default; `reverse` flips the order inside each group
+   while directories stay first. `SortMenu` became `SortName/SortSize/SortMtime/SortExt`, so each
+   choice is a bindable, palette-friendly action; the "menu" is the which-key popup, and pressing
+   the active key again reverses (instead of a second `S`).
+5. **No preview pane or 60/40 split yet** (P2): the list is full width at every terminal width;
+   the "<80 columns hides the preview" rule arrives with the pane. At wide widths the list
+   therefore stretches (the modified-time column shows from 90 columns).
+6. **No `..` row**; `h` goes up. Child counts are computed lazily for the first 256 real
+   directories of a listing (links and cloud placeholders are skipped) and include hidden
+   entries.
+7. **Marks are per directory view** (kept by name, cleared when you move to another directory).
+   Cross-directory selection is the clipboard's job in P6. `space` moves the cursor down after
+   toggling; `ctrl-a` toggles all/none; `esc` leaves visual mode (marks stay), then clears marks.
+8. **Watcher also watches the parent directory** (events filtered to the watched directory itself)
+   because `ReadDirectoryChangesW` never reports the removal of the watched directory (verified:
+   without it the view stayed on a deleted directory). The debouncer's file-id cache is disabled
+   (`NoCache`): on Windows the default `FileIdMap` walks the watched directory and reads a file id
+   per entry (`file_id_map.rs`), pointless since the app re-lists; not benchmarked.
+9. **Git**: status is recomputed for every directory change (no cross-directory cache) and uses
+   `--ignored=traditional` (ignored directories are reported collapsed). Header counts use
+   `+ ~ ? U` for staged/modified/untracked/conflicted. Glyph for an entry uses the highest-priority
+   of its index and work-tree state.
+10. **Time zone**: the UTC offset comes from `GetTimeZoneInformation` on Windows (current offset,
+    including DST, applied to all dates); other platforms show UTC.
+11. **Hint line**: the Normal-mode hints are `h l space . g/ q`; `v select` and `ctrl-o back` were
+    dropped because they do not fit 80 columns. The full hint set arrives with P5.
+12. **Perf test is an `#[ignore]`d integration test**, not a criterion bench (criterion arrives
+    with the `ks-search` benchmarks); extra bindings `home/end/pageup/pagedown`.
+13. **Left as in P0**: `ctrl-i` is `tab`; `docs/keymap.md` generation is still P5. The deferred
+    "captured `m <char>` argument reaches its handler" test moves to P7 (bookmarks are the first
+    consumer of `Invocation::arg`).
+
+### VERIFY results
+
+- **`DirEntry::metadata` on Windows needs no extra syscall**: the std documentation (rust-docs of
+  the installed 1.99 toolchain) says "On Windows this function is cheap to call (no extra system
+  calls needed)"; measured: listing and sorting 100k entries takes 83 ms (release). The kind of
+  a link needs one extra call (`FindFirstFileW`), done only for links.
+- **`DirEntry::file_type().is_symlink()`** is true for junctions too (confirmed by the junction
+  test classifying a `mklink /J` junction as `Junction` through its reparse tag).
+- **notify on Windows, non-recursive watch** (`ReadDirectoryChangesW`): create, delete and rename
+  of direct children are reported within about 125 ms of the change (100 ms debounce); a burst of
+  20 files is one notification; writes inside a subdirectory are not reported (at most the
+  touch of the subdirectory entry itself); the removal of the watched directory is **not**
+  reported (hence the parent watch); dropping the watcher stops notifications.
+- **git porcelain v2 `-z` format** checked against `git status --help` and a real repository (git
+  2.52.0.windows.1): with `-z` the `# branch.*` headers are NUL-terminated records like all
+  others; a renamed entry is `2 R. N... <modes> <hashes> R100 <new path>` followed by a record with
+  the original path; untracked directories appear collapsed as `? dir/`, ignored ones as `! dir/`;
+  paths are relative to the repository root, never quoted with `-z`, so
+  `rev-parse --show-prefix` provides the directory's own prefix. The real-repository test covers
+  modified, staged, untracked, ignored and a subdirectory.
+- **Drives**: on this machine `C:\` reports NTFS, fixed, 497 GB total / 34 GB free via the Win32
+  calls; the label is empty (the view then falls back to "Local Disk").
+- **Linux**: `cargo check` and `cargo clippy -D warnings` pass for `x86_64-unknown-linux-gnu`
+  (not run there). The `#[cfg(unix)]` symlink/executable test is therefore compiled but not
+  executed in this environment.
+- **Real console smoke**: `ks.exe <dir>` started in a hidden console, entered the TUI and
+  stayed alive for 3 s without a panic (log shows normal start-up). Keys cannot be sent from
+  here, so interactive use is covered by the headless tests only.
+
+### Open issues
+
+- Nerd Font code points were chosen from the Font Awesome / Devicons / Seti ranges and need a
+  look in a real Nerd Font (the snapshots cannot show them).
+- OneDrive placeholders are covered by the attribute mapping and the "never open" design (the
+  listing only reads metadata, previews/search come later); not tried on real OneDrive files.
+- `GetVolumeInformationW` on a dead network drive can block the drives query for as long as the
+  OS timeout; the query runs on a blocking thread and is cancellable only between drives.
+- Git runs once per directory change; very large repositories with ignored trees may make that
+  slow. Caching the repository-wide result by root is the follow-up if it shows.
+- Windows symbolic links (needs elevation or developer mode) are not exercised on Windows.
+- Review fixes after the first P1 pass: quitting no longer waits for a blocking listing (the
+  runtime is shut down with a 200 ms timeout); a history move superseded by another navigation
+  puts its popped entry back; visual mode in `AppState` is re-synced when the view drops its
+  anchor; a failed visit always re-lists (swallowed watcher events); file names are sanitised
+  of control characters before drawing; hidden entries are also drawn DIM; which-key choices
+  replace the lower rule on terminals shorter than 20 rows (no hint line); `FindFirstFileW` gets
+  a `\?\` prefix for paths over 240 characters; more snapshots (visual, loading, empty,
+  error status, both themes and sizes); always-on 20k-file listing test; permission-denied
+  listing test.
+- Deferred, not fixed: a test for one unreadable entry in the middle of a listing (needs a
+  fault-injection seam in `list_dir`); `ks_fs::link_target` has no UI consumer until the P2
+  preview (extension point, only unit-tested); the 60/40 preview split, the `border_focus`
+  pane and the header tab strip (P2/P7). The `S` again reverses rule is replaced by
+  `S` then the active key (deviation 4) and the Normal hint line lacks the `/ ctrl-p : ?` hints
+  until P3 to P5 build those features; README/PLAN should record the keymap change at P5.
+
+### Dependencies added in P1
+
+`notify` 8.2.0, `notify-debouncer-full` 0.7.0 (both `ks-fs`); `windows` 0.62.2 (`ks-fs`, Windows
+only; features `Win32_Foundation`, `Win32_Storage_FileSystem`, `Win32_System_Time`,
+`Win32_System_Diagnostics_Debug`); `tokio` with the `process` feature in `ks-fs`; `dunce`,
+`tracing`, `tokio-util` in `ks-fs`; `ks-fs` as a dependency of `ks-app`; `tempfile` as a
+dev-dependency of `ks-fs`.

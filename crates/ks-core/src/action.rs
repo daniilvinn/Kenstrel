@@ -88,7 +88,10 @@ actions! {
     ShellCommand => "shell.run", "Run shell command";
     // View
     HiddenToggle => "view.hidden", "Toggle hidden files";
-    SortMenu => "sort.menu", "Sort menu";
+    SortName => "sort.name", "Sort by name";
+    SortSize => "sort.size", "Sort by size";
+    SortMtime => "sort.mtime", "Sort by modified time";
+    SortExt => "sort.ext", "Sort by extension";
     PreviewToggle => "preview.toggle", "Toggle preview";
     ParentColumnToggle => "preview.parent_column", "Toggle parent column";
     MetadataToggle => "preview.metadata", "Toggle metadata view";

@@ -55,6 +55,63 @@ pub fn truncate_start(s: &str, max: usize) -> String {
     kept.iter().rev().collect()
 }
 
+/// Replaces control characters (which could move the cursor or inject escape sequences)
+/// with `?` before a name is drawn.
+pub fn sanitize(text: &str) -> String {
+    text.chars()
+        .map(|c| if c.is_control() { '?' } else { c })
+        .collect()
+}
+
+/// Shortens a file name to at most `max` cells by replacing the middle with `…`, keeping the
+/// start, the last few characters of the stem and (when `keep_extension`) the whole extension:
+/// `very_long_filename_here.rs` becomes `very_long_fi…here.rs`.
+pub fn truncate_middle(name: &str, max: usize, keep_extension: bool) -> String {
+    if width(name) <= max {
+        return name.to_owned();
+    }
+    let ext_start = if keep_extension {
+        match ks_core::entry::extension_of(name) {
+            "" => name.len(),
+            ext => name.len() - ext.len() - 1,
+        }
+    } else {
+        name.len()
+    };
+    let (stem, ext) = name.split_at(ext_start);
+    let ext_width = width(ext);
+    // Room for at least one leading character, the ellipsis and the extension.
+    if ext_width + 2 > max {
+        return truncate_end(name, max);
+    }
+    let remaining = max - ext_width - 1;
+    let tail_budget = (remaining / 3).min(4);
+    let head_budget = remaining - tail_budget;
+
+    let mut head = String::new();
+    let mut used = 0;
+    for c in stem.chars() {
+        let w = c.width().unwrap_or(0);
+        if used + w > head_budget {
+            break;
+        }
+        head.push(c);
+        used += w;
+    }
+    let mut tail: Vec<char> = Vec::new();
+    let mut used = 0;
+    for c in stem[head.len()..].chars().rev() {
+        let w = c.width().unwrap_or(0);
+        if used + w > tail_budget {
+            break;
+        }
+        tail.push(c);
+        used += w;
+    }
+    let tail: String = tail.into_iter().rev().collect();
+    format!("{head}{ELLIPSIS}{tail}{ext}")
+}
+
 /// Strips `home` from the front of `path`, component by component. Windows paths compare
 /// case-insensitively (`c:\users\me` is the same place as `C:\Users\me`).
 fn strip_home<'a>(path: &'a Path, home: &Path) -> Option<&'a Path> {
@@ -139,6 +196,12 @@ fn join(segments: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn control_characters_are_replaced() {
+        assert_eq!(super::sanitize("a\x1b[2Jb\rc\u{7}"), "a?[2Jb?c?");
+        assert_eq!(super::sanitize("plain ünï.txt"), "plain ünï.txt");
+    }
+
     use std::path::PathBuf;
 
     use super::*;
@@ -153,6 +216,50 @@ mod tests {
         assert_eq!(truncate_end("日本語テキスト", 7), "日本語…");
         assert_eq!(truncate_end("日本語テキスト", 6), "日本…");
         assert_eq!(truncate_start("日本語テキスト", 7), "…キスト");
+    }
+
+    #[test]
+    fn middle_truncation_keeps_the_extension() {
+        assert_eq!(truncate_middle("short.rs", 20, true), "short.rs");
+        assert_eq!(
+            truncate_middle("very_long_filename_here.rs", 20, true),
+            "very_long_fi…here.rs"
+        );
+        assert_eq!(
+            truncate_middle("abcdefghijklmnop.txt", 12, true),
+            "abcde…op.txt"
+        );
+        // Too narrow to keep the extension: fall back to cutting the end.
+        assert_eq!(truncate_middle("abcdefgh.markdown", 6, true), "abcde…");
+        // Names without an extension, dotfiles and directory names are cut in the middle.
+        assert_eq!(truncate_middle("abcdefghijklmnop", 10, true), "abcdef…nop");
+        assert_eq!(
+            truncate_middle(".gitignore_template", 10, true),
+            ".gitig…ate"
+        );
+        assert_eq!(
+            truncate_middle("some.directory.name/", 12, false),
+            "some.dir…me/"
+        );
+    }
+
+    #[test]
+    fn middle_truncation_never_exceeds_the_budget() {
+        let names = [
+            "very_long_filename_here.rs",
+            "日本語のファイル名前.txt",
+            "emoji🎉name🎉name🎉.md",
+            "a.b.c.d.e.f.g.h.i.j.k",
+            "noext_but_long_name",
+        ];
+        for name in names {
+            for keep in [true, false] {
+                for max in 0..40 {
+                    let out = truncate_middle(name, max, keep);
+                    assert!(width(&out) <= max, "{name} -> {out} ({max})");
+                }
+            }
+        }
     }
 
     fn p(s: &str) -> PathBuf {

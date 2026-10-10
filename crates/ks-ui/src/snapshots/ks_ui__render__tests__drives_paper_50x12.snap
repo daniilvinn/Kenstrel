@@ -1,0 +1,37 @@
+---
+source: crates/ks-ui/src/render.rs
+expression: rendered
+---
+ This PC
+──────────────────────────────────────────────────
+   C:   Windows                            NTFS
+ ▌ D:   Games and a very long volume label NTFS
+   E:   Removable Disk                     exFAT
+   F:   CD/DVD Drive
+
+
+
+
+──────────────────────────────────────────────────
+ ›                                            2/4
+--- styles (row cols fg bg mods) ---
+  0   1..50  fg=#2b2724 bg=reset bold
+  1   0..50  fg=#d4ccc2 bg=reset
+  2   3..8   fg=#2f6690 bg=reset bold
+  2   8..43  fg=#2b2724 bg=reset
+  2  43..50  fg=#958e86 bg=reset
+  3   0..1   fg=#2b2724 bg=#ece5dc
+  3   1..2   fg=#c4623f bg=#ece5dc
+  3   2..3   fg=#2b2724 bg=#ece5dc
+  3   3..7   fg=#2f6690 bg=#ece5dc bold
+  3   7..42  fg=#2b2724 bg=#ece5dc
+  3  42..49  fg=#958e86 bg=#ece5dc
+  3  49..50  fg=#2b2724 bg=#ece5dc
+  4   3..8   fg=#2f6690 bg=reset bold
+  4   8..43  fg=#2b2724 bg=reset
+  4  43..50  fg=#958e86 bg=reset
+  5   3..8   fg=#2f6690 bg=reset bold
+  5   8..50  fg=#2b2724 bg=reset
+ 10   0..50  fg=#d4ccc2 bg=reset
+ 11   1..46  fg=#c4623f bg=reset bold
+ 11  46..50  fg=#6b645d bg=reset

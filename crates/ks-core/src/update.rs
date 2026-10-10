@@ -6,10 +6,12 @@
 use std::time::Duration;
 
 use crate::action::Action;
+use crate::config::SortKey;
 use crate::effect::Effect;
 use crate::keymap::{Invocation, Resolution};
 use crate::mode::Mode;
 use crate::msg::{Msg, TimerKind};
+use crate::nav;
 use crate::state::{AppState, Level, QuitKind, Status};
 
 /// How long informational messages stay on the status line.
@@ -26,6 +28,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::Resize(size) => {
             if state.size != size {
                 state.size = size;
+                nav::fit_viewport(state);
             }
             state.dirty = true;
         }
@@ -35,7 +38,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
                 state.dirty = true;
             }
         }
-        Msg::Timer { kind, gen } => on_timer(state, kind, gen),
+        Msg::Timer { kind, gen } => on_timer(state, kind, gen, &mut effects),
         Msg::Notify { level, text } => set_status(state, level, text, &mut effects),
         Msg::JobStarted(id) => {
             state.jobs.insert(id);
@@ -46,6 +49,26 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             state.dirty = true;
         }
         Msg::Interrupt => state.quit = Some(QuitKind::Exit),
+        Msg::Start => nav::start(state, &mut effects),
+        Msg::Clock {
+            now,
+            utc_offset_secs,
+        } => {
+            state.now = now;
+            state.utc_offset_secs = utc_offset_secs;
+            state.dirty = true;
+        }
+        Msg::ListingChunk { gen, entries } => nav::on_chunk(state, &mut effects, gen, entries),
+        Msg::ListingFinished { gen, error } => nav::on_finished(state, &mut effects, gen, error),
+        Msg::DrivesLoaded { gen, drives } => nav::on_drives(state, &mut effects, gen, drives),
+        Msg::ChildCounts { gen, counts } => nav::on_child_counts(state, gen, counts),
+        Msg::DirChanged { gen } => nav::on_dir_changed(state, &mut effects, gen),
+        Msg::GitStatus { gen, snapshot } => nav::on_git_status(state, gen, snapshot),
+    }
+    // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
+    if state.mode == Mode::Visual && !state.view.in_visual_mode() {
+        state.mode = Mode::Normal;
+        state.dirty = true;
     }
     effects
 }
@@ -91,8 +114,14 @@ fn clear_pending(state: &mut AppState, effects: &mut Vec<Effect>) -> bool {
     true
 }
 
-fn on_timer(state: &mut AppState, kind: TimerKind, gen: crate::generation::Gen) {
+fn on_timer(
+    state: &mut AppState,
+    kind: TimerKind,
+    gen: crate::generation::Gen,
+    effects: &mut Vec<Effect>,
+) {
     match kind {
+        TimerKind::GitRefresh => nav::on_git_timer(state, effects, gen),
         TimerKind::WhichKey => {
             if state.which_key_gen.is_current(gen) && !state.pending.is_empty() {
                 state.which_key_visible = true;
@@ -107,7 +136,12 @@ fn on_timer(state: &mut AppState, kind: TimerKind, gen: crate::generation::Gen) 
     }
 }
 
-fn set_status(state: &mut AppState, level: Level, text: String, effects: &mut Vec<Effect>) {
+pub(crate) fn set_status(
+    state: &mut AppState,
+    level: Level,
+    text: String,
+    effects: &mut Vec<Effect>,
+) {
     let gen = state.status_gen.bump();
     state.status = Some(Status { level, text, gen });
     state.dirty = true;
@@ -127,6 +161,29 @@ fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Ef
         Action::Quit => state.quit = Some(QuitKind::Exit),
         Action::QuitCd => state.quit = Some(QuitKind::ChangeDir),
         Action::Cancel => cancel(state),
+        Action::CursorDown => nav::move_cursor(state, 1),
+        Action::CursorUp => nav::move_cursor(state, -1),
+        Action::CursorTop => nav::cursor_edge(state, false),
+        Action::CursorBottom => nav::cursor_edge(state, true),
+        Action::PageHalfDown => nav::half_page(state, true),
+        Action::PageHalfUp => nav::half_page(state, false),
+        Action::DirEnter => nav::enter(state, effects),
+        Action::DirParent => nav::parent(state, effects),
+        Action::HistoryBack => nav::history_back(state, effects),
+        Action::HistoryForward => nav::history_forward(state, effects),
+        Action::GoHome
+        | Action::GoDownloads
+        | Action::GoDesktop
+        | Action::GoConfig
+        | Action::GoDrives => nav::go_place(state, effects, invocation.action),
+        Action::MarkToggle => nav::toggle_mark(state),
+        Action::MarkAll => nav::mark_all(state),
+        Action::VisualToggle => nav::toggle_visual(state),
+        Action::HiddenToggle => nav::toggle_hidden(state, effects),
+        Action::SortName => nav::sort_by(state, effects, SortKey::Name),
+        Action::SortSize => nav::sort_by(state, effects, SortKey::Size),
+        Action::SortMtime => nav::sort_by(state, effects, SortKey::Mtime),
+        Action::SortExt => nav::sort_by(state, effects, SortKey::Ext),
         other => set_status(
             state,
             Level::Info,
@@ -136,13 +193,19 @@ fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Ef
     }
 }
 
-/// `esc`: close the top overlay, else leave the current mode, else dismiss the status line.
+/// `esc`: close the top overlay, else leave the current mode (visual mode keeps its marks),
+/// else clear the marks, else dismiss the status line.
 fn cancel(state: &mut AppState) {
     if state.overlays.pop().is_some() {
         return;
     }
     if state.mode != Mode::Normal {
         state.mode = Mode::Normal;
+        state.view.exit_visual();
+        return;
+    }
+    if state.view.marks_count() > 0 {
+        state.view.clear_marks();
         return;
     }
     state.status = None;
@@ -158,15 +221,18 @@ mod tests {
     use crate::key::KeyChord;
     use crate::keymap::Keymap;
     use crate::mode::Overlay;
-    use crate::state::{JobId, Size, StartParams};
+    use crate::state::{JobId, Places, Size, StartParams};
 
     fn state() -> AppState {
         let mut state = AppState::new(StartParams {
             cwd: PathBuf::from("/home/me/project"),
             home: Some(PathBuf::from("/home/me")),
+            places: Places::default(),
             config: Config::default(),
             keymap: Keymap::defaults(),
             size: Size::new(80, 24),
+            now: std::time::SystemTime::UNIX_EPOCH,
+            utc_offset_secs: 0,
         });
         state.dirty = false;
         state
@@ -250,7 +316,8 @@ mod tests {
         assert!(s.pending.is_empty());
         assert!(!s.which_key_visible);
         assert!(effects.contains(&Effect::CancelTimer(TimerKind::WhichKey)));
-        assert!(s.status.as_ref().unwrap().text.contains("not available"));
+        // `g g` is "jump to top": it ran, and nothing was reported as missing.
+        assert!(s.status.is_none());
     }
 
     #[test]
@@ -288,10 +355,10 @@ mod tests {
     #[test]
     fn unimplemented_actions_report_instead_of_failing_silently() {
         let mut s = state();
-        let effects = key(&mut s, "j");
+        let effects = key(&mut s, "y");
         let status = s.status.as_ref().unwrap();
         assert_eq!(status.level, Level::Info);
-        assert_eq!(status.text, "Move cursor down is not available yet");
+        assert_eq!(status.text, "Copy is not available yet");
         assert!(matches!(
             effects.as_slice(),
             [Effect::StartTimer {
@@ -351,6 +418,9 @@ mod tests {
     #[test]
     fn escape_unwinds_overlays_then_mode_then_status() {
         let mut s = state();
+        s.view
+            .push_chunk(vec![crate::entry::Entry::file("a", 1)], 10);
+        s.view.enter_visual();
         s.mode = Mode::Visual;
         s.overlays.push(Overlay::Help);
         assert_eq!(s.key_context(), crate::mode::KeyContext::Help);
@@ -361,6 +431,8 @@ mod tests {
 
         key(&mut s, "esc");
         assert_eq!(s.mode, Mode::Normal);
+        // The range the visual mode marked is cleared by the next escape.
+        key(&mut s, "esc");
 
         update(
             &mut s,
@@ -388,6 +460,22 @@ mod tests {
 
         update(&mut s, Msg::JobFinished(JobId(1)));
         assert!(!s.has_running_jobs());
+    }
+
+    #[test]
+    fn clock_messages_update_the_time_used_for_relative_dates() {
+        let mut s = state();
+        let later = std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_000);
+        update(
+            &mut s,
+            Msg::Clock {
+                now: later,
+                utc_offset_secs: 7200,
+            },
+        );
+        assert_eq!(s.now, later);
+        assert_eq!(s.utc_offset_secs, 7200);
+        assert!(s.dirty);
     }
 
     #[test]

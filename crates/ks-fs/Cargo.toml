@@ -5,8 +5,33 @@ edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[lints]
-workspace = true
+# Not `workspace = true`: the Windows module needs `unsafe` for Win32 calls, and a workspace
+# `forbid` cannot be relaxed per module. Everything else mirrors the workspace lints.
+[lints.rust]
+unsafe_code = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+print_stdout = "warn"
+print_stderr = "warn"
 
 [dependencies]
+ks-core.workspace = true
+dunce.workspace = true
+notify.workspace = true
+notify-debouncer-full.workspace = true
+tokio = { workspace = true, features = ["process"] }
+tokio-util.workspace = true
+tracing.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Time",
+    "Win32_System_Diagnostics_Debug",
+] }
+
+[dev-dependencies]
+tempfile.workspace = true

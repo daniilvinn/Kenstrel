@@ -5,10 +5,11 @@
 
 use std::fs;
 use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use ks_core::config::DEFAULT_CONFIG_TOML;
-use ks_core::{AppState, Config, Keymap, Level, Msg, Size, StartParams};
+use ks_core::{AppState, Config, Keymap, Level, Msg, Places, Size, StartParams};
 use ks_ui::{ColorDepth, Theme, ThemeLoader};
 
 use crate::paths::AppPaths;
@@ -78,6 +79,21 @@ fn one_line(message: &str) -> String {
     }
 }
 
+/// The well-known folders behind the `g` jump keys. Downloads and Desktop come from the
+/// shell's known-folder lookup, so a relocated folder is found where it really is.
+pub fn discover_places(paths: &AppPaths, home: Option<PathBuf>) -> Places {
+    let user = directories::UserDirs::new();
+    let folder = |pick: fn(&directories::UserDirs) -> Option<&Path>| {
+        user.as_ref().and_then(pick).map(Path::to_path_buf)
+    };
+    Places {
+        home,
+        downloads: folder(directories::UserDirs::download_dir),
+        desktop: folder(directories::UserDirs::desktop_dir),
+        config: Some(paths.config_dir().to_path_buf()),
+    }
+}
+
 /// Everything needed to run, plus start-up messages for the status line.
 pub struct Session {
     pub state: AppState,
@@ -89,8 +105,11 @@ pub struct SessionInputs<'a> {
     pub paths: &'a AppPaths,
     pub cwd: PathBuf,
     pub home: Option<PathBuf>,
+    pub places: Places,
     pub size: Size,
     pub depth: ColorDepth,
+    pub now: SystemTime,
+    pub utc_offset_secs: i32,
 }
 
 /// Loads config, keymap and theme; collects every problem into one error message.
@@ -119,20 +138,23 @@ pub fn build_session(inputs: SessionInputs<'_>) -> Session {
         problems.push(problem);
     }
 
-    let startup = if problems.is_empty() {
-        Vec::new()
-    } else {
-        vec![Msg::Notify {
+    // The first message lists the start directory; the notice (if any) follows.
+    let mut startup = vec![Msg::Start];
+    if !problems.is_empty() {
+        startup.push(Msg::Notify {
             level: Level::Error,
             text: problems.join("; "),
-        }]
-    };
+        });
+    }
     let state = AppState::new(StartParams {
         cwd: inputs.cwd,
         home: inputs.home,
+        places: inputs.places,
         config: loaded.config,
         keymap,
         size: inputs.size,
+        now: inputs.now,
+        utc_offset_secs: inputs.utc_offset_secs,
     });
     Session {
         state,
@@ -151,6 +173,37 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let paths = AppPaths::under(dir.path());
         (dir, paths)
+    }
+
+    fn inputs(paths: &AppPaths, depth: ColorDepth) -> SessionInputs<'_> {
+        SessionInputs {
+            paths,
+            cwd: PathBuf::from("/tmp"),
+            home: None,
+            places: Places::default(),
+            size: Size::new(80, 24),
+            depth,
+            now: SystemTime::UNIX_EPOCH,
+            utc_offset_secs: 0,
+        }
+    }
+
+    #[test]
+    fn places_include_the_config_directory_and_the_given_home() {
+        let (_dir, paths) = paths();
+        let places = discover_places(&paths, Some(PathBuf::from("/home/me")));
+        assert_eq!(places.home.as_deref(), Some(Path::new("/home/me")));
+        assert_eq!(places.config.as_deref(), Some(paths.config_dir()));
+    }
+
+    #[test]
+    fn session_state_carries_the_inputs() {
+        let (_dir, paths) = paths();
+        let mut input = inputs(&paths, ColorDepth::TrueColor);
+        input.utc_offset_secs = 3600;
+        let session = build_session(input);
+        assert_eq!(session.state.utc_offset_secs, 3600);
+        assert_eq!(session.state.cwd, Path::new("/tmp"));
     }
 
     fn write_config(paths: &AppPaths, text: &str) {
@@ -220,16 +273,13 @@ mod tests {
             &paths,
             "theme = \"nope\"\n[keymap.normal]\nx = \"no.such.action\"\nz = \"quit\"\n",
         );
-        let session = build_session(SessionInputs {
-            paths: &paths,
-            cwd: PathBuf::from("/tmp"),
-            home: None,
-            size: Size::new(80, 24),
-            depth: ColorDepth::TrueColor,
-        });
+        let session = build_session(inputs(&paths, ColorDepth::TrueColor));
         assert_eq!(session.theme.name, "ember");
-        let [Msg::Notify { level, text }] = session.startup.as_slice() else {
-            panic!("expected one notification, got {:?}", session.startup);
+        let [Msg::Start, Msg::Notify { level, text }] = session.startup.as_slice() else {
+            panic!(
+                "expected start and one notification, got {:?}",
+                session.startup
+            );
         };
         assert_eq!(*level, Level::Error);
         assert!(text.contains("no.such.action"), "{text}");
@@ -243,16 +293,10 @@ mod tests {
     }
 
     #[test]
-    fn clean_config_yields_no_startup_messages() {
+    fn clean_config_only_starts_the_listing() {
         let (_dir, paths) = paths();
-        let session = build_session(SessionInputs {
-            paths: &paths,
-            cwd: PathBuf::from("/tmp"),
-            home: None,
-            size: Size::new(80, 24),
-            depth: ColorDepth::Indexed256,
-        });
-        assert!(session.startup.is_empty());
+        let session = build_session(inputs(&paths, ColorDepth::Indexed256));
+        assert_eq!(session.startup, [Msg::Start]);
         assert_eq!(session.theme.name, "ember");
     }
 

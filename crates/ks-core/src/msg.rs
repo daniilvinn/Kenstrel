@@ -1,6 +1,13 @@
 //! Everything that can happen to the app, as plain data.
 
+use std::ffi::OsString;
+use std::time::SystemTime;
+
+use crate::drives::DriveInfo;
+use crate::entry::Entry;
+use crate::error::FsError;
 use crate::generation::Gen;
+use crate::git::GitSnapshot;
 use crate::key::KeyChord;
 use crate::state::{JobId, Level, Size};
 
@@ -11,6 +18,8 @@ pub enum TimerKind {
     WhichKey,
     /// Remove the status-line message.
     StatusExpiry,
+    /// The debounce for re-running `git status` after the directory changed.
+    GitRefresh,
 }
 
 /// Input to [`update`](crate::update::update).
@@ -36,4 +45,40 @@ pub enum Msg {
     JobFinished(JobId),
     /// The process was asked to stop (ctrl-c outside raw mode, console close).
     Interrupt,
+    /// Sent once before the first frame: list the start directory.
+    Start,
+    /// Periodic wall-clock update (relative times such as "3m ago" age with it).
+    Clock {
+        now: SystemTime,
+        utc_offset_secs: i32,
+    },
+    /// A batch of entries of the listing started with generation `gen`.
+    ListingChunk {
+        gen: Gen,
+        entries: Vec<Entry>,
+    },
+    /// The listing with generation `gen` ended, successfully or not.
+    ListingFinished {
+        gen: Gen,
+        error: Option<FsError>,
+    },
+    /// The drive list requested with generation `gen`.
+    DrivesLoaded {
+        gen: Gen,
+        drives: Vec<DriveInfo>,
+    },
+    /// Child counts for directories of the current listing.
+    ChildCounts {
+        gen: Gen,
+        counts: Vec<(OsString, u32)>,
+    },
+    /// The watched directory changed (already debounced by the watcher).
+    DirChanged {
+        gen: Gen,
+    },
+    /// Result of `git status`; `None` when the directory is not in a repository.
+    GitStatus {
+        gen: Gen,
+        snapshot: Option<Box<GitSnapshot>>,
+    },
 }

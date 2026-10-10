@@ -1,13 +1,20 @@
 //! The single source of truth for the UI.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
+use std::ffi::OsString;
 use std::path::PathBuf;
+use std::time::SystemTime;
 
 use crate::config::Config;
+use crate::drives::DrivesView;
 use crate::generation::{Gen, GenCounter};
+use crate::git::GitSnapshot;
 use crate::key::KeyChord;
 use crate::keymap::Keymap;
+use crate::layout;
 use crate::mode::{KeyContext, Mode, Overlay};
+use crate::nav::{History, PendingNav};
+use crate::view::DirView;
 
 /// Terminal size in cells.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -51,19 +58,37 @@ pub enum QuitKind {
     ChangeDir,
 }
 
+/// Well-known directories the `g` jump keys lead to. Any of them may be unavailable.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Places {
+    pub home: Option<PathBuf>,
+    pub downloads: Option<PathBuf>,
+    pub desktop: Option<PathBuf>,
+    /// Kestrel's own config directory.
+    pub config: Option<PathBuf>,
+}
+
 /// Everything needed to start a session.
 pub struct StartParams {
     pub cwd: PathBuf,
     pub home: Option<PathBuf>,
+    pub places: Places,
     pub config: Config,
     pub keymap: Keymap,
     pub size: Size,
+    /// The current time, injected so relative times are testable.
+    pub now: SystemTime,
+    /// Offset of local time from UTC in seconds.
+    pub utc_offset_secs: i32,
 }
 
 pub struct AppState {
+    /// The directory being browsed. While the drives view is shown it is the last real
+    /// directory (used for `Q` and to place the drives cursor).
     pub cwd: PathBuf,
     /// Home directory, used to abbreviate paths as `~`.
     pub home: Option<PathBuf>,
+    pub places: Places,
     pub config: Config,
     pub keymap: Keymap,
     pub size: Size,
@@ -82,15 +107,36 @@ pub struct AppState {
     /// Set when the state changed in a way that requires a redraw.
     pub dirty: bool,
     pub quit: Option<QuitKind>,
+    pub now: SystemTime,
+    pub utc_offset_secs: i32,
+    /// Entries of `cwd`.
+    pub view: DirView,
+    /// The "This PC" view is shown instead of `view`.
+    pub show_drives: bool,
+    pub drives: DrivesView,
+    /// Git status of `cwd`, when it is inside a repository.
+    pub git: Option<GitSnapshot>,
+    pub(crate) history: History,
+    /// Where the cursor was in directories left earlier (by entry name).
+    pub(crate) cursor_memory: HashMap<PathBuf, OsString>,
+    /// A navigation or refresh waiting for its first results.
+    pub(crate) nav: Option<PendingNav>,
     pub(crate) which_key_gen: GenCounter,
     pub(crate) status_gen: GenCounter,
+    pub(crate) list_gen: GenCounter,
+    pub(crate) watch_gen: GenCounter,
+    pub(crate) git_gen: GenCounter,
+    pub(crate) git_timer_gen: GenCounter,
+    pub(crate) children_gen: GenCounter,
 }
 
 impl AppState {
     pub fn new(params: StartParams) -> Self {
+        let view = DirView::new(params.config.sort.clone(), params.config.files.show_hidden);
         Self {
             cwd: params.cwd,
             home: params.home,
+            places: params.places,
             config: params.config,
             keymap: params.keymap,
             size: params.size,
@@ -103,9 +149,28 @@ impl AppState {
             spinner_frame: 0,
             dirty: true,
             quit: None,
+            now: params.now,
+            utc_offset_secs: params.utc_offset_secs,
+            view,
+            show_drives: false,
+            drives: DrivesView::default(),
+            git: None,
+            history: History::default(),
+            cursor_memory: HashMap::new(),
+            nav: None,
             which_key_gen: GenCounter::default(),
             status_gen: GenCounter::default(),
+            list_gen: GenCounter::default(),
+            watch_gen: GenCounter::default(),
+            git_gen: GenCounter::default(),
+            git_timer_gen: GenCounter::default(),
+            children_gen: GenCounter::default(),
         }
+    }
+
+    /// Rows available to the list at the current terminal size.
+    pub fn viewport_height(&self) -> usize {
+        usize::from(layout::body_height(self.size))
     }
 
     /// The keymap context that receives the next key: the topmost overlay, else the mode.
@@ -113,6 +178,11 @@ impl AppState {
         self.overlays
             .last()
             .map_or_else(|| self.mode.into(), |&overlay| overlay.into())
+    }
+
+    /// A navigation or refresh is waiting for its first results.
+    pub fn is_navigating(&self) -> bool {
+        self.nav.is_some()
     }
 
     pub fn has_running_jobs(&self) -> bool {

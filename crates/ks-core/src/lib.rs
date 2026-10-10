@@ -5,22 +5,35 @@
 
 pub mod action;
 pub mod config;
+pub mod cursor;
+pub mod drives;
 pub mod effect;
+pub mod entry;
+pub mod error;
 pub mod generation;
+pub mod git;
 pub mod key;
 pub mod keymap;
+pub mod layout;
 pub mod mode;
 pub mod msg;
+mod nav;
 pub mod state;
 pub mod update;
+pub mod view;
 
 pub use action::Action;
 pub use config::Config;
+pub use drives::{DriveInfo, DriveKind, DrivesView};
 pub use effect::Effect;
+pub use entry::{Attrs, Entry, EntryKind};
+pub use error::{FsError, FsErrorKind};
 pub use generation::{Gen, GenCounter};
+pub use git::{GitBranch, GitCounts, GitRecord, GitSnapshot, GitState};
 pub use key::{Key, KeyChord, Modifiers};
 pub use keymap::Keymap;
 pub use mode::{KeyContext, Mode, Overlay};
 pub use msg::{Msg, TimerKind};
-pub use state::{AppState, JobId, Level, QuitKind, Size, StartParams, Status};
+pub use state::{AppState, JobId, Level, Places, QuitKind, Size, StartParams, Status};
 pub use update::update;
+pub use view::DirView;

@@ -23,7 +23,7 @@ use ks_ui::ColorDepth;
 use crate::cli::Cli;
 use crate::event_loop::LoopOptions;
 use crate::paths::AppPaths;
-use crate::settings::{build_session, SessionInputs};
+use crate::settings::{build_session, discover_places, SessionInputs};
 use crate::terminal::TerminalSession;
 
 /// Runs the TUI to completion.
@@ -46,8 +46,11 @@ pub fn run(cli: &Cli) -> Result<()> {
         paths: &paths,
         cwd: start_dir,
         home: paths::home_dir(),
+        places: discover_places(&paths, paths::home_dir()),
         size: Size::new(width, height),
         depth: ColorDepth::detect_from_env(),
+        now: std::time::SystemTime::now(),
+        utc_offset_secs: ks_fs::utc_offset_secs(),
     });
     tracing::info!(cwd = %session.state.cwd.display(), theme = %session.theme, "starting");
 
@@ -57,7 +60,7 @@ pub fn run(cli: &Cli) -> Result<()> {
         .context("cannot start the async runtime")?;
 
     let mut state = session.state;
-    let quit = {
+    let outcome = {
         // Dropping the session restores the terminal on every path out of this block.
         let mut tui = TerminalSession::enter().context("cannot initialise the terminal")?;
         runtime.block_on(event_loop::run(
@@ -69,8 +72,12 @@ pub fn run(cli: &Cli) -> Result<()> {
                 startup: session.startup,
                 panic_after_first_frame: cli.debug_panic,
             },
-        ))?
+        ))
     };
+    // A listing stuck in a blocking syscall (an offline network share) cannot be cancelled;
+    // dropping the runtime would wait for it, so quitting would hang. Abandon it instead.
+    runtime.shutdown_timeout(std::time::Duration::from_millis(200));
+    let quit = outcome?;
 
     startup::finish(quit, cli.cwd_file.as_deref(), &state.cwd)?;
     tracing::info!("exiting");

@@ -1,0 +1,73 @@
+---
+source: crates/ks-ui/src/render.rs
+expression: "draw(&s, &theme(name))"
+---
+ ~/projects/omniforce/src/renderer
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   empty directory
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                                                          0/0
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..160 fg=#2b2724 bg=reset bold
+  1   0..160 fg=#d4ccc2 bg=reset
+  2   3..160 fg=#958e86 bg=reset
+ 45   0..160 fg=#d4ccc2 bg=reset
+ 46   1..156 fg=#c4623f bg=reset bold
+ 46 156..160 fg=#6b645d bg=reset
+ 47   3..4   fg=#958e86 bg=reset
+ 47   4..5   fg=#6b645d bg=reset
+ 47   5..16  fg=#958e86 bg=reset
+ 47  16..17  fg=#6b645d bg=reset
+ 47  17..26  fg=#958e86 bg=reset
+ 47  26..31  fg=#6b645d bg=reset
+ 47  31..40  fg=#958e86 bg=reset
+ 47  40..41  fg=#6b645d bg=reset
+ 47  41..52  fg=#958e86 bg=reset
+ 47  52..55  fg=#6b645d bg=reset
+ 47  55..66  fg=#958e86 bg=reset
+ 47  66..67  fg=#6b645d bg=reset
+ 47  67..160 fg=#958e86 bg=reset

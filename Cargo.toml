@@ -31,6 +31,7 @@ strip = true
 
 [workspace.dependencies]
 ks-core = { path = "crates/ks-core" }
+ks-fs = { path = "crates/ks-fs" }
 ks-ui = { path = "crates/ks-ui" }
 
 anyhow = "1.0.104"
@@ -40,6 +41,8 @@ directories = "6.0.0"
 dunce = "1.0.5"
 futures-util = "0.3.34"
 insta = "1.49.0"
+notify = "8.2.0"
+notify-debouncer-full = "0.7.0"
 ratatui = "0.30.2"
 serde = { version = "1.0.229", features = ["derive"] }
 tempfile = "3.27.0"
@@ -51,3 +54,4 @@ tracing = "0.1.44"
 tracing-appender = "0.2.5"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 unicode-width = "0.2.2"
+windows = "0.62.2"

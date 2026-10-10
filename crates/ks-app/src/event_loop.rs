@@ -3,7 +3,7 @@
 //! Generic over the ratatui backend and the event source so it can be driven headlessly in
 //! tests with a `TestBackend` and a scripted event stream.
 
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Context, Result};
 use crossterm::event::Event;
@@ -13,7 +13,7 @@ use ks_ui::Theme;
 use ratatui::backend::Backend;
 use ratatui::Terminal;
 use tokio::sync::mpsc;
-use tokio::time::{interval, sleep, Instant, MissedTickBehavior};
+use tokio::time::{interval, interval_at, sleep, Instant, MissedTickBehavior};
 
 use crate::effects::EffectRunner;
 use crate::input::translate_event;
@@ -22,6 +22,8 @@ use crate::input::translate_event;
 pub const FRAME_INTERVAL: Duration = Duration::from_millis(16);
 /// The job spinner animates at 10 Hz, and only while jobs are running.
 pub const SPINNER_INTERVAL: Duration = Duration::from_millis(100);
+/// How often the wall clock behind relative times ("3m ago") is refreshed.
+pub const CLOCK_INTERVAL: Duration = Duration::from_secs(30);
 
 const MSG_QUEUE: usize = 256;
 
@@ -52,6 +54,8 @@ where
 
     let mut spinner = interval(SPINNER_INTERVAL);
     spinner.set_missed_tick_behavior(MissedTickBehavior::Skip);
+    let mut clock = interval_at(Instant::now() + CLOCK_INTERVAL, CLOCK_INTERVAL);
+    clock.set_missed_tick_behavior(MissedTickBehavior::Skip);
     let mut last_draw: Option<Instant> = None;
     let mut panic_armed = options.panic_after_first_frame;
 
@@ -90,6 +94,10 @@ where
             },
             Some(msg) = rx.recv() => Some(msg),
             _ = spinner.tick(), if state.has_running_jobs() => Some(Msg::Tick),
+            _ = clock.tick() => Some(Msg::Clock {
+                now: SystemTime::now(),
+                utc_offset_secs: ks_fs::utc_offset_secs(),
+            }),
             () = sleep(frame_due.unwrap_or_default()), if frame_due.is_some() => None,
         };
 
@@ -127,7 +135,7 @@ mod tests {
 
     use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
     use futures_util::stream;
-    use ks_core::{Config, JobId, Keymap, Level, Size, StartParams};
+    use ks_core::{Config, JobId, Keymap, Level, Places, Size, StartParams};
     use ks_ui::ColorDepth;
     use ratatui::backend::TestBackend;
 
@@ -146,9 +154,12 @@ mod tests {
         AppState::new(StartParams {
             cwd: PathBuf::from("/home/me/code"),
             home: Some(PathBuf::from("/home/me")),
+            places: Places::default(),
             config: Config::default(),
             keymap: Keymap::defaults(),
             size: Size::new(80, 24),
+            now: SystemTime::UNIX_EPOCH,
+            utc_offset_secs: 0,
         })
     }
 
@@ -203,11 +214,11 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn key_releases_do_not_double_fire() {
         let mut state = state();
-        // `j` (press + release) then `q`. The release must be ignored, so exactly one
+        // `y` (press + release) then `q`. The release must be ignored, so exactly one
         // "not available" notice is produced and the loop still quits on `q`.
         let events = vec![
-            key('j', KeyEventKind::Press),
-            key('j', KeyEventKind::Release),
+            key('y', KeyEventKind::Press),
+            key('y', KeyEventKind::Release),
             key('q', KeyEventKind::Press),
             key('q', KeyEventKind::Release),
         ];
@@ -215,7 +226,7 @@ mod tests {
         assert_eq!(result.unwrap(), QuitKind::Exit);
         assert_eq!(
             state.status.as_ref().unwrap().text,
-            "Move cursor down is not available yet"
+            "Copy is not available yet"
         );
     }
 

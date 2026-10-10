@@ -2,20 +2,35 @@
 //! [`Msg`]s.
 //!
 //! Every effect runs under a [`CancellationToken`] so it can be replaced, cancelled, or
-//! torn down at shutdown without leaking tasks.
+//! torn down at shutdown without leaking tasks. Effects that must not overlap share a
+//! [`Slot`]: starting one cancels the previous one in the same slot.
 
 use std::collections::HashMap;
+use std::ffi::OsString;
+use std::path::PathBuf;
 
-use ks_core::{Effect, Msg, TimerKind};
+use ks_core::{Effect, Gen, Level, Msg, TimerKind};
+use ks_fs::DirWatcher;
 use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
+
+/// Background work of which only the latest request matters.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum Slot {
+    /// Directory listings and drive queries.
+    Listing,
+    Watcher,
+    Git,
+    ChildCounts,
+}
 
 pub struct EffectRunner {
     tx: Sender<Msg>,
     /// Cancels every task at shutdown; per-effect tokens are children of it.
     shutdown: CancellationToken,
     timers: HashMap<TimerKind, CancellationToken>,
+    slots: HashMap<Slot, CancellationToken>,
 }
 
 impl EffectRunner {
@@ -24,6 +39,7 @@ impl EffectRunner {
             tx,
             shutdown: CancellationToken::new(),
             timers: HashMap::new(),
+            slots: HashMap::new(),
         }
     }
 
@@ -52,6 +68,16 @@ impl EffectRunner {
                         token.cancel();
                     }
                 }
+                Effect::ListDir { gen, path } => self.list_dir(gen, path),
+                Effect::ListDrives { gen } => self.list_drives(gen),
+                Effect::WatchDir { gen, path } => self.watch_dir(gen, path),
+                Effect::StopWatching => {
+                    if let Some(token) = self.slots.remove(&Slot::Watcher) {
+                        token.cancel();
+                    }
+                }
+                Effect::GitStatus { gen, dir } => self.git_status(gen, dir),
+                Effect::CountChildren { gen, dir, names } => self.count_children(gen, dir, names),
             }
         }
     }
@@ -60,6 +86,116 @@ impl EffectRunner {
     pub fn shutdown(&mut self) {
         self.shutdown.cancel();
         self.timers.clear();
+        self.slots.clear();
+    }
+
+    /// A fresh token for `slot`; whatever ran there before is cancelled.
+    fn claim(&mut self, slot: Slot) -> CancellationToken {
+        let token = self.shutdown.child_token();
+        if let Some(previous) = self.slots.insert(slot, token.clone()) {
+            previous.cancel();
+        }
+        token
+    }
+
+    fn list_dir(&mut self, gen: Gen, path: PathBuf) {
+        let token = self.claim(Slot::Listing);
+        let tx = self.tx.clone();
+        tokio::task::spawn_blocking(move || {
+            // `blocking_send` gives backpressure: a slow UI slows the listing down instead
+            // of letting chunks pile up. A closed channel means the app is exiting.
+            let result = ks_fs::list_dir(&path, &token, |entries| {
+                tx.blocking_send(Msg::ListingChunk { gen, entries }).is_ok()
+            });
+            if let Err(error) = &result {
+                tracing::debug!(path = %path.display(), %error, "listing failed");
+            }
+            // A cancelled listing has been superseded; its end must not be reported.
+            if !token.is_cancelled() {
+                let _ = tx.blocking_send(Msg::ListingFinished {
+                    gen,
+                    error: result.err(),
+                });
+            }
+        });
+    }
+
+    fn list_drives(&mut self, gen: Gen) {
+        let token = self.claim(Slot::Listing);
+        let tx = self.tx.clone();
+        tokio::task::spawn_blocking(move || {
+            let drives = ks_fs::list_drives();
+            if !token.is_cancelled() {
+                let _ = tx.blocking_send(Msg::DrivesLoaded { gen, drives });
+            }
+        });
+    }
+
+    fn watch_dir(&mut self, gen: Gen, path: PathBuf) {
+        let token = self.claim(Slot::Watcher);
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let notify_tx = tx.clone();
+            let watch_path = path.clone();
+            // Setting up a watch touches the file system, so it stays off the loop.
+            let created = tokio::task::spawn_blocking(move || {
+                DirWatcher::new(&watch_path, move || {
+                    let _ = notify_tx.blocking_send(Msg::DirChanged { gen });
+                })
+            })
+            .await;
+            let watcher = match created {
+                Ok(Ok(watcher)) => watcher,
+                Ok(Err(error)) => {
+                    tracing::warn!(path = %path.display(), %error, "cannot watch directory");
+                    if !token.is_cancelled() {
+                        let _ = tx
+                            .send(Msg::Notify {
+                                level: Level::Warning,
+                                text: "This directory cannot be watched; changes will not appear on their own"
+                                    .to_owned(),
+                            })
+                            .await;
+                    }
+                    return;
+                }
+                Err(error) => {
+                    tracing::error!(%error, "watcher setup task failed");
+                    return;
+                }
+            };
+            token.cancelled().await;
+            // Dropping stops the OS watch; do it where blocking is allowed.
+            let _ = tokio::task::spawn_blocking(move || drop(watcher)).await;
+        });
+    }
+
+    fn git_status(&mut self, gen: Gen, dir: PathBuf) {
+        let token = self.claim(Slot::Git);
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            // Dropping the status future (on cancellation) kills the git processes.
+            let snapshot = tokio::select! {
+                () = token.cancelled() => return,
+                snapshot = ks_fs::git_status(&dir) => snapshot,
+            };
+            let _ = tx
+                .send(Msg::GitStatus {
+                    gen,
+                    snapshot: snapshot.map(Box::new),
+                })
+                .await;
+        });
+    }
+
+    fn count_children(&mut self, gen: Gen, dir: PathBuf, names: Vec<OsString>) {
+        let token = self.claim(Slot::ChildCounts);
+        let tx = self.tx.clone();
+        tokio::task::spawn_blocking(move || {
+            ks_fs::count_children(&dir, names, &token, |counts| {
+                tx.blocking_send(Msg::ChildCounts { gen, counts }).is_ok()
+            });
+        });
     }
 }
 
@@ -154,5 +290,193 @@ mod tests {
         runner.shutdown();
         tokio::time::sleep(Duration::from_secs(1)).await;
         assert!(rx.try_recv().is_err());
+    }
+}
+
+#[cfg(test)]
+mod fs_effect_tests {
+    use std::time::Duration;
+
+    use ks_core::{FsErrorKind, GenCounter};
+    use tokio::sync::mpsc::{self, Receiver};
+    use tokio::time::timeout;
+
+    use super::*;
+
+    const WAIT: Duration = Duration::from_secs(5);
+
+    fn gen() -> Gen {
+        GenCounter::default().bump()
+    }
+
+    async fn next(rx: &mut Receiver<Msg>) -> Msg {
+        timeout(WAIT, rx.recv())
+            .await
+            .expect("a message in time")
+            .expect("an open channel")
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn listing_streams_chunks_then_reports_the_end() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["a.txt", "b.txt", "c.txt"] {
+            std::fs::write(dir.path().join(name), "x").unwrap();
+        }
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let g = gen();
+        runner.run([Effect::ListDir {
+            gen: g,
+            path: dir.path().to_owned(),
+        }]);
+
+        let mut names = Vec::new();
+        loop {
+            match next(&mut rx).await {
+                Msg::ListingChunk { gen, entries } => {
+                    assert_eq!(gen, g);
+                    names.extend(entries.iter().map(|e| e.display_name().into_owned()));
+                }
+                Msg::ListingFinished { gen, error } => {
+                    assert_eq!(gen, g);
+                    assert!(error.is_none());
+                    break;
+                }
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+        names.sort();
+        assert_eq!(names, ["a.txt", "b.txt", "c.txt"]);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn listing_a_missing_directory_reports_the_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let g = gen();
+        runner.run([Effect::ListDir {
+            gen: g,
+            path: dir.path().join("missing"),
+        }]);
+        match next(&mut rx).await {
+            Msg::ListingFinished { gen, error } => {
+                assert_eq!(gen, g);
+                assert_eq!(error.unwrap().kind, FsErrorKind::NotFound);
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn drives_are_listed() {
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        runner.run([Effect::ListDrives { gen: gen() }]);
+        match next(&mut rx).await {
+            Msg::DrivesLoaded { drives, .. } => assert!(!drives.is_empty()),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_watched_directory_reports_changes_until_watching_stops() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let g = gen();
+        runner.run([Effect::WatchDir {
+            gen: g,
+            path: dir.path().to_owned(),
+        }]);
+        // Give the watch time to be established.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        std::fs::write(dir.path().join("new.txt"), "x").unwrap();
+        assert_eq!(next(&mut rx).await, Msg::DirChanged { gen: g });
+
+        runner.run([Effect::StopWatching]);
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        while rx.try_recv().is_ok() {}
+        std::fs::write(dir.path().join("later.txt"), "x").unwrap();
+        assert!(timeout(Duration::from_millis(700), rx.recv())
+            .await
+            .is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn watching_a_missing_directory_warns() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        runner.run([Effect::WatchDir {
+            gen: gen(),
+            path: dir.path().join("missing"),
+        }]);
+        match next(&mut rx).await {
+            Msg::Notify { level, text } => {
+                assert_eq!(level, Level::Warning);
+                assert!(text.contains("cannot be watched"), "{text}");
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn git_status_outside_a_repository_is_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let g = gen();
+        runner.run([Effect::GitStatus {
+            gen: g,
+            dir: dir.path().to_owned(),
+        }]);
+        assert_eq!(
+            next(&mut rx).await,
+            Msg::GitStatus {
+                gen: g,
+                snapshot: None
+            }
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn child_counts_are_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+        std::fs::write(dir.path().join("sub").join("f"), "x").unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let g = gen();
+        runner.run([Effect::CountChildren {
+            gen: g,
+            dir: dir.path().to_owned(),
+            names: vec!["sub".into()],
+        }]);
+        assert_eq!(
+            next(&mut rx).await,
+            Msg::ChildCounts {
+                gen: g,
+                counts: vec![("sub".into(), 1)]
+            }
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn shutdown_stops_watching() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        runner.run([Effect::WatchDir {
+            gen: gen(),
+            path: dir.path().to_owned(),
+        }]);
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        runner.shutdown();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        std::fs::write(dir.path().join("x"), "x").unwrap();
+        assert!(timeout(Duration::from_millis(700), rx.recv())
+            .await
+            .is_err());
     }
 }
