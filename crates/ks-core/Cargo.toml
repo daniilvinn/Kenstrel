@@ -9,6 +9,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+nucleo-matcher = "0.3.1"
 serde.workspace = true
 thiserror.workspace = true
 toml.workspace = true

@@ -18,6 +18,10 @@ pub struct Cli {
     #[arg(long, value_name = "FILE")]
     pub cwd_file: Option<PathBuf>,
 
+    /// Print the default keymap as Markdown (the source of docs/keymap.md) and exit.
+    #[arg(long)]
+    pub dump_keymap: bool,
+
     /// Panic right after the first frame, to test that the terminal is restored.
     #[arg(long, hide = true)]
     pub debug_panic: bool,
@@ -40,6 +44,7 @@ mod tests {
     fn defaults_are_empty() {
         let cli = Cli::try_parse_from(["ks"]).unwrap();
         assert!(cli.path.is_none() && cli.cwd_file.is_none() && !cli.debug_panic);
+        assert!(!cli.dump_keymap);
     }
 
     #[test]

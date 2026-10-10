@@ -9,10 +9,11 @@ use crate::action::Action;
 use crate::config::SortKey;
 use crate::effect::Effect;
 use crate::keymap::{Invocation, Resolution};
-use crate::mode::Mode;
+use crate::mode::{Mode, Overlay};
 use crate::msg::{Msg, TimerKind};
 use crate::nav;
 use crate::state::{AppState, Level, QuitKind, Status};
+use crate::{help, palette};
 
 /// How long informational messages stay on the status line.
 const TOAST_DURATION: Duration = Duration::from_secs(3);
@@ -29,6 +30,8 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             if state.size != size {
                 state.size = size;
                 nav::fit_viewport(state);
+                state.palette.refit(palette::visible_rows(size));
+                state.help.clamp_scroll(help::visible_rows(size));
             }
             state.dirty = true;
         }
@@ -64,6 +67,19 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::ChildCounts { gen, counts } => nav::on_child_counts(state, gen, counts),
         Msg::DirChanged { gen } => nav::on_dir_changed(state, &mut effects, gen),
         Msg::GitStatus { gen, snapshot } => nav::on_git_status(state, gen, snapshot),
+        Msg::ConfigReloaded {
+            config,
+            keymap,
+            issues,
+        } => on_config_reloaded(state, *config, *keymap, issues, &mut effects),
+        Msg::ThemesAvailable(names) => {
+            state.themes = names;
+            state.dirty = true;
+        }
+        Msg::ThemeApplied(name) => {
+            state.config.theme = name;
+            state.dirty = true;
+        }
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
@@ -74,6 +90,13 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
 }
 
 fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Effect>) {
+    // The help filter field owns every key while it has focus.
+    if state.overlays.last() == Some(&Overlay::Help)
+        && state.help.filtering
+        && help::on_filter_key(state, key)
+    {
+        return;
+    }
     let ctx = state.key_context();
     match state.keymap.resolve(ctx, &state.pending, key) {
         Resolution::Action(invocation) => {
@@ -94,6 +117,11 @@ fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Eff
         }
         // An unbound key with nothing pending changes nothing, so it costs no redraw.
         Resolution::NoMatch => {
+            // Unbound keys are text for the palette's query field.
+            if state.overlays.last() == Some(&Overlay::Palette) && palette::on_text_key(state, key)
+            {
+                return;
+            }
             if clear_pending(state, effects) {
                 state.dirty = true;
             }
@@ -156,8 +184,21 @@ pub(crate) fn set_status(
     });
 }
 
-fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Effect>) {
+pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Effect>) {
+    let handled = match state.overlays.last() {
+        Some(Overlay::Palette) => palette::on_action(state, invocation, effects),
+        Some(Overlay::Help) => help::on_action(state, invocation, effects),
+        _ => false,
+    };
+    if handled {
+        return;
+    }
     match invocation.action {
+        Action::PaletteOpen => palette::open(state),
+        Action::HelpOpen => help::open(state),
+        Action::ThemeSwitch => palette::open_page(state, palette::Page::Themes),
+        Action::IconsSwitch => palette::open_page(state, palette::Page::Icons),
+        Action::ConfigReload => effects.push(Effect::ReloadConfig),
         Action::Quit => state.quit = Some(QuitKind::Exit),
         Action::QuitCd => state.quit = Some(QuitKind::ChangeDir),
         Action::Cancel => cancel(state),
@@ -191,6 +232,32 @@ fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Ef
             effects,
         ),
     }
+}
+
+fn on_config_reloaded(
+    state: &mut AppState,
+    mut config: crate::config::Config,
+    keymap: crate::keymap::Keymap,
+    issues: Vec<String>,
+    effects: &mut Vec<Effect>,
+) {
+    // The active theme only changes once it has actually loaded (`Msg::ThemeApplied`).
+    let wanted_theme = std::mem::replace(&mut config.theme, state.config.theme.clone());
+    state.config = config;
+    state.keymap = keymap;
+    let (level, text) = match issues.split_first() {
+        None => (Level::Info, "Config reloaded".to_owned()),
+        Some((first, [])) => (Level::Error, format!("Config reloaded; {first}")),
+        Some((first, rest)) => (
+            Level::Error,
+            format!("Config reloaded; {first} (+{} more)", rest.len()),
+        ),
+    };
+    set_status(state, level, text, effects);
+    effects.push(Effect::SetTheme {
+        name: wanted_theme,
+        announce: false,
+    });
 }
 
 /// `esc`: close the top overlay, else leave the current mode (visual mode keeps its marks),

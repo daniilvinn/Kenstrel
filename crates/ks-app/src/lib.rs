@@ -9,6 +9,7 @@ pub mod event_loop;
 pub mod input;
 pub mod logging;
 pub mod paths;
+pub mod reload;
 pub mod settings;
 pub mod startup;
 pub mod terminal;
@@ -23,11 +24,19 @@ use ks_ui::ColorDepth;
 use crate::cli::Cli;
 use crate::event_loop::LoopOptions;
 use crate::paths::AppPaths;
+use crate::reload::Reloader;
 use crate::settings::{build_session, discover_places, SessionInputs};
 use crate::terminal::TerminalSession;
 
 /// Runs the TUI to completion.
 pub fn run(cli: &Cli) -> Result<()> {
+    if cli.dump_keymap {
+        // Documentation generator: needs no terminal and has no side effects.
+        let text = ks_core::docs::keymap_markdown(&ks_core::Keymap::defaults());
+        std::io::Write::write_all(&mut std::io::stdout(), text.as_bytes())
+            .context("cannot write the keymap")?;
+        return Ok(());
+    }
     // Checked first so a refused start has no side effects (no log file, no config).
     if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
         bail!("ks is an interactive program and must be run in a terminal");
@@ -42,13 +51,14 @@ pub fn run(cli: &Cli) -> Result<()> {
     let start_dir = startup::resolve_start_dir(cli.path.as_deref(), &cwd)?;
     let (width, height) = crossterm::terminal::size().context("cannot read the terminal size")?;
 
+    let depth = ColorDepth::detect_from_env();
     let session = build_session(SessionInputs {
         paths: &paths,
         cwd: start_dir,
         home: paths::home_dir(),
         places: discover_places(&paths, paths::home_dir()),
         size: Size::new(width, height),
-        depth: ColorDepth::detect_from_env(),
+        depth,
         now: std::time::SystemTime::now(),
         utc_offset_secs: ks_fs::utc_offset_secs(),
     });
@@ -63,7 +73,7 @@ pub fn run(cli: &Cli) -> Result<()> {
     let outcome = {
         // Dropping the session restores the terminal on every path out of this block.
         let mut tui = TerminalSession::enter().context("cannot initialise the terminal")?;
-        runtime.block_on(event_loop::run(
+        runtime.block_on(event_loop::run_with(
             tui.terminal(),
             EventStream::new(),
             &mut state,
@@ -72,6 +82,7 @@ pub fn run(cli: &Cli) -> Result<()> {
                 startup: session.startup,
                 panic_after_first_frame: cli.debug_panic,
             },
+            Some(Reloader::new(paths.clone(), depth)),
         ))
     };
     // A listing stuck in a blocking syscall (an offline network share) cannot be cancelled;

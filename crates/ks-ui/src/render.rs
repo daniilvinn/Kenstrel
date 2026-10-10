@@ -47,12 +47,17 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
     render_list(frame, body, state, theme);
     render_rule(frame, bottom_rule, theme);
     render_prompt(frame, prompt, state, theme);
+    // The which-key popup floats over the list; only when there is no room for it do the
+    // choices replace the hint line (or the lower rule on a short terminal).
+    let popup_shown = crate::which_key::render(frame, body, state, theme);
+    let in_hints = state.which_key_visible && !popup_shown;
     if show_hint {
-        render_hints(frame, hint, state, theme);
-    } else if state.which_key_visible {
-        // No hint line on a short terminal: the choices replace the lower rule instead.
-        render_hints(frame, bottom_rule, state, theme);
+        render_hints(frame, hint, state, theme, in_hints);
+    } else if in_hints {
+        render_hints(frame, bottom_rule, state, theme, true);
     }
+    crate::palette::render(frame, state, theme);
+    crate::help::render(frame, state, theme);
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
@@ -280,12 +285,24 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::VisualToggle, "done"),
             (Action::Cancel, "cancel"),
         ],
+        (KeyContext::Palette, _) => &[
+            (Action::Accept, "run"),
+            (Action::CursorDown, "down"),
+            (Action::CursorUp, "up"),
+            (Action::Cancel, "close"),
+        ],
+        (KeyContext::Help, _) => &[
+            (Action::FilterOpen, "filter"),
+            (Action::CursorDown, "scroll"),
+            (Action::PageHalfDown, "page"),
+            (Action::Cancel, "close"),
+        ],
         _ => &[(Action::Cancel, "cancel")],
     }
 }
 
-fn render_hints(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
-    let entries: Vec<(String, String)> = if state.which_key_visible {
+fn render_hints(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme, which_key: bool) {
+    let entries: Vec<(String, String)> = if which_key {
         state
             .keymap
             .continuations(state.key_context(), &state.pending)
@@ -710,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    fn which_key_replaces_the_hint_line_when_visible() {
+    fn which_key_popup_floats_over_the_list_and_the_hint_line_stays() {
         let mut s = listing_state(200, 24);
         let effects = update(&mut s, Msg::Key(KeyChord::char('g')));
         let ks_core::Effect::StartTimer { gen, .. } = effects[0] else {
@@ -724,8 +741,13 @@ mod tests {
             },
         );
         let out = text_of(&s);
-        assert!(out.contains("‹g› Jump to top"), "{out}");
-        assert!(out.contains("‹j› Jobs overlay"), "{out}");
+        assert!(out.contains("g  Jump to top"), "{out}");
+        assert!(out.contains("j  Jobs overlay"), "{out}");
+        assert!(
+            out.contains("╭─ g "),
+            "popup title is the pending prefix: {out}"
+        );
+        assert!(out.contains("‹q› quit"), "normal hints stay: {out}");
     }
 
     #[test]
@@ -744,10 +766,10 @@ mod tests {
         );
         let out = text_of(&s);
         for entry in [
-            "‹n› Sort by name",
-            "‹s› Sort by size",
-            "‹m› Sort by modified time",
-            "‹e› Sort by extension",
+            "n  Sort by name",
+            "s  Sort by size",
+            "m  Sort by modified time",
+            "e  Sort by extension",
         ] {
             assert!(out.contains(entry), "{entry} missing in {out}");
         }

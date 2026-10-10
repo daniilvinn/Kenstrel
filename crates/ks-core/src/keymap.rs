@@ -221,7 +221,7 @@ pub enum KeymapError {
 }
 
 /// All bindings, grouped by context.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Keymap {
     tables: BTreeMap<KeyContext, Vec<Binding>>,
 }
@@ -277,15 +277,20 @@ impl Keymap {
                 }
             };
             for (keys, target) in entries {
-                if target.trim() == "none" {
+                if matches!(target.trim(), "none" | "") {
                     match keys
                         .split_whitespace()
                         .map(str::parse)
                         .collect::<Result<Vec<KeyPattern>, _>>()
                     {
                         Ok(seq) => {
-                            if let Some(table) = self.tables.get_mut(&ctx) {
-                                table.retain(|b| b.keys != seq);
+                            let table = self.tables.entry(ctx).or_default();
+                            let before = table.len();
+                            table.retain(|b| b.keys != seq);
+                            if table.len() == before {
+                                issues.push(format!(
+                                    "keymap.{ctx} `{keys}` = `none`: nothing is bound to it"
+                                ));
                             }
                         }
                         Err(e) => issues.push(format!("keymap.{ctx} `{keys}`: {e}")),
@@ -311,6 +316,21 @@ impl Keymap {
                         other.keys_display()
                     ));
                     continue;
+                }
+                // Binding `g` removes every `g ...` default (and `g x` removes a plain `g`).
+                // Replacing the very same keys is an ordinary rebind and stays silent.
+                let shadowed: Vec<String> = table
+                    .iter()
+                    .filter(|b| {
+                        b.keys != binding.keys && sequences_conflict(&b.keys, &binding.keys)
+                    })
+                    .map(Binding::keys_display)
+                    .collect();
+                if !shadowed.is_empty() {
+                    issues.push(format!(
+                        "keymap.{ctx} `{keys}` shadows `{}`, which no longer work",
+                        shadowed.join("`, `")
+                    ));
                 }
                 table.retain(|b| !sequences_conflict(&b.keys, &binding.keys));
                 user_defined.insert((ctx, binding.keys.clone()));
@@ -498,9 +518,28 @@ pub const DEFAULT_BINDINGS: &[(KeyContext, &str, &str)] = &[
     (C::Palette, "esc", "cancel"),
     (C::Palette, "ctrl-c", "cancel"),
     (C::Palette, "enter", "accept"),
+    (C::Palette, "down", "cursor.down"),
+    (C::Palette, "ctrl-n", "cursor.down"),
+    (C::Palette, "up", "cursor.up"),
+    (C::Palette, "ctrl-p", "cursor.up"),
+    (C::Palette, "pagedown", "page.half_down"),
+    (C::Palette, "pageup", "page.half_up"),
     (C::Help, "esc", "cancel"),
     (C::Help, "q", "cancel"),
     (C::Help, "?", "cancel"),
+    (C::Help, "j", "cursor.down"),
+    (C::Help, "down", "cursor.down"),
+    (C::Help, "k", "cursor.up"),
+    (C::Help, "up", "cursor.up"),
+    (C::Help, "ctrl-d", "page.half_down"),
+    (C::Help, "pagedown", "page.half_down"),
+    (C::Help, "ctrl-u", "page.half_up"),
+    (C::Help, "pageup", "page.half_up"),
+    (C::Help, "g g", "cursor.top"),
+    (C::Help, "home", "cursor.top"),
+    (C::Help, "G", "cursor.bottom"),
+    (C::Help, "end", "cursor.bottom"),
+    (C::Help, "/", "filter.open"),
     (C::Confirm, "esc", "cancel"),
     (C::Confirm, "ctrl-c", "cancel"),
     (C::Confirm, "enter", "accept"),
@@ -538,7 +577,11 @@ mod tests {
     #[test]
     fn every_action_has_a_default_binding_except_the_palette_only_ones() {
         // Reachable through the command palette (phase 5) and bindable in config.toml.
-        let palette_only = [Action::ConfigReload];
+        let palette_only = [
+            Action::ConfigReload,
+            Action::ThemeSwitch,
+            Action::IconsSwitch,
+        ];
         let map = Keymap::defaults();
         for &action in Action::ALL {
             let bound = KeyContext::ALL
@@ -749,7 +792,10 @@ mod tests {
             "normal",
             &[("q", "none"), ("Z Z", "quit"), ("g", "go.home")],
         ));
-        assert!(issues.is_empty(), "{issues:?}");
+        // Shadowing the `g ...` family is legal but reported.
+        assert_eq!(issues.len(), 1, "{issues:?}");
+        assert!(issues[0].contains("`g` shadows `g g`"), "{issues:?}");
+        assert!(issues[0].contains("g /"), "{issues:?}");
         assert_eq!(
             map.resolve(KeyContext::Normal, &[], chord("q")),
             Resolution::NoMatch
@@ -781,6 +827,53 @@ mod tests {
         assert_eq!(
             map.resolve(KeyContext::Normal, &[], chord("x")),
             invoke(Action::Cut)
+        );
+    }
+
+    #[test]
+    fn extending_a_single_key_binding_reports_the_shadowed_one() {
+        let mut map = Keymap::defaults();
+        let issues = map.apply_overrides(&overrides("normal", &[("q q", "quit")]));
+        assert_eq!(issues.len(), 1, "{issues:?}");
+        assert!(issues[0].contains("`q q` shadows `q`"), "{issues:?}");
+        assert_eq!(
+            map.resolve(KeyContext::Normal, &[], chord("q")),
+            Resolution::Pending
+        );
+    }
+
+    #[test]
+    fn plain_rebinding_of_the_same_keys_is_silent() {
+        let mut map = Keymap::defaults();
+        let issues = map.apply_overrides(&overrides("normal", &[("d", "file.delete")]));
+        assert!(issues.is_empty(), "{issues:?}");
+        assert_eq!(
+            map.resolve(KeyContext::Normal, &[], chord("d")),
+            invoke(Action::DeletePermanent)
+        );
+    }
+
+    #[test]
+    fn unbinding_something_unbound_is_reported() {
+        let mut map = Keymap::defaults();
+        let issues = map.apply_overrides(&overrides("normal", &[("F5", "none"), ("j", "")]));
+        assert_eq!(issues.len(), 1, "{issues:?}");
+        assert!(issues[0].contains("nothing is bound"), "{issues:?}");
+        assert_eq!(
+            map.resolve(KeyContext::Normal, &[], chord("j")),
+            Resolution::NoMatch,
+            "an empty target unbinds too"
+        );
+    }
+
+    #[test]
+    fn overlay_contexts_can_be_rebound() {
+        let mut map = Keymap::defaults();
+        let issues = map.apply_overrides(&overrides("palette", &[("ctrl-j", "cursor.down")]));
+        assert!(issues.is_empty(), "{issues:?}");
+        assert_eq!(
+            map.resolve(KeyContext::Palette, &[], chord("ctrl-j")),
+            invoke(Action::CursorDown)
         );
     }
 

@@ -43,3 +43,15 @@ fn unknown_flags_are_rejected() {
     let output = ks().arg("--no-such-flag").output().unwrap();
     assert!(!output.status.success());
 }
+
+#[test]
+fn dump_keymap_prints_the_committed_documentation() {
+    let output = ks().arg("--dump-keymap").output().unwrap();
+    assert!(output.status.success());
+    let printed = String::from_utf8(output.stdout).unwrap();
+    let committed =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/keymap.md"))
+            .unwrap()
+            .replace("\r\n", "\n");
+    assert_eq!(printed, committed, "docs/keymap.md is out of date");
+}

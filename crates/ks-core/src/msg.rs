@@ -3,12 +3,14 @@
 use std::ffi::OsString;
 use std::time::SystemTime;
 
+use crate::config::Config;
 use crate::drives::DriveInfo;
 use crate::entry::Entry;
 use crate::error::FsError;
 use crate::generation::Gen;
 use crate::git::GitSnapshot;
 use crate::key::KeyChord;
+use crate::keymap::Keymap;
 use crate::state::{JobId, Level, Size};
 
 /// A delayed wake-up requested through [`Effect::StartTimer`](crate::effect::Effect).
@@ -81,4 +83,14 @@ pub enum Msg {
         gen: Gen,
         snapshot: Option<Box<GitSnapshot>>,
     },
+    /// `config.toml` was re-read. `issues` are keymap problems (already logged).
+    ConfigReloaded {
+        config: Box<Config>,
+        keymap: Box<Keymap>,
+        issues: Vec<String>,
+    },
+    /// The themes that can be switched to.
+    ThemesAvailable(Vec<String>),
+    /// The named theme is now the active one.
+    ThemeApplied(String),
 }

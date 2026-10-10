@@ -41,4 +41,11 @@ pub enum Effect {
         dir: PathBuf,
         names: Vec<OsString>,
     },
+    /// Load the theme `name` (built-in or user file) and make it the active one. The result
+    /// comes back as `Msg::ThemeApplied` (or an error `Msg::Notify`); `announce` adds an
+    /// info message on success.
+    SetTheme { name: String, announce: bool },
+    /// Re-read `config.toml` and rebuild the keymap, reporting `Msg::ConfigReloaded` (or an
+    /// error `Msg::Notify` that leaves the running settings untouched).
+    ReloadConfig,
 }

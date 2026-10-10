@@ -112,16 +112,23 @@ pub struct SessionInputs<'a> {
     pub utc_offset_secs: i32,
 }
 
+/// The default keymap with the config's `[keymap.*]` overrides applied. Every problem is
+/// logged and returned; none is fatal.
+pub fn build_keymap(config: &Config) -> (Keymap, Vec<String>) {
+    let mut keymap = Keymap::defaults();
+    let issues = keymap.apply_overrides(&config.keymap);
+    for issue in &issues {
+        tracing::warn!(issue, "keymap override rejected");
+    }
+    (keymap, issues)
+}
+
 /// Loads config, keymap and theme; collects every problem into one error message.
 pub fn build_session(inputs: SessionInputs<'_>) -> Session {
     let loaded = load_config(inputs.paths);
     let mut problems: Vec<String> = loaded.problem.into_iter().collect();
 
-    let mut keymap = Keymap::defaults();
-    let issues = keymap.apply_overrides(&loaded.config.keymap);
-    for issue in &issues {
-        tracing::warn!(issue, "keymap override rejected");
-    }
+    let (keymap, issues) = build_keymap(&loaded.config);
     if let Some(first) = issues.first() {
         let more = issues.len() - 1;
         problems.push(if more == 0 {
@@ -305,5 +312,22 @@ mod tests {
         let err = Config::from_toml("theme = \n").unwrap_err().to_string();
         assert!(err.contains('\n'), "premise: toml errors span lines");
         assert!(!one_line(&err).contains('\n'));
+    }
+
+    #[test]
+    fn an_unparsable_key_string_is_an_error_level_notice() {
+        let (_dir, paths) = paths();
+        write_config(
+            &paths,
+            "[keymap.normal]
+\"ctrl-bogus-x\" = \"quit\"
+",
+        );
+        let session = build_session(inputs(&paths, ColorDepth::TrueColor));
+        let [Msg::Start, Msg::Notify { level, text }] = session.startup.as_slice() else {
+            panic!("expected one notification, got {:?}", session.startup);
+        };
+        assert_eq!(*level, Level::Error);
+        assert!(text.contains("ctrl-bogus-x"), "{text}");
     }
 }

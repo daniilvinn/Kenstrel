@@ -112,6 +112,8 @@ actions! {
     Cancel => "cancel", "Cancel / close";
     Accept => "accept", "Accept / confirm";
     ConfigReload => "config.reload", "Reload config";
+    ThemeSwitch => "theme.switch", "Switch theme";
+    IconsSwitch => "icons.switch", "Switch icon set";
     Quit => "quit", "Quit";
     QuitCd => "quit.cd", "Quit and cd shell to current directory";
 }
