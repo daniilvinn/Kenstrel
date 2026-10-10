@@ -4,21 +4,26 @@
 //! tested by feeding [`Msg`]s to [`update`] and asserting on the resulting [`AppState`].
 
 pub mod action;
+pub mod command;
 pub mod config;
 pub mod cursor;
+pub mod docs;
 pub mod drives;
 pub mod effect;
 pub mod entry;
 pub mod error;
 pub mod generation;
 pub mod git;
+pub mod help;
 pub mod key;
 pub mod keymap;
 pub mod layout;
 pub mod mode;
 pub mod msg;
 mod nav;
+pub mod palette;
 pub mod state;
+pub mod text_input;
 pub mod update;
 pub mod view;
 

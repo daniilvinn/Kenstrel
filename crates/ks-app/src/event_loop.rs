@@ -3,12 +3,14 @@
 //! Generic over the ratatui backend and the event source so it can be driven headlessly in
 //! tests with a `TestBackend` and a scripted event stream.
 
+use std::collections::VecDeque;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Context, Result};
 use crossterm::event::Event;
 use futures_util::{Stream, StreamExt};
-use ks_core::{update, AppState, Msg, QuitKind};
+use ks_core::{update, AppState, Effect, Level, Msg, QuitKind};
 use ks_ui::Theme;
 use ratatui::backend::Backend;
 use ratatui::Terminal;
@@ -17,6 +19,7 @@ use tokio::time::{interval, interval_at, sleep, Instant, MissedTickBehavior};
 
 use crate::effects::EffectRunner;
 use crate::input::translate_event;
+use crate::reload::Reloader;
 
 /// Redraws are capped at roughly 60 frames per second.
 pub const FRAME_INTERVAL: Duration = Duration::from_millis(16);
@@ -34,7 +37,8 @@ pub struct LoopOptions {
     pub panic_after_first_frame: bool,
 }
 
-/// Runs until the state requests quit, returning how.
+/// Runs until the state requests quit, returning how. Config reloads and theme switches
+/// are unavailable (use [`run_with`] to provide a [`Reloader`]).
 pub async fn run<B, E>(
     terminal: &mut Terminal<B>,
     events: E,
@@ -47,7 +51,120 @@ where
     B::Error: Send + Sync + 'static,
     E: Stream<Item = std::io::Result<Event>>,
 {
+    run_with(terminal, events, state, theme, options, None).await
+}
+
+/// Results of file work done off the loop thread (config and theme reads), delivered
+/// through a side channel because `Msg` cannot carry a `Theme`.
+enum Side {
+    Msg(Msg),
+    Theme {
+        name: String,
+        theme: Box<Theme>,
+        announce: bool,
+    },
+}
+
+/// Applies `msg` and everything it leads to. Effects that change the application itself
+/// (reloading the config, switching the theme) are started here, on blocking threads,
+/// because the result needs the loop's theme; the rest go to the effect runner.
+fn dispatch(
+    state: &mut AppState,
+    reloader: Option<&Arc<Reloader>>,
+    side: &mpsc::UnboundedSender<Side>,
+    runner: &mut EffectRunner,
+    msg: Msg,
+) {
+    let mut queue = VecDeque::from([msg]);
+    while let Some(msg) = queue.pop_front() {
+        let mut for_runner = Vec::new();
+        for effect in update(state, msg) {
+            match effect {
+                Effect::ReloadConfig => match reloader {
+                    Some(reloader) => {
+                        let (reloader, side) = (Arc::clone(reloader), side.clone());
+                        tokio::task::spawn_blocking(move || {
+                            let _ = side.send(Side::Msg(reloader.reload_config()));
+                            let _ = side.send(Side::Msg(Msg::ThemesAvailable(reloader.themes())));
+                        });
+                    }
+                    None => queue.push_back(unavailable("Config reload")),
+                },
+                Effect::SetTheme { name, announce } => match reloader {
+                    Some(reloader) => {
+                        let (reloader, side) = (Arc::clone(reloader), side.clone());
+                        tokio::task::spawn_blocking(move || {
+                            let result = match reloader.load_theme(&name) {
+                                Ok(theme) => Side::Theme {
+                                    name,
+                                    theme: Box::new(theme),
+                                    announce,
+                                },
+                                Err(message) => Side::Msg(Msg::Notify {
+                                    level: Level::Error,
+                                    text: message,
+                                }),
+                            };
+                            let _ = side.send(result);
+                        });
+                    }
+                    None => queue.push_back(unavailable("Theme switching")),
+                },
+                other => for_runner.push(other),
+            }
+        }
+        runner.run(for_runner);
+    }
+}
+
+/// Turns a side-channel result into the message to apply next (adopting a loaded theme).
+fn take_side(side: Side, theme: &mut Theme, tx: &mpsc::Sender<Msg>) -> Msg {
+    match side {
+        Side::Msg(msg) => msg,
+        Side::Theme {
+            name,
+            theme: loaded,
+            announce,
+        } => {
+            *theme = *loaded;
+            if announce {
+                let _ = tx.try_send(Msg::Notify {
+                    level: Level::Info,
+                    text: format!("Theme: {name}"),
+                });
+            }
+            Msg::ThemeApplied(name)
+        }
+    }
+}
+
+fn unavailable(what: &str) -> Msg {
+    Msg::Notify {
+        level: Level::Warning,
+        text: format!("{what} is not available here"),
+    }
+}
+
+/// [`run`] with a [`Reloader`] that performs config reloads and theme switches.
+pub async fn run_with<B, E>(
+    terminal: &mut Terminal<B>,
+    events: E,
+    state: &mut AppState,
+    theme: &Theme,
+    options: LoopOptions,
+    reloader: Option<Reloader>,
+) -> Result<QuitKind>
+where
+    B: Backend,
+    B::Error: Send + Sync + 'static,
+    E: Stream<Item = std::io::Result<Event>>,
+{
+    let mut theme = theme.clone();
+    let reloader = reloader.map(Arc::new);
+    let reloader = reloader.as_ref();
     let (tx, mut rx) = mpsc::channel::<Msg>(MSG_QUEUE);
+    let (side_tx, mut side_rx) = mpsc::unbounded_channel::<Side>();
+    let loop_tx = tx.clone();
     let mut runner = EffectRunner::new(tx.clone());
     spawn_interrupt_listener(tx);
     let mut events = std::pin::pin!(events);
@@ -59,14 +176,20 @@ where
     let mut last_draw: Option<Instant> = None;
     let mut panic_armed = options.panic_after_first_frame;
 
+    if let Some(reloader) = reloader {
+        let (reloader, side) = (Arc::clone(reloader), side_tx.clone());
+        tokio::task::spawn_blocking(move || {
+            let _ = side.send(Side::Msg(Msg::ThemesAvailable(reloader.themes())));
+        });
+    }
     for msg in options.startup {
-        runner.run(update(state, msg));
+        dispatch(state, reloader, &side_tx, &mut runner, msg);
     }
 
     let outcome = loop {
         if state.dirty && last_draw.is_none_or(|t| t.elapsed() >= FRAME_INTERVAL) {
             terminal
-                .draw(|frame| ks_ui::render(frame, state, theme))
+                .draw(|frame| ks_ui::render(frame, state, &theme))
                 .map_err(anyhow::Error::new)
                 .context("drawing a frame failed")?;
             state.dirty = false;
@@ -93,6 +216,7 @@ where
                 None => return Err(anyhow!("terminal input stream closed")),
             },
             Some(msg) = rx.recv() => Some(msg),
+            Some(side) = side_rx.recv() => Some(take_side(side, &mut theme, &loop_tx)),
             _ = spinner.tick(), if state.has_running_jobs() => Some(Msg::Tick),
             _ = clock.tick() => Some(Msg::Clock {
                 now: SystemTime::now(),
@@ -106,7 +230,7 @@ where
         let mut next = first;
         loop {
             if let Some(msg) = next {
-                runner.run(update(state, msg));
+                dispatch(state, reloader, &side_tx, &mut runner, msg);
             }
             match rx.try_recv() {
                 Ok(msg) => next = Some(msg),
@@ -333,5 +457,236 @@ mod tests {
         .await;
         let message = format!("{:#}", result.unwrap_err());
         assert!(message.contains("console gone"), "{message}");
+    }
+
+    fn special(code: KeyCode) -> std::io::Result<Event> {
+        Ok(Event::Key(KeyEvent {
+            code,
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }))
+    }
+
+    fn typed(text: &str) -> Vec<std::io::Result<Event>> {
+        text.chars().map(|c| key(c, KeyEventKind::Press)).collect()
+    }
+
+    /// Delays `events` so the start-up theme listing (read on a blocking thread) has
+    /// arrived before the first key.
+    fn settled(events: Vec<std::io::Result<Event>>) -> impl Stream<Item = std::io::Result<Event>> {
+        stream::once(async { sleep(Duration::from_millis(300)).await })
+            .filter_map(|()| async { None })
+            .chain(stream::iter(events))
+    }
+
+    /// Like `drive`, but with a reloader over a temporary config directory.
+    async fn drive_with_config(
+        config_toml: Option<&str>,
+        events: Vec<std::io::Result<Event>>,
+        state: &mut AppState,
+    ) -> (Result<QuitKind>, Terminal<TestBackend>, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = crate::paths::AppPaths::under(dir.path());
+        if let Some(text) = config_toml {
+            std::fs::create_dir_all(paths.config_dir()).unwrap();
+            std::fs::write(paths.config_file(), text).unwrap();
+        }
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
+        // A pause before quitting lets the final frame be drawn.
+        let quit = stream::once(async {
+            sleep(Duration::from_millis(200)).await;
+            Ok(Event::Key(KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            }))
+        });
+        let stream = settled(events).chain(quit).chain(stream::pending());
+        let result = run_with(
+            &mut terminal,
+            stream,
+            state,
+            &theme,
+            options(),
+            Some(Reloader::new(paths, ColorDepth::TrueColor)),
+        );
+        let result = tokio::time::timeout(Duration::from_secs(20), result)
+            .await
+            .expect("loop did not quit");
+        (result, terminal, dir)
+    }
+
+    // Real time: config and theme reads run on blocking threads.
+    #[tokio::test]
+    async fn palette_reload_config_applies_keymap_icons_and_theme() {
+        let mut state = state();
+        let mut events = typed(":reload config");
+        events.push(special(KeyCode::Enter));
+        let config = "theme = \"paper\"
+icons = \"ascii\"
+[keymap.normal]
+\"q\" = \"none\"
+\"T\" = \"file.trash\"
+";
+        let (result, terminal, _dir) = drive_with_config(Some(config), events, &mut state).await;
+        assert_eq!(result.unwrap(), QuitKind::Exit);
+        assert_eq!(state.config.theme, "paper");
+        assert_eq!(state.config.icons, ks_core::config::IconSet::Ascii);
+        assert_eq!(state.themes, ["ember", "paper"]);
+        assert!(state
+            .keymap
+            .keys_for(ks_core::KeyContext::Normal, ks_core::Action::Trash)
+            .contains(&"T".to_owned()));
+        assert!(state
+            .keymap
+            .keys_for(ks_core::KeyContext::Normal, ks_core::Action::Quit)
+            .iter()
+            .all(|k| k != "q"));
+        // The frame was redrawn with the paper theme (light text colour differs from ember).
+        let paper = Theme::builtin("paper", ColorDepth::TrueColor).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert!(
+            (0..buffer.area.width).any(|x| buffer[(x, 0)].fg == paper.fg_dim),
+            "header should use the paper palette"
+        );
+    }
+
+    // Real time: config and theme reads run on blocking threads.
+    #[tokio::test]
+    async fn palette_switch_theme_changes_the_drawn_colours() {
+        let mut state = state();
+        let mut events = typed(":switch theme");
+        events.push(special(KeyCode::Enter));
+        events.push(special(KeyCode::Down));
+        events.push(special(KeyCode::Enter));
+        let (result, terminal, _dir) = drive_with_config(None, events, &mut state).await;
+        assert!(result.is_ok());
+        assert_eq!(state.config.theme, "paper");
+        let paper = Theme::builtin("paper", ColorDepth::TrueColor).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert!(
+            (0..buffer.area.width).any(|x| buffer[(x, 0)].fg == paper.fg_dim),
+            "header should use the paper palette"
+        );
+    }
+
+    // Real time: config and theme reads run on blocking threads.
+    #[tokio::test]
+    async fn a_broken_user_theme_is_reported_and_the_old_theme_kept() {
+        let mut state = state();
+        let dir = tempfile::tempdir().unwrap();
+        let paths = crate::paths::AppPaths::under(dir.path());
+        std::fs::create_dir_all(paths.themes_dir()).unwrap();
+        std::fs::write(
+            paths.themes_dir().join("broken.toml"),
+            "colors = 5
+",
+        )
+        .unwrap();
+        let mut events = typed(":switch theme");
+        events.push(special(KeyCode::Enter));
+        events.extend(typed("broken"));
+        events.push(special(KeyCode::Enter));
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
+        let quit = stream::once(async {
+            sleep(Duration::from_millis(300)).await;
+            Ok(Event::Key(KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+                kind: KeyEventKind::Press,
+                state: KeyEventState::NONE,
+            }))
+        });
+        let stream = settled(events).chain(quit).chain(stream::pending());
+        let reloader = Reloader::new(paths, ColorDepth::TrueColor);
+        let result = run_with(
+            &mut terminal,
+            stream,
+            &mut state,
+            &theme,
+            options(),
+            Some(reloader),
+        );
+        tokio::time::timeout(Duration::from_secs(20), result)
+            .await
+            .expect("loop did not quit")
+            .unwrap();
+        assert_eq!(state.config.theme, "ember", "theme unchanged");
+        let status = state.status.as_ref().unwrap();
+        assert_eq!(status.level, Level::Error);
+        assert!(status.text.contains("broken"), "{}", status.text);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn without_a_reloader_switching_reports_instead_of_failing() {
+        let mut state = state();
+        let mut events = typed(":reload config");
+        events.push(special(KeyCode::Enter));
+        events.push(key('q', KeyEventKind::Press));
+        let (result, _) = drive(events, &mut state, options()).await;
+        assert!(result.is_ok());
+        assert!(state
+            .status
+            .as_ref()
+            .unwrap()
+            .text
+            .contains("not available here"));
+    }
+
+    fn ctrl(c: char) -> std::io::Result<Event> {
+        Ok(Event::Key(KeyEvent {
+            code: KeyCode::Char(c),
+            modifiers: KeyModifiers::CONTROL,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        }))
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn palette_ctrl_n_ctrl_p_move_selection() {
+        let mut state = state();
+        let mut events = vec![key(':', KeyEventKind::Press)];
+        events.extend([ctrl('n'), ctrl('n'), ctrl('n'), ctrl('p')]);
+        events.push(special(KeyCode::Esc));
+        events.push(key('q', KeyEventKind::Press));
+        let (result, _) = drive(events, &mut state, options()).await;
+        assert!(result.is_ok());
+        assert_eq!(state.palette.selected, 2);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_which_key_popup_appears_after_the_delay_through_the_loop() {
+        let mut state = state();
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
+        let stream = stream::iter(vec![key('g', KeyEventKind::Press)]).chain(stream::pending());
+        // The loop never quits on its own; cut it off once the timer should have fired.
+        let early = tokio::time::timeout(
+            Duration::from_millis(100),
+            run(&mut terminal, stream, &mut state, &theme, options()),
+        )
+        .await;
+        assert!(early.is_err(), "loop keeps running");
+        assert!(!state.which_key_visible, "not before the delay");
+        assert!(!screen(&terminal).contains("Go to home"));
+
+        let stream = stream::iter(vec![key('g', KeyEventKind::Press)]).chain(stream::pending());
+        let mut state2 = self::state();
+        let late = tokio::time::timeout(
+            Duration::from_millis(600),
+            run(&mut terminal, stream, &mut state2, &theme, options()),
+        )
+        .await;
+        assert!(late.is_err());
+        assert!(state2.which_key_visible);
+        assert!(
+            screen(&terminal).contains("Go to home"),
+            "{}",
+            screen(&terminal)
+        );
     }
 }

@@ -78,6 +78,11 @@ impl EffectRunner {
                 }
                 Effect::GitStatus { gen, dir } => self.git_status(gen, dir),
                 Effect::CountChildren { gen, dir, names } => self.count_children(gen, dir, names),
+                // These change the loop's own theme and config; `event_loop::dispatch`
+                // performs them before effects reach the runner.
+                Effect::SetTheme { .. } | Effect::ReloadConfig => {
+                    tracing::debug!("loop-level effect reached the runner; ignored");
+                }
             }
         }
     }

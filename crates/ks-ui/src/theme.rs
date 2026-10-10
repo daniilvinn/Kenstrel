@@ -311,6 +311,38 @@ impl ThemeLoader {
         self.depth
     }
 
+    /// Names of every theme that can be loaded: built-ins first, then user files
+    /// (`themes/*.toml` with a valid name) that are not built-in names, sorted.
+    pub fn available(&self) -> Vec<String> {
+        let mut names: Vec<String> = Theme::builtin_names().map(str::to_owned).collect();
+        let mut user = Vec::new();
+        if let Some(entries) = self
+            .user_dir
+            .as_ref()
+            .and_then(|dir| std::fs::read_dir(dir).ok())
+        {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                    continue;
+                }
+                let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                    continue;
+                };
+                let valid = !stem.is_empty()
+                    && stem
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+                if valid && !names.iter().any(|n| n == stem) && !user.iter().any(|n| n == stem) {
+                    user.push(stem.to_owned());
+                }
+            }
+        }
+        user.sort();
+        names.extend(user);
+        names
+    }
+
     /// Loads `name` from `<user_dir>/<name>.toml` if present, else from the built-ins.
     pub fn load(&self, name: &str) -> Result<Theme, ThemeError> {
         if name.is_empty()
@@ -349,6 +381,22 @@ impl ThemeLoader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn available_lists_builtins_then_user_themes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("zebra.toml"), "").unwrap();
+        std::fs::write(dir.path().join("apple.toml"), "").unwrap();
+        // A user file named like a built-in shadows it but is listed once.
+        std::fs::write(dir.path().join("paper.toml"), "").unwrap();
+        std::fs::write(dir.path().join("notes.txt"), "").unwrap();
+        std::fs::write(dir.path().join("bad name.toml"), "").unwrap();
+        let loader = ThemeLoader::new(Some(dir.path().to_owned()), ColorDepth::TrueColor);
+        assert_eq!(loader.available(), ["ember", "paper", "apple", "zebra"]);
+
+        let none = ThemeLoader::new(Some(dir.path().join("missing")), ColorDepth::TrueColor);
+        assert_eq!(none.available(), ["ember", "paper"]);
+    }
 
     #[test]
     fn builtin_themes_are_complete_and_resolve_in_both_depths() {

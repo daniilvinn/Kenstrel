@@ -9,11 +9,13 @@ use crate::config::Config;
 use crate::drives::DrivesView;
 use crate::generation::{Gen, GenCounter};
 use crate::git::GitSnapshot;
+use crate::help::HelpState;
 use crate::key::KeyChord;
 use crate::keymap::Keymap;
 use crate::layout;
 use crate::mode::{KeyContext, Mode, Overlay};
 use crate::nav::{History, PendingNav};
+use crate::palette::PaletteState;
 use crate::view::DirView;
 
 /// Terminal size in cells.
@@ -116,6 +118,12 @@ pub struct AppState {
     pub drives: DrivesView,
     /// Git status of `cwd`, when it is inside a repository.
     pub git: Option<GitSnapshot>,
+    /// Command palette state (valid while `Overlay::Palette` is open; recents persist).
+    pub palette: PaletteState,
+    /// Help overlay state.
+    pub help: HelpState,
+    /// Names of the themes that can be switched to (built-ins and user files).
+    pub themes: Vec<String>,
     pub(crate) history: History,
     /// Where the cursor was in directories left earlier (by entry name).
     pub(crate) cursor_memory: HashMap<PathBuf, OsString>,
@@ -155,6 +163,9 @@ impl AppState {
             show_drives: false,
             drives: DrivesView::default(),
             git: None,
+            palette: PaletteState::default(),
+            help: HelpState::default(),
+            themes: Vec::new(),
             history: History::default(),
             cursor_memory: HashMap::new(),
             nav: None,
