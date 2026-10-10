@@ -1,0 +1,82 @@
+# Kestrel example configuration: every setting the program understands, uncommented.
+#
+# Copy it to %APPDATA%\kestrel\config.toml (or merge the parts you want). Kestrel itself
+# writes a fully commented-out file there on first run. Most values below are the defaults;
+# the ones that differ from them are marked "(example)".
+#
+# This file is loaded by a test in ks-core, so it cannot drift from what the program
+# accepts. Unknown keys are rejected on purpose: a typo makes Kestrel fall back to the
+# defaults and show the error in the status line (it never refuses to start). Edit the
+# file, then run "Reload config" from the command palette (`:`).
+
+# Theme name: a built-in ("ember" dark, "paper" light) or a file themes\<name>.toml next to
+# this file. Colours and syntax colours live in the theme file, see docs/theme.example.toml.
+theme = "ember"
+
+# Icon set: "nerd" (needs a Nerd Font), "unicode" or "ascii".
+icons = "nerd"
+
+[sort]
+key = "name"        # "name" | "size" | "mtime" | "ext"
+reverse = false
+dirs_first = true
+
+[files]
+show_hidden = false   # dotfiles and hidden/system files
+show_ignored = false  # gitignored files in find/search
+size_base = 1024      # 1024 (KiB-style) or 1000 (SI)
+
+[preview]
+enabled = true
+image_protocol = "auto"  # "auto" | "halfblocks" | "sixel" | "kitty" | "iterm2"
+max_bytes = 262144       # read at most this much of a text file
+max_lines = 2000
+
+[layout]
+list_percent = 40     # width of the list pane, 10..=90
+parent_column = false # also togglable with P (needs a terminal 100 columns wide)
+
+[editor]
+# Commands; {file} and {line} are substituted. Empty "open" means $VISUAL, then $EDITOR,
+# then "code", then "notepad".
+open = ""
+# Used when a content-search hit is opened with enter. A value other than the default is
+# treated as the whole command line, e.g. "nvim +{line} {file}" (example, not the default).
+open_at_line = "code -g {file}:{line}"
+# "auto" runs known terminal editors (vim, nvim, hx, nano, micro, ...) inside the terminal
+# and starts everything else (code, notepad, ...) detached; "always" / "never" force it.
+terminal = "auto"
+
+[ui]
+which_key_delay_ms = 300
+
+[claude]
+# Kestrel only starts your installed `claude`; it never reads credentials. An empty
+# binary means: look it up on PATH.
+binary = ""
+# Variables removed from the claude process so your subscription login is used.
+strip_env = [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "CLAUDE_CODE_USE_FOUNDRY",
+]
+pane_position = "bottom"   # "bottom" | "right"
+pane_percent = 40          # share of the screen body, 15..=85
+focus_key = 'ctrl-\'       # toggles focus between the explorer and the Claude pane
+
+# Key bindings (example). A key is a space-separated sequence ("g g", "ctrl-p", "m <char>");
+# the value is a command id from docs/keymap.md, or "none" to remove a binding.
+# Contexts: normal, visual, prompt, filter, finder, grep, palette, help, confirm, jobs,
+# claude, bookmarks, jump, conflict, pager, menu, claude_changes.
+[keymap.normal]
+"H" = "dir.parent"
+"L" = "dir.enter"
+"ctrl-t" = "tab.new"
+"g l" = "claude.changes"
+
+[keymap.finder]
+"ctrl-j" = "cursor.down"
+"ctrl-k" = "cursor.up"

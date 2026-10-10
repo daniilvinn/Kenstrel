@@ -460,3 +460,11 @@ Merged `phase/p10` (Claude Code integration; wiring of 10a-10e) onto main (P5 + 
 - **Snapshots**: the which-key `g` popup (new `r w a X p` rows; at 80x12 it now spans the width), help (91 to 104 rows), palette counts (84 to 95, query `srt` 16 to 17) and the billing/install/login dialogs (now P6's confirm look) changed and were accepted after inspection. The two `which_key_*_160x48` snapshots were regenerated (text conflict). All other P10 snapshots (pane, `◆`, changes, diff) are unchanged.
 - `Cargo.lock`: took ours; cargo updated it for `serde_json`.
 - Not verifiable here (as in the track note): WT split against a real `wt`, paste-burst detection and `ctrl-\` in a real console, the Claude UI after the trust prompt, the dialogs in Windows Terminal.
+
+## Integration: fix/f4
+
+Merged `fix/f4` (README rewrite, `docs/manual-test.md`, example config/theme + two tests, CI/release workflows) onto main. No conflicts; docs/CI only plus two additive tests.
+
+- **Gates**: fmt and clippy clean; `cargo test --workspace --no-fail-fast` passes except `ks-app` `fileops::move_undo_and_trash_undo`, which times out waiting for the trashed file to be restored when the whole `fileops` file runs (passes alone). It fails identically on plain main (5b58d42), so it is not caused by this merge (Recycle Bin restore on this machine; not hidden).
+- **README key tables** were verified by f4 at 5b58d42 only; re-check against `docs/keymap.md` after f1/f2/f3 are merged. `docs/keymap.md` untouched by this merge.
+- Open issues are as in `docs/progress/f4.md` (screenshots, workflows never run on GitHub).

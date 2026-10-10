@@ -494,4 +494,25 @@ image_protocol = \"blit\"",
             "the commented file must also be valid as written"
         );
     }
+
+    #[test]
+    fn the_documented_example_config_is_valid() {
+        // docs/config.example.toml is shown in the README; it must keep parsing, and its
+        // key bindings must be accepted by the keymap without a single complaint.
+        let example = include_str!("../../../docs/config.example.toml");
+        let config = Config::from_toml(example).unwrap();
+        let mut keymap = crate::keymap::Keymap::defaults();
+        let issues = keymap.apply_overrides(&config.keymap);
+        assert!(issues.is_empty(), "{issues:?}");
+        assert!(!config.keymap.is_empty());
+        // Everything but the keymap examples is the default configuration.
+        let defaults = Config::default();
+        assert_eq!(
+            Config {
+                keymap: KeymapOverrides::new(),
+                ..config
+            },
+            defaults
+        );
+    }
 }

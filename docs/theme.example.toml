@@ -1,0 +1,54 @@
+# Kestrel example theme.
+#
+# Save it as %APPDATA%\kestrel\themes\<name>.toml (letters, digits, `-` and `_` in the name),
+# then select it with `theme = "<name>"` in config.toml or "Switch theme" in the command
+# palette. A user file with a built-in's name ("ember", "paper") shadows the built-in.
+#
+# Every key is optional. Tokens you leave out are inherited from `base`; `base` must be a
+# built-in theme ("ember" or "paper") and defaults to "ember". Colours are "#rrggbb",
+# "#rgb", or "reset" (the terminal's own colour; `bg = "reset"` lets your Windows Terminal
+# background show through). On terminals without truecolor the colours are mapped to the
+# xterm 256-colour palette.
+#
+# This file is loaded by a test in ks-ui, so it cannot drift from what the program accepts.
+
+base = "ember"
+
+# All 22 colour tokens.
+[colors]
+bg = "reset"
+fg = "#e8e3dc"
+fg_dim = "#a9a29a"
+fg_muted = "#716b64"
+accent = "#6aa5d9"          # (example) a blue accent instead of ember's terracotta
+accent_fg = "#1f1b18"
+selection_bg = "#2f2a26"
+border = "#403a35"
+border_focus = "#4f7aa0"    # (example)
+dir = "#7fa8c9"
+exec = "#92c07f"
+symlink = "#b799d9"
+hidden = "#625c56"
+success = "#92c07f"
+warning = "#e5b567"
+error = "#e8707a"
+git_added = "#92c07f"
+git_modified = "#e5b567"
+git_untracked = "#c9a27f"
+git_ignored = "#625c56"
+git_conflict = "#e8707a"
+match = "#f4a582"
+
+# Syntax highlighting colours of the preview pane. Unset keys are derived from the tokens
+# above: keyword=accent, string=success, comment=fg_muted, function=dir, type=warning,
+# number=symlink, constant=git_untracked, operator and punctuation=fg_dim.
+[syntax]
+keyword = "#6aa5d9"
+string = "#9cc27a"
+comment = "#7a746c"
+function = "#7ab0d8"
+type = "#e5c07b"
+number = "#c68fd9"
+constant = "#d19a66"
+operator = "#b8b0a4"
+punctuation = "#9a948a"
