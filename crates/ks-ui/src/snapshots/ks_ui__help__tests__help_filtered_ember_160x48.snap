@@ -5,49 +5,49 @@ expression: "draw(&s, &theme(name))"
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    ◆ current/            ╭─ Help ─────────────────────────────────────────────────────────────────────────────────────────────────────╮            2025-02-02
-   ◆ passes/             │ / sort                                                                                            53 shown │          7     5h ago M
+   ◆ passes/             │ / sort                                                                                            54 shown │          7     5h ago M
    ◆ shaders/            │ Navigation                                                                                                 │         12 2025-03-12 !
-   ◆ a_rather_long_file_n│   j, down             Move cursor down                    Move the cursor one row down.                    │    75.2 KB 2025-03-11
-   ◆ build.ps1           │   k, up               Move cursor up                      Move the cursor one row up.                      │     1.9 KB 2025-03-05
-   ◆ descriptors.rs      │   h, left, backspace  Go to parent directory              Go to the parent directory, keeping the cursor … │     6.1 KB  yesterday +
-   ◆ mod.rs              │   l, right, enter     Enter directory / open file         Enter the directory under the cursor, or open t… │      412 B 2024-02-08
-   ◆ new_pass.rs         │   ctrl-o              History: back                       Go back to the previous directory.               │        0 B     1m ago ?
-   ◆ photo_from_phone.jpg│   tab                 History: forward                    Go forward again after going back.               │     4.0 MB 2025-02-22
-   ◆ pipeline_cache.rs   │   g c                 Go to config directory              Jump to Kestrel's own config directory.          │     3.3 KB   just now
-  ●◆ swapchain.rs        │   g /                 Go to This PC (drives)              Show all drives with free space.                 │     9.8 KB    12m ago
+   ◆ a_rather_long_file_n│   j, down                 Move cursor down                    Move the cursor one row down.                │    75.2 KB 2025-03-11
+   ◆ build.ps1           │   k, up                   Move cursor up                      Move the cursor one row up.                  │     1.9 KB 2025-03-05
+   ◆ descriptors.rs      │   h, left, backspace      Go to parent directory              Go to the parent directory, keeping the cur… │     6.1 KB  yesterday +
+   ◆ mod.rs              │   l, right, enter         Enter directory / open file         Enter the directory under the cursor, or op… │      412 B 2024-02-08
+   ◆ new_pass.rs         │   ctrl-o                  History: back                       Go back to the previous directory.           │        0 B     1m ago ?
+   ◆ photo_from_phone.jpg│   tab                     History: forward                    Go forward again after going back.           │     4.0 MB 2025-02-22
+   ◆ pipeline_cache.rs   │   g c                     Go to config directory              Jump to Kestrel's own config directory.      │     3.3 KB   just now
+  ●◆ swapchain.rs        │   g /                     Go to This PC (drives)              Show all drives with free space.             │     9.8 KB    12m ago
  ▌ ◆ vulkan_device.rs    │                                                                                                            │    14.2 KB     3h ago M
    ◆ 日本語のメモ.txt    │ Search                                                                                                     │      220 B     2h ago
-                         │   —                   Find file: cycle scope (cwd, git …  Find file: cycle the search scope (current dire… │
-                         │   —                   Find file: toggle gitignored files  Find file: include or skip files ignored by git. │
-                         │   —                   Find file: open with default app    Find file: open the marked results, or the high… │
-                         │   —                   Search contents: toggle regex       Search contents: toggle regular-expression matc… │
-                         │   —                   Search contents: toggle whole word  Search contents: toggle whole-word matching.     │
-                         │   —                   Search contents: switch query/glo…  Search contents: switch between the query and g… │
-                         │   —                   Search contents: open results as …  Search contents: show the files with matches as… │
-                         │   —                   Search contents: mark the hit       Search contents: mark the highlighted hit so al… │
+                         │   in finder                                                                                                │
+                         │   ctrl-r (finder)         Find file: cycle scope (cwd, git …  Find file: cycle the search scope (current … │
+                         │   alt-g (finder)          Find file: toggle gitignored files  Find file: include or skip files ignored by… │
+                         │   ctrl-enter, ctrl-o (f…  Find file: open with default app    Find file: open the marked results, or the … │
+                         │   in grep                                                                                                  │
+                         │   ctrl-r (grep)           Search contents: toggle regex       Search contents: toggle regular-expression … │
+                         │   ctrl-w (grep)           Search contents: toggle whole word  Search contents: toggle whole-word matching. │
+                         │   tab, backtab (grep)     Search contents: switch query/glo…  Search contents: switch between the query a… │
+                         │   ctrl-l (grep)           Search contents: open results as …  Search contents: show the files with matche… │
+                         │   alt-m (grep)            Search contents: mark the hit       Search contents: mark the highlighted hit s… │
                          │                                                                                                            │
                          │ Selection                                                                                                  │
-                         │   space               Toggle mark                         Mark or unmark the entry under the cursor.       │
-                         │   v                   Visual (range select) mode          Mark a range of entries while moving the cursor. │
+                         │   space                   Toggle mark                         Mark or unmark the entry under the cursor.   │
+                         │   v                       Visual (range select) mode          Mark a range of entries while moving the cu… │
                          │                                                                                                            │
                          │ File operations                                                                                            │
-                         │   y                   Copy                                Copy the marked entries (or the one under the c… │
-                         │   p                   Paste                               Paste copied or cut entries into this directory. │
-                         │   R                   Bulk rename in editor               Rename many entries by editing their names in y… │
-                         │   D                   Delete permanently                  Delete the entries for good after typed confirm… │
-                         │   u                   Undo last file operation            Undo the last rename, move, create or trash.     │
-                         │   !                   Run shell command                   Run a shell command in this directory.           │
+                         │   y                       Copy                                Copy the marked entries (or the one under t… │
+                         │   p                       Paste                               Paste copied or cut entries into this direc… │
+                         │   R                       Bulk rename in editor               Rename many entries by editing their names … │
+                         │   D                       Delete permanently                  Delete the entries for good after typed con… │
+                         │   u                       Undo last file operation            Undo the last rename, move, create or trash. │
+                         │   !                       Run shell command                   Run a shell command in this directory.       │
                          │                                                                                                            │
                          │ View                                                                                                       │
-                         │   S n                 Sort by name                        Sort by name; again to reverse.                  │
-                         │   S s                 Sort by size                        Sort by size; again to reverse.                  │
-                         │   S m                 Sort by modified time               Sort by modified time; again to reverse.         │
-                         │   S e                 Sort by extension                   Sort by extension; again to reverse.             │
-                         │   w                   Toggle preview                      Show or hide the preview pane.                   │
-                         │   P                   Toggle parent column                Show or hide the parent directory column.        │
-                         │   J                   Scroll preview down                 Scroll the preview down.                         │
-                         │   K                   Scroll preview up                   Scroll the preview up.                           │
-─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 68 ─╯─────────────────────────
+                         │   S n                     Sort by name                        Sort by name; again to reverse.              │
+                         │   S s                     Sort by size                        Sort by size; again to reverse.              │
+                         │   S m                     Sort by modified time               Sort by modified time; again to reverse.     │
+                         │   S e                     Sort by extension                   Sort by extension; again to reverse.         │
+                         │   w                       Toggle preview                      Show or hide the preview pane.               │
+                         │   P                       Toggle parent column                Show or hide the parent directory column.    │
+─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 77 ─╯─────────────────────────
  ›                                                                                                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -84,26 +84,26 @@ expression: "draw(&s, &theme(name))"
   5   3..5   fg=#a9a29a bg=reset
   5   5..25  fg=#e8e3dc bg=reset
   5  25..29  fg=#8f5c47 bg=reset
-  5  29..49  fg=#e8e3dc bg=reset bold
-  5  49..85  fg=#a9a29a bg=reset
-  5  85..134 fg=#716b64 bg=reset
+  5  29..53  fg=#e8e3dc bg=reset bold
+  5  53..89  fg=#a9a29a bg=reset
+  5  89..134 fg=#716b64 bg=reset
   5 134..139 fg=#8f5c47 bg=reset
   5 139..147 fg=#a9a29a bg=reset
   5 147..160 fg=#716b64 bg=reset
   6   3..25  fg=#92c07f bg=reset
   6  25..29  fg=#8f5c47 bg=reset
-  6  29..49  fg=#e8e3dc bg=reset bold
-  6  49..85  fg=#a9a29a bg=reset
-  6  85..134 fg=#716b64 bg=reset
+  6  29..53  fg=#e8e3dc bg=reset bold
+  6  53..89  fg=#a9a29a bg=reset
+  6  89..134 fg=#716b64 bg=reset
   6 134..140 fg=#8f5c47 bg=reset
   6 140..147 fg=#a9a29a bg=reset
   6 147..160 fg=#716b64 bg=reset
   7   3..5   fg=#a9a29a bg=reset
   7   5..25  fg=#e8e3dc bg=reset
   7  25..29  fg=#8f5c47 bg=reset
-  7  29..49  fg=#e8e3dc bg=reset bold
-  7  49..85  fg=#a9a29a bg=reset
-  7  85..134 fg=#716b64 bg=reset
+  7  29..53  fg=#e8e3dc bg=reset bold
+  7  53..89  fg=#a9a29a bg=reset
+  7  89..134 fg=#716b64 bg=reset
   7 134..140 fg=#8f5c47 bg=reset
   7 140..148 fg=#a9a29a bg=reset
   7 148..158 fg=#716b64 bg=reset
@@ -111,18 +111,18 @@ expression: "draw(&s, &theme(name))"
   8   3..5   fg=#a9a29a bg=reset
   8   5..25  fg=#e8e3dc bg=reset
   8  25..29  fg=#8f5c47 bg=reset
-  8  29..49  fg=#e8e3dc bg=reset bold
-  8  49..85  fg=#a9a29a bg=reset
-  8  85..134 fg=#716b64 bg=reset
+  8  29..53  fg=#e8e3dc bg=reset bold
+  8  53..89  fg=#a9a29a bg=reset
+  8  89..134 fg=#716b64 bg=reset
   8 134..141 fg=#8f5c47 bg=reset
   8 141..147 fg=#a9a29a bg=reset
   8 147..160 fg=#716b64 bg=reset
   9   3..5   fg=#a9a29a bg=reset
   9   5..25  fg=#e8e3dc bg=reset
   9  25..29  fg=#8f5c47 bg=reset
-  9  29..49  fg=#e8e3dc bg=reset bold
-  9  49..85  fg=#a9a29a bg=reset
-  9  85..134 fg=#716b64 bg=reset
+  9  29..53  fg=#e8e3dc bg=reset bold
+  9  53..89  fg=#a9a29a bg=reset
+  9  89..134 fg=#716b64 bg=reset
   9 134..143 fg=#8f5c47 bg=reset
   9 143..151 fg=#a9a29a bg=reset
   9 151..158 fg=#716b64 bg=reset
@@ -130,18 +130,18 @@ expression: "draw(&s, &theme(name))"
  10   3..5   fg=#a9a29a bg=reset
  10   5..25  fg=#a9a29a bg=reset italic
  10  25..29  fg=#8f5c47 bg=reset
- 10  29..49  fg=#e8e3dc bg=reset bold
- 10  49..85  fg=#a9a29a bg=reset
- 10  85..134 fg=#716b64 bg=reset
+ 10  29..53  fg=#e8e3dc bg=reset bold
+ 10  53..89  fg=#a9a29a bg=reset
+ 10  89..134 fg=#716b64 bg=reset
  10 134..140 fg=#8f5c47 bg=reset
  10 140..147 fg=#a9a29a bg=reset
  10 147..160 fg=#716b64 bg=reset
  11   3..5   fg=#a9a29a bg=reset
  11   5..25  fg=#e8e3dc bg=reset
  11  25..29  fg=#8f5c47 bg=reset
- 11  29..49  fg=#e8e3dc bg=reset bold
- 11  49..85  fg=#a9a29a bg=reset
- 11  85..134 fg=#716b64 bg=reset
+ 11  29..53  fg=#e8e3dc bg=reset bold
+ 11  53..89  fg=#a9a29a bg=reset
+ 11  89..134 fg=#716b64 bg=reset
  11 134..140 fg=#8f5c47 bg=reset
  11 140..149 fg=#a9a29a bg=reset
  11 149..160 fg=#716b64 bg=reset
@@ -149,9 +149,9 @@ expression: "draw(&s, &theme(name))"
  12   3..5   fg=#a9a29a bg=reset
  12   5..25  fg=#d97757 bg=reset bold
  12  25..29  fg=#8f5c47 bg=reset
- 12  29..49  fg=#e8e3dc bg=reset bold
- 12  49..85  fg=#a9a29a bg=reset
- 12  85..134 fg=#716b64 bg=reset
+ 12  29..53  fg=#e8e3dc bg=reset bold
+ 12  53..89  fg=#a9a29a bg=reset
+ 12  89..134 fg=#716b64 bg=reset
  12 134..140 fg=#8f5c47 bg=reset
  12 140..150 fg=#a9a29a bg=reset
  12 150..160 fg=#716b64 bg=reset
@@ -175,136 +175,132 @@ expression: "draw(&s, &theme(name))"
  14 141..151 fg=#a9a29a bg=reset
  14 151..160 fg=#716b64 bg=reset
  15  25..29  fg=#8f5c47 bg=reset
- 15  29..49  fg=#716b64 bg=reset
- 15  49..85  fg=#a9a29a bg=reset
- 15  85..134 fg=#716b64 bg=reset
+ 15  29..134 fg=#716b64 bg=reset
  15 134..160 fg=#8f5c47 bg=reset
  16  25..29  fg=#8f5c47 bg=reset
- 16  29..49  fg=#716b64 bg=reset
- 16  49..85  fg=#a9a29a bg=reset
- 16  85..134 fg=#716b64 bg=reset
+ 16  29..53  fg=#e8e3dc bg=reset bold
+ 16  53..89  fg=#a9a29a bg=reset
+ 16  89..134 fg=#716b64 bg=reset
  16 134..160 fg=#8f5c47 bg=reset
  17  25..29  fg=#8f5c47 bg=reset
- 17  29..49  fg=#716b64 bg=reset
- 17  49..85  fg=#a9a29a bg=reset
- 17  85..134 fg=#716b64 bg=reset
+ 17  29..53  fg=#e8e3dc bg=reset bold
+ 17  53..89  fg=#a9a29a bg=reset
+ 17  89..134 fg=#716b64 bg=reset
  17 134..160 fg=#8f5c47 bg=reset
  18  25..29  fg=#8f5c47 bg=reset
- 18  29..49  fg=#716b64 bg=reset
- 18  49..85  fg=#a9a29a bg=reset
- 18  85..134 fg=#716b64 bg=reset
+ 18  29..53  fg=#e8e3dc bg=reset bold
+ 18  53..89  fg=#a9a29a bg=reset
+ 18  89..134 fg=#716b64 bg=reset
  18 134..160 fg=#8f5c47 bg=reset
  19  25..29  fg=#8f5c47 bg=reset
- 19  29..49  fg=#716b64 bg=reset
- 19  49..85  fg=#a9a29a bg=reset
- 19  85..134 fg=#716b64 bg=reset
+ 19  29..134 fg=#716b64 bg=reset
  19 134..160 fg=#8f5c47 bg=reset
  20  25..29  fg=#8f5c47 bg=reset
- 20  29..49  fg=#716b64 bg=reset
- 20  49..85  fg=#a9a29a bg=reset
- 20  85..134 fg=#716b64 bg=reset
+ 20  29..53  fg=#e8e3dc bg=reset bold
+ 20  53..89  fg=#a9a29a bg=reset
+ 20  89..134 fg=#716b64 bg=reset
  20 134..160 fg=#8f5c47 bg=reset
  21  25..29  fg=#8f5c47 bg=reset
- 21  29..49  fg=#716b64 bg=reset
- 21  49..85  fg=#a9a29a bg=reset
- 21  85..134 fg=#716b64 bg=reset
+ 21  29..53  fg=#e8e3dc bg=reset bold
+ 21  53..89  fg=#a9a29a bg=reset
+ 21  89..134 fg=#716b64 bg=reset
  21 134..160 fg=#8f5c47 bg=reset
  22  25..29  fg=#8f5c47 bg=reset
- 22  29..49  fg=#716b64 bg=reset
- 22  49..85  fg=#a9a29a bg=reset
- 22  85..134 fg=#716b64 bg=reset
+ 22  29..53  fg=#e8e3dc bg=reset bold
+ 22  53..89  fg=#a9a29a bg=reset
+ 22  89..134 fg=#716b64 bg=reset
  22 134..160 fg=#8f5c47 bg=reset
- 23  25..160 fg=#8f5c47 bg=reset
- 24  25..27  fg=#8f5c47 bg=reset
- 24  27..134 fg=#d97757 bg=reset bold
+ 23  25..29  fg=#8f5c47 bg=reset
+ 23  29..53  fg=#e8e3dc bg=reset bold
+ 23  53..89  fg=#a9a29a bg=reset
+ 23  89..134 fg=#716b64 bg=reset
+ 23 134..160 fg=#8f5c47 bg=reset
+ 24  25..29  fg=#8f5c47 bg=reset
+ 24  29..53  fg=#e8e3dc bg=reset bold
+ 24  53..89  fg=#a9a29a bg=reset
+ 24  89..134 fg=#716b64 bg=reset
  24 134..160 fg=#8f5c47 bg=reset
- 25  25..29  fg=#8f5c47 bg=reset
- 25  29..49  fg=#e8e3dc bg=reset bold
- 25  49..85  fg=#a9a29a bg=reset
- 25  85..134 fg=#716b64 bg=reset
- 25 134..160 fg=#8f5c47 bg=reset
- 26  25..29  fg=#8f5c47 bg=reset
- 26  29..49  fg=#e8e3dc bg=reset bold
- 26  49..85  fg=#a9a29a bg=reset
- 26  85..134 fg=#716b64 bg=reset
+ 25  25..160 fg=#8f5c47 bg=reset
+ 26  25..27  fg=#8f5c47 bg=reset
+ 26  27..134 fg=#d97757 bg=reset bold
  26 134..160 fg=#8f5c47 bg=reset
- 27  25..160 fg=#8f5c47 bg=reset
- 28  25..27  fg=#8f5c47 bg=reset
- 28  27..134 fg=#d97757 bg=reset bold
+ 27  25..29  fg=#8f5c47 bg=reset
+ 27  29..53  fg=#e8e3dc bg=reset bold
+ 27  53..89  fg=#a9a29a bg=reset
+ 27  89..134 fg=#716b64 bg=reset
+ 27 134..160 fg=#8f5c47 bg=reset
+ 28  25..29  fg=#8f5c47 bg=reset
+ 28  29..53  fg=#e8e3dc bg=reset bold
+ 28  53..89  fg=#a9a29a bg=reset
+ 28  89..134 fg=#716b64 bg=reset
  28 134..160 fg=#8f5c47 bg=reset
- 29  25..29  fg=#8f5c47 bg=reset
- 29  29..49  fg=#e8e3dc bg=reset bold
- 29  49..85  fg=#a9a29a bg=reset
- 29  85..134 fg=#716b64 bg=reset
- 29 134..160 fg=#8f5c47 bg=reset
- 30  25..29  fg=#8f5c47 bg=reset
- 30  29..49  fg=#e8e3dc bg=reset bold
- 30  49..85  fg=#a9a29a bg=reset
- 30  85..134 fg=#716b64 bg=reset
+ 29  25..160 fg=#8f5c47 bg=reset
+ 30  25..27  fg=#8f5c47 bg=reset
+ 30  27..134 fg=#d97757 bg=reset bold
  30 134..160 fg=#8f5c47 bg=reset
  31  25..29  fg=#8f5c47 bg=reset
- 31  29..49  fg=#e8e3dc bg=reset bold
- 31  49..85  fg=#a9a29a bg=reset
- 31  85..134 fg=#716b64 bg=reset
+ 31  29..53  fg=#e8e3dc bg=reset bold
+ 31  53..89  fg=#a9a29a bg=reset
+ 31  89..134 fg=#716b64 bg=reset
  31 134..160 fg=#8f5c47 bg=reset
  32  25..29  fg=#8f5c47 bg=reset
- 32  29..49  fg=#e8e3dc bg=reset bold
- 32  49..85  fg=#a9a29a bg=reset
- 32  85..134 fg=#716b64 bg=reset
+ 32  29..53  fg=#e8e3dc bg=reset bold
+ 32  53..89  fg=#a9a29a bg=reset
+ 32  89..134 fg=#716b64 bg=reset
  32 134..160 fg=#8f5c47 bg=reset
  33  25..29  fg=#8f5c47 bg=reset
- 33  29..49  fg=#e8e3dc bg=reset bold
- 33  49..85  fg=#a9a29a bg=reset
- 33  85..134 fg=#716b64 bg=reset
+ 33  29..53  fg=#e8e3dc bg=reset bold
+ 33  53..89  fg=#a9a29a bg=reset
+ 33  89..134 fg=#716b64 bg=reset
  33 134..160 fg=#8f5c47 bg=reset
  34  25..29  fg=#8f5c47 bg=reset
- 34  29..49  fg=#e8e3dc bg=reset bold
- 34  49..85  fg=#a9a29a bg=reset
- 34  85..134 fg=#716b64 bg=reset
+ 34  29..53  fg=#e8e3dc bg=reset bold
+ 34  53..89  fg=#a9a29a bg=reset
+ 34  89..134 fg=#716b64 bg=reset
  34 134..160 fg=#8f5c47 bg=reset
- 35  25..160 fg=#8f5c47 bg=reset
- 36  25..27  fg=#8f5c47 bg=reset
- 36  27..134 fg=#d97757 bg=reset bold
+ 35  25..29  fg=#8f5c47 bg=reset
+ 35  29..53  fg=#e8e3dc bg=reset bold
+ 35  53..89  fg=#a9a29a bg=reset
+ 35  89..134 fg=#716b64 bg=reset
+ 35 134..160 fg=#8f5c47 bg=reset
+ 36  25..29  fg=#8f5c47 bg=reset
+ 36  29..53  fg=#e8e3dc bg=reset bold
+ 36  53..89  fg=#a9a29a bg=reset
+ 36  89..134 fg=#716b64 bg=reset
  36 134..160 fg=#8f5c47 bg=reset
- 37  25..29  fg=#8f5c47 bg=reset
- 37  29..49  fg=#e8e3dc bg=reset bold
- 37  49..85  fg=#a9a29a bg=reset
- 37  85..134 fg=#716b64 bg=reset
- 37 134..160 fg=#8f5c47 bg=reset
- 38  25..29  fg=#8f5c47 bg=reset
- 38  29..49  fg=#e8e3dc bg=reset bold
- 38  49..85  fg=#a9a29a bg=reset
- 38  85..134 fg=#716b64 bg=reset
+ 37  25..160 fg=#8f5c47 bg=reset
+ 38  25..27  fg=#8f5c47 bg=reset
+ 38  27..134 fg=#d97757 bg=reset bold
  38 134..160 fg=#8f5c47 bg=reset
  39  25..29  fg=#8f5c47 bg=reset
- 39  29..49  fg=#e8e3dc bg=reset bold
- 39  49..85  fg=#a9a29a bg=reset
- 39  85..134 fg=#716b64 bg=reset
+ 39  29..53  fg=#e8e3dc bg=reset bold
+ 39  53..89  fg=#a9a29a bg=reset
+ 39  89..134 fg=#716b64 bg=reset
  39 134..160 fg=#8f5c47 bg=reset
  40  25..29  fg=#8f5c47 bg=reset
- 40  29..49  fg=#e8e3dc bg=reset bold
- 40  49..85  fg=#a9a29a bg=reset
- 40  85..134 fg=#716b64 bg=reset
+ 40  29..53  fg=#e8e3dc bg=reset bold
+ 40  53..89  fg=#a9a29a bg=reset
+ 40  89..134 fg=#716b64 bg=reset
  40 134..160 fg=#8f5c47 bg=reset
  41  25..29  fg=#8f5c47 bg=reset
- 41  29..49  fg=#e8e3dc bg=reset bold
- 41  49..85  fg=#a9a29a bg=reset
- 41  85..134 fg=#716b64 bg=reset
+ 41  29..53  fg=#e8e3dc bg=reset bold
+ 41  53..89  fg=#a9a29a bg=reset
+ 41  89..134 fg=#716b64 bg=reset
  41 134..160 fg=#8f5c47 bg=reset
  42  25..29  fg=#8f5c47 bg=reset
- 42  29..49  fg=#e8e3dc bg=reset bold
- 42  49..85  fg=#a9a29a bg=reset
- 42  85..134 fg=#716b64 bg=reset
+ 42  29..53  fg=#e8e3dc bg=reset bold
+ 42  53..89  fg=#a9a29a bg=reset
+ 42  89..134 fg=#716b64 bg=reset
  42 134..160 fg=#8f5c47 bg=reset
  43  25..29  fg=#8f5c47 bg=reset
- 43  29..49  fg=#e8e3dc bg=reset bold
- 43  49..85  fg=#a9a29a bg=reset
- 43  85..134 fg=#716b64 bg=reset
+ 43  29..53  fg=#e8e3dc bg=reset bold
+ 43  53..89  fg=#a9a29a bg=reset
+ 43  89..134 fg=#716b64 bg=reset
  43 134..160 fg=#8f5c47 bg=reset
  44  25..29  fg=#8f5c47 bg=reset
- 44  29..49  fg=#e8e3dc bg=reset bold
- 44  49..85  fg=#a9a29a bg=reset
- 44  85..134 fg=#716b64 bg=reset
+ 44  29..53  fg=#e8e3dc bg=reset bold
+ 44  53..89  fg=#a9a29a bg=reset
+ 44  89..134 fg=#716b64 bg=reset
  44 134..160 fg=#8f5c47 bg=reset
  45   0..25  fg=#403a35 bg=reset
  45  25..123 fg=#8f5c47 bg=reset

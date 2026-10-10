@@ -44,7 +44,7 @@ impl DirWatcher {
             // The watch broke (for example the directory was deleted): the listing
             // refresh that follows reports the real reason.
             Err(errors) => {
-                tracing::debug!(?errors, "watcher error");
+                tracing::warn!(?errors, "watcher error");
                 on_change();
             }
         };
@@ -59,7 +59,7 @@ impl DirWatcher {
         if let Some(parent) = dir.parent().filter(|p| !p.as_os_str().is_empty()) {
             // Best effort: without it only the removal of `dir` itself goes unnoticed.
             if let Err(error) = debouncer.watch(parent, RecursiveMode::NonRecursive) {
-                tracing::debug!(%error, parent = %parent.display(), "cannot watch the parent");
+                tracing::warn!(%error, parent = %parent.display(), "cannot watch the parent");
             }
         }
         Ok(Self {

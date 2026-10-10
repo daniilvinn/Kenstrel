@@ -20,15 +20,15 @@ expression: rendered
                                    │▌ Sort by size                                                                      S s │
                                    │  Sort by modified time                                                             S m │
                                    │  Sort by extension                                                                 S e │
-                                   │  Search contents: toggle regex                                                         │
-                                   │  Search contents: toggle whole word                                                    │
+                                   │  Search contents: toggle regex                                           ctrl-r (grep) │
+                                   │  Search contents: toggle whole word                                      ctrl-w (grep) │
                                    │  Send marked files to Claude                                                         C │
-                                   │  Find file: cycle scope (cwd, git root, home, drive)                                   │
-                                   │  Search contents: switch query/glob field                                              │
-                                   │  Search contents: open results as a list                                               │
-                                   │  Search contents: mark the hit                                                         │
-                                   │  Search contents: send the hit to Claude                                               │
-                                   │  Send the selected preview lines to Claude                                             │
+                                   │  Find file: cycle scope (cwd, git root, home, drive)                   ctrl-r (finder) │
+                                   │  Search contents: switch query/glob field                          tab, backtab (grep) │
+                                   │  Search contents: open results as a list                                 ctrl-l (grep) │
+                                   │  Search contents: mark the hit                                            alt-m (grep) │
+                                   │  Search contents: send the hit to Claude                                  alt-c (grep) │
+                                   │  Send the selected preview lines to Claude                    C, enter (preview_lines) │
                                    │  Search file contents                                                        ctrl-f, s │
                                    │  Quit and cd shell to current directory                                              Q │
                                    │  Visual (range select) mode                                                          v │
@@ -38,7 +38,7 @@ expression: rendered
                                    │  Jump to bottom                                                                 G, end │
                                    │                                                                                        │
                                    │                                                                                        │
-                                   ╰────────────────────────────────────────────────────────────────────────────────────────╯
+                                   ╰─────────────────────────────────────────── ctrl-n/ctrl-p move · enter run · esc close ─╯
 
 
 
@@ -166,7 +166,8 @@ expression: rendered
  18  41..42  fg=#c4623f bg=reset bold
  18  42..55  fg=#2b2724 bg=reset
  18  55..56  fg=#c4623f bg=reset bold
- 18  56..124 fg=#2b2724 bg=reset
+ 18  56..110 fg=#2b2724 bg=reset
+ 18 110..124 fg=#958e86 bg=reset
  18 124..160 fg=#c4623f bg=reset
  19  35..38  fg=#c4623f bg=reset
  19  38..39  fg=#c4623f bg=reset bold
@@ -174,7 +175,8 @@ expression: rendered
  19  41..42  fg=#c4623f bg=reset bold
  19  42..55  fg=#2b2724 bg=reset
  19  55..56  fg=#c4623f bg=reset bold
- 19  56..124 fg=#2b2724 bg=reset
+ 19  56..110 fg=#2b2724 bg=reset
+ 19 110..124 fg=#958e86 bg=reset
  19 124..160 fg=#c4623f bg=reset
  20  35..38  fg=#c4623f bg=reset
  20  38..39  fg=#c4623f bg=reset bold
@@ -192,7 +194,8 @@ expression: rendered
  21  71..72  fg=#c4623f bg=reset bold
  21  72..74  fg=#2b2724 bg=reset
  21  74..75  fg=#c4623f bg=reset bold
- 21  75..124 fg=#2b2724 bg=reset
+ 21  75..108 fg=#2b2724 bg=reset
+ 21 108..124 fg=#958e86 bg=reset
  21 124..160 fg=#c4623f bg=reset
  22  35..38  fg=#c4623f bg=reset
  22  38..39  fg=#c4623f bg=reset bold
@@ -200,7 +203,8 @@ expression: rendered
  22  41..42  fg=#c4623f bg=reset bold
  22  42..48  fg=#2b2724 bg=reset
  22  48..49  fg=#c4623f bg=reset bold
- 22  49..124 fg=#2b2724 bg=reset
+ 22  49..104 fg=#2b2724 bg=reset
+ 22 104..124 fg=#958e86 bg=reset
  22 124..160 fg=#c4623f bg=reset
  23  35..38  fg=#c4623f bg=reset
  23  38..39  fg=#c4623f bg=reset bold
@@ -208,7 +212,8 @@ expression: rendered
  23  41..42  fg=#c4623f bg=reset bold
  23  42..48  fg=#2b2724 bg=reset
  23  48..49  fg=#c4623f bg=reset bold
- 23  49..124 fg=#2b2724 bg=reset
+ 23  49..110 fg=#2b2724 bg=reset
+ 23 110..124 fg=#958e86 bg=reset
  23 124..160 fg=#c4623f bg=reset
  24  35..38  fg=#c4623f bg=reset
  24  38..39  fg=#c4623f bg=reset bold
@@ -216,7 +221,8 @@ expression: rendered
  24  41..42  fg=#c4623f bg=reset bold
  24  42..48  fg=#2b2724 bg=reset
  24  48..49  fg=#c4623f bg=reset bold
- 24  49..124 fg=#2b2724 bg=reset
+ 24  49..111 fg=#2b2724 bg=reset
+ 24 111..124 fg=#958e86 bg=reset
  24 124..160 fg=#c4623f bg=reset
  25  35..38  fg=#c4623f bg=reset
  25  38..39  fg=#c4623f bg=reset bold
@@ -224,7 +230,8 @@ expression: rendered
  25  41..42  fg=#c4623f bg=reset bold
  25  42..48  fg=#2b2724 bg=reset
  25  48..49  fg=#c4623f bg=reset bold
- 25  49..124 fg=#2b2724 bg=reset
+ 25  49..111 fg=#2b2724 bg=reset
+ 25 111..124 fg=#958e86 bg=reset
  25 124..160 fg=#c4623f bg=reset
  26  35..38  fg=#c4623f bg=reset
  26  38..47  fg=#2b2724 bg=reset
@@ -233,7 +240,8 @@ expression: rendered
  26  57..58  fg=#c4623f bg=reset bold
  26  58..70  fg=#2b2724 bg=reset
  26  70..71  fg=#c4623f bg=reset bold
- 26  71..124 fg=#2b2724 bg=reset
+ 26  71..99  fg=#2b2724 bg=reset
+ 26  99..124 fg=#958e86 bg=reset
  26 124..160 fg=#c4623f bg=reset
  27  35..38  fg=#c4623f bg=reset
  27  38..39  fg=#c4623f bg=reset bold
@@ -293,7 +301,9 @@ expression: rendered
  33 124..160 fg=#c4623f bg=reset
  34  35..160 fg=#c4623f bg=reset
  35  35..160 fg=#c4623f bg=reset
- 36  35..160 fg=#c4623f bg=reset
+ 36  35..80  fg=#c4623f bg=reset
+ 36  80..123 fg=#958e86 bg=reset
+ 36 123..160 fg=#c4623f bg=reset
  45   0..160 fg=#d4ccc2 bg=reset
  46   1..141 fg=#c4623f bg=reset bold
  46 141..160 fg=#6b645d bg=reset

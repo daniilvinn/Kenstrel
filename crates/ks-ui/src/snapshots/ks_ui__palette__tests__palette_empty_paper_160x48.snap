@@ -38,7 +38,7 @@ expression: "dump(&buffer(&s, &theme(name)))"
                                    │                                                                                        │
                                    │                                                                                        │
                                    │                                                                                        │
-                                   ╰────────────────────────────────────────────────────────────────────────────────────────╯
+                                   ╰─────────────────────────────────────────── ctrl-n/ctrl-p move · enter run · esc close ─╯
 
 
 
@@ -154,7 +154,9 @@ expression: "dump(&buffer(&s, &theme(name)))"
  33  35..160 fg=#c4623f bg=reset
  34  35..160 fg=#c4623f bg=reset
  35  35..160 fg=#c4623f bg=reset
- 36  35..160 fg=#c4623f bg=reset
+ 36  35..80  fg=#c4623f bg=reset
+ 36  80..123 fg=#958e86 bg=reset
+ 36 123..160 fg=#c4623f bg=reset
  45   0..160 fg=#d4ccc2 bg=reset
  46   1..141 fg=#c4623f bg=reset bold
  46 141..160 fg=#6b645d bg=reset

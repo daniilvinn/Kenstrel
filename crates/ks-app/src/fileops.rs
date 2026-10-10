@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use ks_core::config::{EditorConfig, EditorTerminal};
 use ks_core::fileops::{
-    BulkPlanResult, ConflictAnswer, ConflictInfo, ForegroundPurpose, ForegroundRequest,
+    BulkPlanResult, BulkRetry, ConflictAnswer, ConflictInfo, ForegroundPurpose, ForegroundRequest,
     ForegroundSpec, ItemMeta, JobDone, JobMsg, JobProgress, JobRequest, JobStatus, OpKind,
     PathFormatKind, ShellMsg,
 };
@@ -22,7 +22,7 @@ use ks_core::{Effect, JobId as CoreJobId, Level, Msg};
 use ks_fs::launch::clipboard::{format_paths, Clipboard, PathFormat, SystemClipboard};
 use ks_fs::launch::editor::is_terminal_editor;
 use ks_fs::launch::{
-    build_open_command, find_in_path, launch_handler, open_default, open_with_handlers,
+    build_open_command, find_in_path, launch_handler, open_default, open_with_handlers_for_all,
     resolve_editor, spawn_detached, spawn_shell, split_command_line, CommandSpec, Editor, Env,
     ShellEvent, ShellHandle, ShellId, ShellRequest, ShellStream, SystemEnv,
 };
@@ -476,8 +476,8 @@ impl FileOpsRunner {
             }
             Effect::OpenDefault { path } => self.open_default(path),
             Effect::OpenInEditor { path, line } => self.open_in_editor(path, line),
-            Effect::ListOpenHandlers { path } => self.list_handlers(path),
-            Effect::OpenWith { path, handler } => self.open_with(path, handler),
+            Effect::ListOpenHandlers { paths } => self.list_handlers(paths),
+            Effect::OpenWith { paths, handler } => self.open_with(paths, handler),
             Effect::CopyPaths { paths, format, cwd } => self.copy_paths(paths, format, cwd),
             Effect::RunShell { id, command, cwd } => self.run_shell(id, command, cwd),
             Effect::CancelShell(id) => {
@@ -485,7 +485,14 @@ impl FileOpsRunner {
                     shell.cancel();
                 }
             }
-            Effect::BulkRenameEdit { dir, names } => self.bulk_edit(dir, names),
+            Effect::BulkRenameEdit { dir, names, reuse } => self.bulk_edit(dir, names, reuse),
+            Effect::BulkRenameDiscard { file } => {
+                tokio::task::spawn_blocking(move || {
+                    if let Err(error) = std::fs::remove_file(&file) {
+                        tracing::warn!(file = %file.display(), %error, "bulk rename temp file not removed");
+                    }
+                });
+            }
             Effect::BulkRenamePlan {
                 dir,
                 names,
@@ -568,27 +575,37 @@ impl FileOpsRunner {
         });
     }
 
-    fn list_handlers(&self, path: PathBuf) {
+    fn list_handlers(&self, paths: Vec<PathBuf>) {
         let tx = self.tx.clone();
         tokio::task::spawn_blocking(move || {
-            let names = open_with_handlers().into_iter().map(|h| h.name).collect();
-            let _ = tx.blocking_send(Msg::OpenHandlers { path, names });
+            // The registry is read here, off the UI thread.
+            let names = open_with_handlers_for_all(&paths)
+                .into_iter()
+                .map(|h| h.name)
+                .collect();
+            let _ = tx.blocking_send(Msg::OpenHandlers { paths, names });
         });
     }
 
-    fn open_with(&self, path: PathBuf, handler: String) {
+    fn open_with(&self, paths: Vec<PathBuf>, handler: String) {
         let tx = self.tx.clone();
         tokio::task::spawn_blocking(move || {
-            let Some(found) = open_with_handlers().into_iter().find(|h| h.name == handler) else {
+            let Some(found) = open_with_handlers_for_all(&paths)
+                .into_iter()
+                .find(|h| h.name == handler)
+            else {
                 Self::notify(&tx, Level::Warning, format!("{handler} is not available"));
                 return;
             };
-            if let Err(error) = launch_handler(&found, &path) {
-                Self::notify(
-                    &tx,
-                    Level::Error,
-                    format!("Cannot start {handler}: {error}"),
-                );
+            for path in &paths {
+                if let Err(error) = launch_handler(&found, path) {
+                    Self::notify(
+                        &tx,
+                        Level::Error,
+                        format!("Cannot start {handler}: {error}"),
+                    );
+                    break;
+                }
             }
         });
     }
@@ -640,12 +657,14 @@ impl FileOpsRunner {
         self.shells.insert(id, handle);
     }
 
-    fn bulk_edit(&self, dir: PathBuf, names: Vec<String>) {
+    fn bulk_edit(&self, dir: PathBuf, names: Vec<String>, reuse: Option<PathBuf>) {
         let tx = self.tx.clone();
         let settings = self.editor.clone();
         tokio::task::spawn_blocking(move || {
             let session = BulkRename::new(dir.clone(), names.clone());
-            let file = match session.write_edit_file() {
+            // A kept file that was removed meanwhile (temp cleaner, user) is written afresh.
+            let reuse = reuse.filter(|file| file.is_file());
+            let file = match reuse.map_or_else(|| session.write_edit_file(), Ok) {
                 Ok(file) => file,
                 Err(error) => {
                     Self::notify(
@@ -694,7 +713,7 @@ impl FileOpsRunner {
 
 /// Validates the edited file and removes it.
 fn plan_bulk(dir: &Path, names: Vec<String>, file: &Path, error: Option<String>) -> BulkPlanResult {
-    let session = BulkRename::new(dir, names);
+    let session = BulkRename::new(dir, names.clone());
     let result = match error {
         Some(error) => BulkPlanResult::Failed(format!("cancelled: {error}")),
         None => match session.plan_from_file(file) {
@@ -707,14 +726,22 @@ fn plan_bulk(dir: &Path, names: Vec<String>, file: &Path, error: Option<String>)
                     .map(|s| (s.src.clone(), s.dst.clone()))
                     .collect(),
             },
-            Ok(Err(problems)) => BulkPlanResult::Invalid {
-                problems: problems.iter().map(ToString::to_string).collect(),
-            },
+            Ok(Err(problems)) => {
+                // Keep the file: the user gets to fix it instead of starting over.
+                return BulkPlanResult::Invalid {
+                    problems: problems.iter().map(ToString::to_string).collect(),
+                    retry: Some(BulkRetry {
+                        dir: dir.to_owned(),
+                        names,
+                        file: file.to_owned(),
+                    }),
+                };
+            }
             Err(error) => BulkPlanResult::Failed(format!("cannot read the edited file: {error}")),
         },
     };
     if let Err(error) = std::fs::remove_file(file) {
-        tracing::debug!(file = %file.display(), %error, "bulk rename temp file not removed");
+        tracing::warn!(file = %file.display(), %error, "bulk rename temp file not removed");
     }
     result
 }

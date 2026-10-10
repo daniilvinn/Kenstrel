@@ -13,6 +13,7 @@ use ks_core::keymap::{Continuation, ContinuationTarget, KeyPattern};
 use ks_core::layout::shows_hint_line;
 use ks_core::{Action, AppState, GitSnapshot, KeyContext, Level, Mode};
 
+use crate::hints::{fit_by_priority, NORMAL_HINTS};
 use crate::preview::render_body;
 use crate::text::{breadcrumb, truncate_end, width};
 use crate::theme::Theme;
@@ -325,14 +326,7 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::HistoryBack, "back"),
             (Action::Quit, "quit"),
         ],
-        (KeyContext::Normal, false) => &[
-            (Action::DirParent, "parent"),
-            (Action::DirEnter, "open"),
-            (Action::MarkToggle, "mark"),
-            (Action::HiddenToggle, "hidden"),
-            (Action::GoDrives, "drives"),
-            (Action::Quit, "quit"),
-        ],
+        (KeyContext::Normal, false) => NORMAL_HINTS,
         (KeyContext::Claude, _) => &[
             (Action::ClaudeFocus, "explorer"),
             (Action::ClaudeGrow, "grow"),
@@ -418,13 +412,20 @@ fn render_hints(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme, 
             .collect()
     } else {
         let ctx = state.key_context();
-        hints_for(state)
-            .iter()
-            .filter_map(|(action, label)| {
-                let keys = state.keymap.keys_for(ctx, *action);
-                keys.first().map(|k| (k.clone(), (*label).to_owned()))
-            })
-            .collect()
+        let resolved = hints_for(state).iter().filter_map(|(action, label)| {
+            let keys = state.keymap.keys_for(ctx, *action);
+            keys.first()
+                .map(|k| (*action, k.clone(), (*label).to_owned()))
+        });
+        if std::ptr::eq(hints_for(state), NORMAL_HINTS) {
+            // Width-aware: `: ? q` stay, optional hints give way by priority.
+            fit_by_priority(
+                resolved.collect(),
+                usize::from(area.width).saturating_sub(3),
+            )
+        } else {
+            resolved.map(|(_, key, label)| (key, label)).collect()
+        }
     };
 
     let budget = usize::from(area.width).saturating_sub(3);
@@ -845,9 +846,43 @@ mod tests {
         assert!(tall.contains("‹q› quit"), "{tall}");
     }
 
+    fn hint_row(width: u16) -> String {
+        let text = text_of(&listing_state(width, 24));
+        text.lines()
+            .rev()
+            .find(|l| l.contains("‹"))
+            .unwrap_or_default()
+            .to_owned()
+    }
+
+    #[test]
+    fn essential_hints_survive_every_width() {
+        for width in 40..=200u16 {
+            let row = hint_row(width);
+            for hint in ["‹:› commands", "‹?› help", "‹q› quit"] {
+                // below 41 columns not even the essentials fit
+                if width >= 41 {
+                    assert!(row.contains(hint), "{width}: {hint} missing in {row:?}");
+                }
+            }
+            assert!(!row.contains('…'), "{width}: {row:?}");
+        }
+    }
+
+    #[test]
+    fn optional_hints_appear_as_width_allows() {
+        let narrow = hint_row(80);
+        assert!(narrow.contains("‹/› filter"), "{narrow}");
+        assert!(!narrow.contains("‹ctrl-f› search"), "{narrow}");
+        let wide = hint_row(120);
+        for hint in ["‹/› filter", "‹ctrl-p› find", "‹ctrl-f› search"] {
+            assert!(wide.contains(hint), "{wide}");
+        }
+    }
+
     #[test]
     fn hints_follow_the_mode() {
-        let mut s = listing_state(140, 24);
+        let mut s = listing_state(160, 24);
         let normal = text_of(&s);
         assert!(normal.contains("‹space› mark"), "{normal}");
         assert!(normal.contains("‹g /› drives"), "{normal}");

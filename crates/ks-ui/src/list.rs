@@ -18,6 +18,9 @@ use crate::theme::Theme;
 
 const CURSOR_GLYPH: &str = "▌";
 const MARK_GLYPH: &str = "●";
+/// Shown in the mark column for an entry waiting in the cut register (next to the dimming, so
+/// the state does not depend on colour alone).
+const CUT_GLYPH: &str = "×";
 /// Cells before the icon: left margin, cursor bar, mark.
 const LEAD_WIDTH: usize = 3;
 /// Icon and the space after it.
@@ -75,6 +78,7 @@ pub fn render_list(frame: &mut Frame, area: Rect, state: &AppState, theme: &Them
     let name_width = usize::from(area.width)
         .saturating_sub(columns.fixed_width())
         .max(MIN_NAME_WIDTH.min(usize::from(area.width)));
+    let cut = cut_names(state);
     let first = view.cursor.offset;
     let rows = usize::from(area.height);
     let lines: Vec<Line> = (first..first.saturating_add(rows).min(view.len()))
@@ -89,6 +93,7 @@ pub fn render_list(frame: &mut Frame, area: Rect, state: &AppState, theme: &Them
                     name_width,
                     cursor: index == view.cursor.index,
                     marked: view.is_marked(entry),
+                    cut: !cut.is_empty() && cut.contains(&cut_key(&entry.display_name())),
                     highlight: view.highlight(index),
                 },
             ))
@@ -104,6 +109,8 @@ struct RowContext<'a> {
     name_width: usize,
     cursor: bool,
     marked: bool,
+    /// The entry sits in the cut register (`x`): dimmed and flagged with a glyph.
+    cut: bool,
     /// Matched character positions of the in-directory filter.
     highlight: &'a [u32],
 }
@@ -116,6 +123,7 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
         name_width,
         cursor,
         marked,
+        cut,
         highlight,
     } = ctx;
     let row_bg = if cursor {
@@ -131,15 +139,21 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
         if cursor { CURSOR_GLYPH } else { " " }.into(),
         theme.accent_style(),
     ));
-    spans.push(span(
-        if marked { MARK_GLYPH } else { " " }.into(),
-        theme.accent_style(),
-    ));
+    spans.push(match (marked, cut) {
+        (true, _) => span(MARK_GLYPH.into(), theme.accent_style()),
+        (false, true) => span(CUT_GLYPH.into(), theme.dim()),
+        (false, false) => span(" ".into(), theme.accent_style()),
+    });
 
-    let name_style = name_style(entry, marked, theme);
+    let mut name_style = name_style(entry, marked, theme);
+    let mut icon_style = icon_style(entry, theme);
+    if cut {
+        name_style = dimmed(name_style, theme);
+        icon_style = dimmed(icon_style, theme);
+    }
     spans.push(span(
         format!("{} ", icon_for(entry, state.config.icons)),
-        icon_style(entry, theme),
+        icon_style,
     ));
 
     let mut name = crate::text::sanitize(&entry.display_name());
@@ -200,6 +214,40 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
     });
     spans.push(span(" ".repeat(MARGIN_RIGHT), Style::new()));
     Line::from(spans)
+}
+
+/// The dimmed look of an entry that is waiting to be moved.
+fn dimmed(style: Style, theme: &Theme) -> Style {
+    style
+        .fg(theme.fg_muted)
+        .remove_modifier(Modifier::BOLD)
+        .add_modifier(Modifier::DIM)
+}
+
+/// Lookup key of a name in this directory (file names compare case-insensitively on Windows).
+fn cut_key(name: &str) -> String {
+    if cfg!(windows) {
+        name.to_lowercase()
+    } else {
+        name.to_owned()
+    }
+}
+
+/// Names in the current directory that are in the cut register.
+fn cut_names(state: &AppState) -> std::collections::HashSet<String> {
+    let Some(register) = state.fileops.register.as_ref().filter(|r| r.cut) else {
+        return Default::default();
+    };
+    register
+        .paths
+        .iter()
+        .filter(|path| {
+            path.parent()
+                .is_some_and(|parent| ks_core::fileops::same_path(parent, &state.cwd))
+        })
+        .filter_map(|path| path.file_name())
+        .map(|name| cut_key(&name.to_string_lossy()))
+        .collect()
 }
 
 /// Maps match positions in `name` onto the shortened `shown` (`head…tail`); positions inside

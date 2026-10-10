@@ -103,11 +103,18 @@ pub fn default_launch_dir() -> PathBuf {
 ///
 /// Looks in `base` (normally `std::env::temp_dir()`) for directories named `kestrel-<digits>`
 /// whose files were last modified more than `max_age` ago, skipping the directory of `own_pid`,
-/// and only deletes directories that contain nothing but `mcp.json` / `settings.json`. A
-/// pid-liveness check would need extra OS bindings, so age is the criterion: pick a `max_age`
-/// well above any Claude session you expect (the files are only read when `claude` starts).
-/// Returns how many directories were removed. Call it once at startup, off the UI thread.
-pub fn sweep_stale_launch_dirs(base: &Path, own_pid: u32, max_age: std::time::Duration) -> usize {
+/// and only deletes directories that contain nothing but `mcp.json` / `settings.json`.
+/// `pid_alive` is the liveness check (this crate forbids `unsafe`, so the OS call lives in
+/// `ks_fs::pid_alive`); a directory whose process is alive is never touched. `max_age` is an
+/// extra safety margin for processes that just exited (the files are only read when `claude`
+/// starts). Returns how many directories were removed. Call it once at startup, off the UI
+/// thread.
+pub fn sweep_stale_launch_dirs(
+    base: &Path,
+    own_pid: u32,
+    max_age: std::time::Duration,
+    pid_alive: impl Fn(u32) -> bool,
+) -> usize {
     let Ok(entries) = std::fs::read_dir(base) else {
         return 0;
     };
@@ -120,6 +127,10 @@ pub fn sweep_stale_launch_dirs(base: &Path, own_pid: u32, max_age: std::time::Du
         };
         if name == own || pid.is_empty() || !pid.bytes().all(|b| b.is_ascii_digit()) {
             continue;
+        }
+        match pid.parse::<u32>() {
+            Ok(n) if !pid_alive(n) => {}
+            _ => continue,
         }
         let dir = entry.path();
         let Ok(files) = std::fs::read_dir(&dir) else {
@@ -246,12 +257,33 @@ mod tests {
         mk("other-444", &["mcp.json"]); // not ours: keep
                                         // everything is "new": nothing may be removed with a generous age
         assert_eq!(
-            sweep_stale_launch_dirs(base.path(), 333, std::time::Duration::from_secs(3600)),
+            sweep_stale_launch_dirs(
+                base.path(),
+                333,
+                std::time::Duration::from_secs(3600),
+                |_| false
+            ),
             0
         );
         std::thread::sleep(std::time::Duration::from_millis(30));
+        // a live process keeps its directory, however old
         assert_eq!(
-            sweep_stale_launch_dirs(base.path(), 333, std::time::Duration::from_millis(5)),
+            sweep_stale_launch_dirs(
+                base.path(),
+                333,
+                std::time::Duration::from_millis(5),
+                |_| true
+            ),
+            0
+        );
+        assert!(base.path().join("kestrel-111").exists());
+        assert_eq!(
+            sweep_stale_launch_dirs(
+                base.path(),
+                333,
+                std::time::Duration::from_millis(5),
+                |pid| pid != 111
+            ),
             1
         );
         assert!(!base.path().join("kestrel-111").exists());

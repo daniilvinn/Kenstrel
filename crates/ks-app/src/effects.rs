@@ -395,7 +395,7 @@ impl EffectRunner {
                 tx.blocking_send(Msg::ListingChunk { gen, entries }).is_ok()
             });
             if let Err(error) = &result {
-                tracing::debug!(path = %path.display(), %error, "listing failed");
+                tracing::warn!(path = %path.display(), %error, "listing failed");
             }
             // A cancelled listing has been superseded; its end must not be reported.
             if !token.is_cancelled() {

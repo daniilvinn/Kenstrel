@@ -411,7 +411,7 @@ impl ClaudePane {
     pub fn resize(&self, size: PaneSize) {
         if let Some(m) = lock(&self.master).as_ref() {
             if let Err(e) = m.resize(size.pty()) {
-                tracing::debug!("pty resize failed: {e}");
+                tracing::warn!("pty resize failed: {e}");
             }
         }
         lock(&self.shared.parser)
@@ -694,8 +694,10 @@ pub fn paste_bytes(text: &str, bracketed: bool) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(windows)]
     use std::sync::mpsc;
 
+    #[cfg(windows)]
     fn channel_sink() -> (EventSink, mpsc::Receiver<ClaudeEvent>) {
         let (tx, rx) = mpsc::channel();
         let tx = Mutex::new(tx);
@@ -705,10 +707,12 @@ mod tests {
         (sink, rx)
     }
 
+    #[cfg(windows)]
     fn powershell() -> Option<PathBuf> {
         which::which("powershell").ok()
     }
 
+    #[cfg(windows)]
     fn ps_config(script: &str) -> Option<PaneConfig> {
         let mut cfg = PaneConfig::new(
             std::env::temp_dir(),
@@ -722,6 +726,7 @@ mod tests {
         Some(cfg)
     }
 
+    #[cfg(windows)]
     /// Collect events until `PaneExited` (or `max` elapses).
     fn collect_until_exit(rx: &mpsc::Receiver<ClaudeEvent>, max: Duration) -> Vec<ClaudeEvent> {
         let end = Instant::now() + max;

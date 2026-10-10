@@ -253,6 +253,14 @@ pub struct ForegroundRequest {
     pub purpose: ForegroundPurpose,
 }
 
+/// What it takes to reopen the edit file of a bulk rename whose plan was invalid.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BulkRetry {
+    pub dir: PathBuf,
+    pub names: Vec<String>,
+    pub file: PathBuf,
+}
+
 /// Result of validating the edited bulk-rename file (`Msg::BulkPlanned`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BulkPlanResult {
@@ -265,6 +273,9 @@ pub enum BulkPlanResult {
     },
     Invalid {
         problems: Vec<String>,
+        /// The kept edit file, so it can be opened again with the mistakes still in it.
+        /// `None` when there is nothing to reopen.
+        retry: Option<BulkRetry>,
     },
     /// The edit file could not be read or the editor failed.
     Failed(String),
@@ -312,6 +323,8 @@ pub enum ConfirmAction {
     BulkRename {
         steps: Vec<(PathBuf, PathBuf)>,
     },
+    /// The bulk-rename plan was invalid: enter reopens the kept edit file, esc discards it.
+    BulkReedit(BulkRetry),
     /// Quit although jobs are still running (they are cancelled).
     Quit {
         kind: crate::state::QuitKind,

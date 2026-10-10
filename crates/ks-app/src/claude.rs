@@ -46,8 +46,8 @@ const SNAPSHOT_INTERVAL: Duration = Duration::from_millis(16);
 const WALK_CACHE_TTL: Duration = Duration::from_secs(5);
 /// A diff request waits this long and is skipped if a newer one arrived (cursor moves).
 const DIFF_DEBOUNCE: Duration = Duration::from_millis(60);
-/// Launch directories older than this are removed as leftovers of crashed sessions.
-const STALE_LAUNCH_DIR_AGE: Duration = Duration::from_secs(24 * 3600);
+/// Launch directories of dead processes are removed once they are older than this margin.
+const STALE_LAUNCH_DIR_AGE: Duration = Duration::from_secs(60);
 
 /// Where the host keeps its files. All optional so tests never touch the real locations.
 #[derive(Clone, Debug, Default)]
@@ -409,6 +409,7 @@ impl Inner {
                 &std::env::temp_dir(),
                 std::process::id(),
                 STALE_LAUNCH_DIR_AGE,
+                ks_fs::pid_alive,
             );
         }
         let ipc_name = self.ensure_ipc();
@@ -614,14 +615,14 @@ impl Writer {
                     self.leave_history();
                     if let Some(key) = to_pane_key(chord) {
                         if let Err(e) = self.pane.send_key(key) {
-                            tracing::debug!("cannot send a key to Claude: {e}");
+                            tracing::warn!("cannot send a key to Claude: {e}");
                         }
                     }
                 }
                 InputOp::Paste(text) | InputOp::Text(text) => {
                     self.leave_history();
                     if let Err(e) = self.pane.paste(&text) {
-                        tracing::debug!("cannot paste into Claude: {e}");
+                        tracing::warn!("cannot paste into Claude: {e}");
                     }
                 }
                 InputOp::Resize(size) => self.pane.resize(size),

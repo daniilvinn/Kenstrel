@@ -472,6 +472,7 @@ fn start_bulk_rename(state: &mut AppState, effects: &mut Vec<Effect>) {
     effects.push(Effect::BulkRenameEdit {
         dir: state.cwd.clone(),
         names,
+        reuse: None,
     });
 }
 
@@ -526,11 +527,22 @@ fn open_default(state: &mut AppState, effects: &mut Vec<Effect>) {
 }
 
 fn open_with(state: &mut AppState, effects: &mut Vec<Effect>) {
-    match state.view.current().filter(|_| !state.show_drives) {
-        Some(entry) => effects.push(Effect::ListOpenHandlers {
-            path: state.cwd.join(&entry.name),
-        }),
-        None => warn(state, effects, "Nothing to open here"),
+    if state.show_drives {
+        warn(state, effects, "Nothing to open here");
+        return;
+    }
+    // Marked entries (or the cursor entry), like `o`.
+    let paths = launch_targets(state, false);
+    if paths.is_empty() {
+        warn(state, effects, "Nothing to open here");
+    } else if paths.len() > MAX_LAUNCH {
+        let text = format!(
+            "Too many items to open at once ({} > {MAX_LAUNCH})",
+            paths.len()
+        );
+        warn(state, effects, &text);
+    } else {
+        effects.push(Effect::ListOpenHandlers { paths });
     }
 }
 
@@ -640,9 +652,10 @@ fn choose_menu_item(state: &mut AppState, effects: &mut Vec<Effect>) {
             });
         }
         MenuKind::OpenWith => {
-            if let (Some(item), Some(path)) = (menu.items.get(menu.selected), menu.paths.first()) {
+            if let Some(item) = menu.items.get(menu.selected) {
+                clear_selection(state);
                 effects.push(Effect::OpenWith {
-                    path: path.clone(),
+                    paths: menu.paths,
                     handler: item.label.clone(),
                 });
             }
@@ -692,7 +705,19 @@ fn scroll_to(pager: &mut Pager, target: usize, max: usize) {
 
 fn confirm_action(state: &mut AppState, action: Action, effects: &mut Vec<Effect>) -> bool {
     match action {
-        Action::Cancel => close_confirm(state),
+        Action::Cancel => {
+            // Abandoning an invalid bulk rename discards its kept edit file.
+            if let Some(ConfirmAction::BulkReedit(retry)) = state
+                .fileops
+                .confirm
+                .as_ref()
+                .and_then(|c| c.action.clone())
+            {
+                effects.push(Effect::BulkRenameDiscard { file: retry.file });
+                set_status(state, Level::Info, "Bulk rename discarded".into(), effects);
+            }
+            close_confirm(state);
+        }
         Action::Accept => accept_confirm(state, effects),
         _ => {}
     }
@@ -732,6 +757,11 @@ fn accept_confirm(state: &mut AppState, effects: &mut Vec<Effect>) {
         Some(ConfirmAction::BulkRename { steps }) => effects.push(Effect::SubmitJob {
             request: JobRequest::BulkRename { steps },
             keep_both: false,
+        }),
+        Some(ConfirmAction::BulkReedit(retry)) => effects.push(Effect::BulkRenameEdit {
+            dir: retry.dir,
+            names: retry.names,
+            reuse: Some(retry.file),
         }),
         None => {}
     }
@@ -1281,10 +1311,13 @@ pub(crate) fn on_foreground_done(
 
 pub(crate) fn on_open_handlers(
     state: &mut AppState,
-    path: PathBuf,
+    paths: Vec<PathBuf>,
     names: Vec<String>,
     effects: &mut Vec<Effect>,
 ) {
+    let Some(first) = paths.first() else {
+        return;
+    };
     if names.is_empty() {
         warn(state, effects, "No programs to open this with");
         return;
@@ -1299,10 +1332,13 @@ pub(crate) fn on_open_handlers(
         .collect();
     state.fileops.menu = Some(Menu {
         kind: MenuKind::OpenWith,
-        title: format!("Open {} with", name_of(&path)),
+        title: match paths.len() {
+            1 => format!("Open {} with", name_of(first)),
+            n => format!("Open {n} items with"),
+        },
         items,
         selected: 0,
-        paths: vec![path],
+        paths,
     });
     push_overlay(state, Overlay::Menu);
     state.dirty = true;
@@ -1341,19 +1377,23 @@ pub(crate) fn on_bulk_planned(
             });
             push_overlay(state, Overlay::Confirm);
         }
-        BulkPlanResult::Invalid { problems } => {
+        BulkPlanResult::Invalid { problems, retry } => {
             let count = problems.len();
             let more = count.saturating_sub(CONFIRM_LINES);
+            let mut lines: Vec<String> = problems.into_iter().take(CONFIRM_LINES).collect();
+            if retry.is_some() {
+                lines.push("Your edits are kept: enter reopens the file, esc discards it.".into());
+            }
             state.fileops.confirm = Some(ConfirmDialog {
                 title: format!("Bulk rename: {} found", plural(count, "problem")),
-                lines: problems.into_iter().take(CONFIRM_LINES).collect(),
+                lines,
                 more,
                 danger: true,
                 token: None,
                 typed: PromptInput::new(),
                 mismatch: false,
-                action: None,
-                accept_label: "close".to_owned(),
+                action: retry.map(ConfirmAction::BulkReedit),
+                accept_label: "edit again".to_owned(),
             });
             push_overlay(state, Overlay::Confirm);
         }

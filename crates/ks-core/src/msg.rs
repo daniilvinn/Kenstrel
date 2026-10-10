@@ -133,9 +133,9 @@ pub enum Msg {
         id: u64,
         error: Option<String>,
     },
-    /// The programs `O` can open `path` with.
+    /// The programs `O` can open `paths` with.
     OpenHandlers {
-        path: PathBuf,
+        paths: Vec<PathBuf>,
         names: Vec<String>,
     },
     /// The edited bulk-rename file was validated.

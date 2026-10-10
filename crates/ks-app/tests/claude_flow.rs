@@ -2,6 +2,9 @@
 //! socket and a real ConPTY, without the real `claude` (a fake `claude.cmd` stands in) and
 //! without ever sending a prompt. The one test that needs the real binary is `#[ignore]`.
 
+// The fake `claude.cmd` needs Windows; elsewhere only the helpers compile.
+#![cfg_attr(not(windows), allow(dead_code, unused_imports))]
+
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 

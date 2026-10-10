@@ -488,3 +488,11 @@ Merged `fix/f2` (finder cache freshness with background re-walk, `Touched` cache
 - **Event loop**: f1's deferred terminal query and f2's parked-tab watchers do not interact; no change needed.
 - **Gates**: fmt, clippy `-D warnings` clean; `cargo test --workspace --no-fail-fast` fully green, no `.snap.new`. f2 added no Action, so `docs/keymap.md` and README key tables are unchanged.
 - **Open issues**: as in `docs/progress/f2.md` (re-walk rebuilds the matcher when paths vanished; abandoned drive-query threads live until the OS call returns). f3 palette/help snapshots may still need regeneration.
+
+## Integration: fix/f3
+
+- **Conflicts**: `ks-fs` (`lib.rs` exports `file_owner` from f1 and `pid_alive` from f3; `win32.rs` keeps both Win32 APIs and merged imports), `ks-app/tests/fileops.rs` (kept f3's `assert_no_new_bulk_files` subset check over f1's settle loop), `docs/keymap.md` and help/palette snapshots (regenerated, not hand-merged).
+- **Snapshots**: after regeneration the only diffs on top of f3's own were f1's grep mark/send and `preview.select_lines` entries (help total 111 to 117 lines, palette result counts) and f3's hint line applied to f1/f2 snapshots (`tabs_stale`, `link_header`: `/ filter`, `: commands`, `? help`, `q quit` at 80 columns).
+- **Keymap**: `docs/keymap.md` regenerated; `preview.select_lines` (`V`) and `grep.mark` / `grep.send_claude` appear with titles; the `preview_lines` context is listed. README key tables already match (V, alt-m, alt-c); no default key changed.
+- **Open issues**: as in `docs/progress/f3.md` (kept bulk-rename temp file leaks on ctrl-c, no real-terminal check of the cut glyph or hint line). `move_undo_and_trash_undo` is now split: `move_undo` always runs, `trash_undo` (real Recycle Bin) is `#[ignore]`.
+- **Gates**: fmt, clippy `-D warnings` clean; `cargo test --workspace` all pass (1179 tests), no flakes this run.

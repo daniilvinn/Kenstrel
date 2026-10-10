@@ -25,3 +25,12 @@ pub fn file_owner(_path: &Path) -> Option<String> {
 pub fn utc_offset_secs() -> i32 {
     0
 }
+
+/// Whether a process with this id is running (Linux: `/proc`; elsewhere assumed alive).
+pub fn pid_alive(pid: u32) -> bool {
+    if cfg!(target_os = "linux") {
+        Path::new(&format!("/proc/{pid}")).exists()
+    } else {
+        true
+    }
+}

@@ -23,7 +23,7 @@ expression: "dump(&buffer(&s, &theme(name)))"
                 │                                              │
                 │                                              │
                 │                                              │
-────────────────╰──────────────────────────────────────────────╯────────────────
+────────────────╰────────────────── ctrl-n/p move · esc close ─╯────────────────
  ›                                                           12/13 · 1 selected
    ‹enter› run  ‹down› down  ‹up› up  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -116,7 +116,9 @@ expression: "dump(&buffer(&s, &theme(name)))"
  19  16..80  fg=#c4623f bg=reset
  20  16..80  fg=#c4623f bg=reset
  21   0..16  fg=#d4ccc2 bg=reset
- 21  16..64  fg=#c4623f bg=reset
+ 21  16..36  fg=#c4623f bg=reset
+ 21  36..62  fg=#958e86 bg=reset
+ 21  62..64  fg=#c4623f bg=reset
  21  64..80  fg=#d4ccc2 bg=reset
  22   1..61  fg=#c4623f bg=reset bold
  22  61..80  fg=#6b645d bg=reset

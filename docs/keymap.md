@@ -21,7 +21,10 @@ sequence, the value a command id from the tables below:
 ```
 
 Contexts: `normal`, `visual` (inherits `normal`), `prompt`, `filter`, `finder`, `grep`,
-`palette`, `help`, `confirm`, `jobs`, `claude`. Binding a prefix (`g`) removes the longer
+`palette`, `help`, `confirm`, `jobs`, `claude`, `bookmarks`, `jump`, `conflict`, `pager`,
+`menu`, `claude_changes`; each one is listed below under "Other contexts". In the help
+overlay and the palette a command that only exists in one of them shows its key with the
+context, for example `ctrl-r (finder)`. Binding a prefix (`g`) removes the longer
 defaults that start with it (`g g`, `g h`, ...); the status line tells you when that
 happens. Key names: single characters, `space`, `enter`, `esc`, `tab`, `backspace`,
 `delete`, `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `f1`..`f12`,
@@ -167,243 +170,243 @@ the palette (`Reload config`).
 
 ### `visual` (also uses every `normal` binding it does not override)
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `v` | `mode.visual` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `v` | Visual (range select) mode | `mode.visual` |
 
 ### `prompt`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
 
 ### `filter`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
-| `down` | `cursor.down` |
-| `up` | `cursor.up` |
-| `ctrl-n` | `cursor.down` |
-| `ctrl-p` | `cursor.up` |
-| `pagedown` | `page.half_down` |
-| `pageup` | `page.half_up` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
+| `down` | Move cursor down | `cursor.down` |
+| `up` | Move cursor up | `cursor.up` |
+| `ctrl-n` | Move cursor down | `cursor.down` |
+| `ctrl-p` | Move cursor up | `cursor.up` |
+| `pagedown` | Scroll half a page down | `page.half_down` |
+| `pageup` | Scroll half a page up | `page.half_up` |
 
 ### `finder`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
-| `down` | `cursor.down` |
-| `up` | `cursor.up` |
-| `ctrl-n` | `cursor.down` |
-| `ctrl-p` | `cursor.up` |
-| `pagedown` | `page.half_down` |
-| `pageup` | `page.half_up` |
-| `ctrl-r` | `finder.scope` |
-| `alt-.` | `finder.hidden` |
-| `alt-g` | `finder.gitignore` |
-| `ctrl-enter` | `finder.open` |
-| `ctrl-o` | `finder.open` |
-| `tab` | `finder.mark` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
+| `down` | Move cursor down | `cursor.down` |
+| `up` | Move cursor up | `cursor.up` |
+| `ctrl-n` | Move cursor down | `cursor.down` |
+| `ctrl-p` | Move cursor up | `cursor.up` |
+| `pagedown` | Scroll half a page down | `page.half_down` |
+| `pageup` | Scroll half a page up | `page.half_up` |
+| `ctrl-r` | Find file: cycle scope (cwd, git root, home, drive) | `finder.scope` |
+| `alt-.` | Find file: toggle hidden files | `finder.hidden` |
+| `alt-g` | Find file: toggle gitignored files | `finder.gitignore` |
+| `ctrl-enter` | Find file: open with default app | `finder.open` |
+| `ctrl-o` | Find file: open with default app | `finder.open` |
+| `tab` | Find file: mark result | `finder.mark` |
 
 ### `grep`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
-| `down` | `cursor.down` |
-| `up` | `cursor.up` |
-| `ctrl-n` | `cursor.down` |
-| `ctrl-p` | `cursor.up` |
-| `pagedown` | `page.half_down` |
-| `pageup` | `page.half_up` |
-| `ctrl-r` | `grep.regex` |
-| `ctrl-w` | `grep.word` |
-| `tab` | `grep.field` |
-| `backtab` | `grep.field` |
-| `ctrl-l` | `grep.to_list` |
-| `alt-c` | `grep.send_claude` |
-| `alt-m` | `grep.mark` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
+| `down` | Move cursor down | `cursor.down` |
+| `up` | Move cursor up | `cursor.up` |
+| `ctrl-n` | Move cursor down | `cursor.down` |
+| `ctrl-p` | Move cursor up | `cursor.up` |
+| `pagedown` | Scroll half a page down | `page.half_down` |
+| `pageup` | Scroll half a page up | `page.half_up` |
+| `ctrl-r` | Search contents: toggle regex | `grep.regex` |
+| `ctrl-w` | Search contents: toggle whole word | `grep.word` |
+| `tab` | Search contents: switch query/glob field | `grep.field` |
+| `backtab` | Search contents: switch query/glob field | `grep.field` |
+| `ctrl-l` | Search contents: open results as a list | `grep.to_list` |
+| `alt-c` | Search contents: send the hit to Claude | `grep.send_claude` |
+| `alt-m` | Search contents: mark the hit | `grep.mark` |
 
 ### `palette`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
-| `down` | `cursor.down` |
-| `ctrl-n` | `cursor.down` |
-| `up` | `cursor.up` |
-| `ctrl-p` | `cursor.up` |
-| `pagedown` | `page.half_down` |
-| `pageup` | `page.half_up` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
+| `down` | Move cursor down | `cursor.down` |
+| `ctrl-n` | Move cursor down | `cursor.down` |
+| `up` | Move cursor up | `cursor.up` |
+| `ctrl-p` | Move cursor up | `cursor.up` |
+| `pagedown` | Scroll half a page down | `page.half_down` |
+| `pageup` | Scroll half a page up | `page.half_up` |
 
 ### `help`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `q` | `cancel` |
-| `?` | `cancel` |
-| `j` | `cursor.down` |
-| `down` | `cursor.down` |
-| `k` | `cursor.up` |
-| `up` | `cursor.up` |
-| `ctrl-d` | `page.half_down` |
-| `pagedown` | `page.half_down` |
-| `ctrl-u` | `page.half_up` |
-| `pageup` | `page.half_up` |
-| `g g` | `cursor.top` |
-| `home` | `cursor.top` |
-| `G` | `cursor.bottom` |
-| `end` | `cursor.bottom` |
-| `/` | `filter.open` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `q` | Cancel / close | `cancel` |
+| `?` | Cancel / close | `cancel` |
+| `j` | Move cursor down | `cursor.down` |
+| `down` | Move cursor down | `cursor.down` |
+| `k` | Move cursor up | `cursor.up` |
+| `up` | Move cursor up | `cursor.up` |
+| `ctrl-d` | Scroll half a page down | `page.half_down` |
+| `pagedown` | Scroll half a page down | `page.half_down` |
+| `ctrl-u` | Scroll half a page up | `page.half_up` |
+| `pageup` | Scroll half a page up | `page.half_up` |
+| `g g` | Jump to top | `cursor.top` |
+| `home` | Jump to top | `cursor.top` |
+| `G` | Jump to bottom | `cursor.bottom` |
+| `end` | Jump to bottom | `cursor.bottom` |
+| `/` | Filter current directory | `filter.open` |
 
 ### `confirm`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
 
 ### `jobs`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `q` | `cancel` |
-| `x` | `job.cancel` |
-| `c` | `jobs.clear` |
-| `j` | `cursor.down` |
-| `k` | `cursor.up` |
-| `down` | `cursor.down` |
-| `up` | `cursor.up` |
-| `g g` | `cursor.top` |
-| `G` | `cursor.bottom` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `q` | Cancel / close | `cancel` |
+| `x` | Cancel selected job | `job.cancel` |
+| `c` | Clear finished jobs | `jobs.clear` |
+| `j` | Move cursor down | `cursor.down` |
+| `k` | Move cursor up | `cursor.up` |
+| `down` | Move cursor down | `cursor.down` |
+| `up` | Move cursor up | `cursor.up` |
+| `g g` | Jump to top | `cursor.top` |
+| `G` | Jump to bottom | `cursor.bottom` |
 
 ### `claude`
 
-| Keys | Command |
-|---|---|
-| `ctrl-\` | `claude.focus` |
-| `alt-=` | `claude.grow` |
-| `alt--` | `claude.shrink` |
-| `shift-pageup` | `claude.scroll_up` |
-| `shift-pagedown` | `claude.scroll_down` |
+| Keys | Command | Id |
+|---|---|---|
+| `ctrl-\` | Toggle focus between explorer and Claude | `claude.focus` |
+| `alt-=` | Grow Claude pane | `claude.grow` |
+| `alt--` | Shrink Claude pane | `claude.shrink` |
+| `shift-pageup` | Scroll Claude pane up | `claude.scroll_up` |
+| `shift-pagedown` | Scroll Claude pane down | `claude.scroll_down` |
 
 ### `bookmarks`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `q` | `cancel` |
-| `enter` | `accept` |
-| `j` | `cursor.down` |
-| `down` | `cursor.down` |
-| `k` | `cursor.up` |
-| `up` | `cursor.up` |
-| `d` | `bookmark.delete` |
-| `delete` | `bookmark.delete` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `q` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
+| `j` | Move cursor down | `cursor.down` |
+| `down` | Move cursor down | `cursor.down` |
+| `k` | Move cursor up | `cursor.up` |
+| `up` | Move cursor up | `cursor.up` |
+| `d` | Delete bookmark | `bookmark.delete` |
+| `delete` | Delete bookmark | `bookmark.delete` |
 
 ### `jump`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
-| `down` | `cursor.down` |
-| `ctrl-n` | `cursor.down` |
-| `ctrl-j` | `cursor.down` |
-| `up` | `cursor.up` |
-| `ctrl-p` | `cursor.up` |
-| `ctrl-k` | `cursor.up` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
+| `down` | Move cursor down | `cursor.down` |
+| `ctrl-n` | Move cursor down | `cursor.down` |
+| `ctrl-j` | Move cursor down | `cursor.down` |
+| `up` | Move cursor up | `cursor.up` |
+| `ctrl-p` | Move cursor up | `cursor.up` |
+| `ctrl-k` | Move cursor up | `cursor.up` |
 
 ### `conflict`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
 
 ### `pager`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `q` | `cancel` |
-| `ctrl-c` | `job.cancel` |
-| `j` | `cursor.down` |
-| `k` | `cursor.up` |
-| `down` | `cursor.down` |
-| `up` | `cursor.up` |
-| `g g` | `cursor.top` |
-| `G` | `cursor.bottom` |
-| `ctrl-d` | `page.half_down` |
-| `ctrl-u` | `page.half_up` |
-| `pagedown` | `page.half_down` |
-| `pageup` | `page.half_up` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `q` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel selected job | `job.cancel` |
+| `j` | Move cursor down | `cursor.down` |
+| `k` | Move cursor up | `cursor.up` |
+| `down` | Move cursor down | `cursor.down` |
+| `up` | Move cursor up | `cursor.up` |
+| `g g` | Jump to top | `cursor.top` |
+| `G` | Jump to bottom | `cursor.bottom` |
+| `ctrl-d` | Scroll half a page down | `page.half_down` |
+| `ctrl-u` | Scroll half a page up | `page.half_up` |
+| `pagedown` | Scroll half a page down | `page.half_down` |
+| `pageup` | Scroll half a page up | `page.half_up` |
 
 ### `menu`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `q` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
-| `j` | `cursor.down` |
-| `k` | `cursor.up` |
-| `down` | `cursor.down` |
-| `up` | `cursor.up` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `q` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
+| `j` | Move cursor down | `cursor.down` |
+| `k` | Move cursor up | `cursor.up` |
+| `down` | Move cursor down | `cursor.down` |
+| `up` | Move cursor up | `cursor.up` |
 
 ### `claude_changes`
 
-| Keys | Command |
-|---|---|
-| `esc` | `cancel` |
-| `q` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `enter` | `accept` |
-| `j` | `cursor.down` |
-| `down` | `cursor.down` |
-| `k` | `cursor.up` |
-| `up` | `cursor.up` |
-| `g g` | `cursor.top` |
-| `home` | `cursor.top` |
-| `G` | `cursor.bottom` |
-| `end` | `cursor.bottom` |
-| `X` | `claude.changes_clear` |
-| `d` | `claude.changes_diff` |
+| Keys | Command | Id |
+|---|---|---|
+| `esc` | Cancel / close | `cancel` |
+| `q` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `enter` | Accept / confirm | `accept` |
+| `j` | Move cursor down | `cursor.down` |
+| `down` | Move cursor down | `cursor.down` |
+| `k` | Move cursor up | `cursor.up` |
+| `up` | Move cursor up | `cursor.up` |
+| `g g` | Jump to top | `cursor.top` |
+| `home` | Jump to top | `cursor.top` |
+| `G` | Jump to bottom | `cursor.bottom` |
+| `end` | Jump to bottom | `cursor.bottom` |
+| `X` | Clear Claude changes | `claude.changes_clear` |
+| `d` | Toggle the git diff in the Claude changes view | `claude.changes_diff` |
 
 ### `preview_lines`
 
-| Keys | Command |
-|---|---|
-| `j` | `cursor.down` |
-| `down` | `cursor.down` |
-| `k` | `cursor.up` |
-| `up` | `cursor.up` |
-| `ctrl-d` | `page.half_down` |
-| `ctrl-u` | `page.half_up` |
-| `g g` | `cursor.top` |
-| `G` | `cursor.bottom` |
-| `C` | `preview.lines_send` |
-| `enter` | `preview.lines_send` |
-| `esc` | `cancel` |
-| `ctrl-c` | `cancel` |
-| `V` | `cancel` |
+| Keys | Command | Id |
+|---|---|---|
+| `j` | Move cursor down | `cursor.down` |
+| `down` | Move cursor down | `cursor.down` |
+| `k` | Move cursor up | `cursor.up` |
+| `up` | Move cursor up | `cursor.up` |
+| `ctrl-d` | Scroll half a page down | `page.half_down` |
+| `ctrl-u` | Scroll half a page up | `page.half_up` |
+| `g g` | Jump to top | `cursor.top` |
+| `G` | Jump to bottom | `cursor.bottom` |
+| `C` | Send the selected preview lines to Claude | `preview.lines_send` |
+| `enter` | Send the selected preview lines to Claude | `preview.lines_send` |
+| `esc` | Cancel / close | `cancel` |
+| `ctrl-c` | Cancel / close | `cancel` |
+| `V` | Cancel / close | `cancel` |

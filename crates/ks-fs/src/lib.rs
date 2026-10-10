@@ -18,6 +18,6 @@ pub mod watcher;
 pub use children::count_children;
 pub use git::read_status as git_status;
 pub use listing::{link_target, list_dir};
-pub use platform::{file_owner, list_drives, utc_offset_secs};
+pub use platform::{file_owner, list_drives, pid_alive, utc_offset_secs};
 pub use stat::{stat_entries, EntryStat};
 pub use watcher::DirWatcher;

@@ -1,6 +1,5 @@
 ---
 source: crates/ks-ui/src/which_key.rs
-assertion_line: 170
 expression: "draw(&pending(w, h, &keys), &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
@@ -10,23 +9,23 @@ expression: "draw(&pending(w, h, &keys), &theme(name))"
    ◆ shaders/                                                              12 !
    ◆ a_rather_long_file_name_that_must_be_cut_in_the_middle…_row.rs   75.2 KB
    ◆ build.ps1                                                         1.9 KB
-   ◆ descriptors.rs                ╭─ g ──────────────────────────────────────╮
-   ◆ mod.rs                        │ g  Jump to top                           │
-   ◆ new_pass.rs                   │ h  Go to home directory                  │
-   ◆ photo_from_phone.jpg          │ d  Go to Downloads                       │
-   ◆ pipeline_cache.rs             │ D  Go to Desktop                         │
-  ●◆ swapchain.rs                  │ c  Go to config directory                │
- ▌ ◆ vulkan_device.rs              │ /  Go to This PC (drives)                │
-   ◆ 日本語のメモ.txt              │ j  Jobs overlay                          │
-                                   │ r  Resume last Claude session            │
-                                   │ w  Open Claude in Windows Terminal split │
-                                   │ a  Claude changes                        │
-                                   │ X  Close Claude pane                     │
-                                   │ p  Move Claude pane (bottom / right)     │
-                                   ╰──────────────────────────────────────────╯
+   ◆ descriptors.rs                             ╭─ g ─────────────────────────╮
+   ◆ mod.rs                                     │ g  Jump to top              │
+   ◆ new_pass.rs                                │ h  Go to home directory     │
+   ◆ photo_from_phone.jpg                       │ d  Go to Downloads          │
+   ◆ pipeline_cache.rs                          │ D  Go to Desktop            │
+  ●◆ swapchain.rs                               │ c  Go to config directory   │
+ ▌ ◆ vulkan_device.rs                           │ /  Go to This PC (drives)   │
+   ◆ 日本語のメモ.txt                           │ j  Jobs overlay             │
+                                                │ r  Resume Claude session    │
+                                                │ w  Claude in terminal split │
+                                                │ a  Claude changes           │
+                                                │ X  Close Claude pane        │
+                                                │ p  Move Claude pane         │
+                                                ╰─────────────────────────────╯
 ────────────────────────────────────────────────────────────────────────────────
  ›                                                        g  12/13 · 1 selected
-   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+   ‹h› parent  ‹l› open  ‹/› filter  ‹:› commands  ‹?› help  ‹q› quit
 --- styles (row cols fg bg mods) ---
   0   1..26  fg=#a9a29a bg=reset
   0  26..63  fg=#e8e3dc bg=reset bold
@@ -50,77 +49,77 @@ expression: "draw(&pending(w, h, &keys), &theme(name))"
   6   3..71  fg=#92c07f bg=reset
   6  71..80  fg=#a9a29a bg=reset
   7   3..5   fg=#a9a29a bg=reset
-  7   5..35  fg=#e8e3dc bg=reset
-  7  35..38  fg=#403a35 bg=reset
-  7  38..40  fg=#d97757 bg=reset bold
-  7  40..80  fg=#403a35 bg=reset
+  7   5..48  fg=#e8e3dc bg=reset
+  7  48..51  fg=#403a35 bg=reset
+  7  51..53  fg=#d97757 bg=reset bold
+  7  53..80  fg=#403a35 bg=reset
   8   3..5   fg=#a9a29a bg=reset
-  8   5..35  fg=#e8e3dc bg=reset
-  8  35..37  fg=#403a35 bg=reset
-  8  37..40  fg=#d97757 bg=reset bold
-  8  40..78  fg=#a9a29a bg=reset
+  8   5..48  fg=#e8e3dc bg=reset
+  8  48..50  fg=#403a35 bg=reset
+  8  50..53  fg=#d97757 bg=reset bold
+  8  53..78  fg=#a9a29a bg=reset
   8  78..80  fg=#403a35 bg=reset
   9   3..5   fg=#a9a29a bg=reset
-  9   5..35  fg=#e8e3dc bg=reset
-  9  35..37  fg=#403a35 bg=reset
-  9  37..40  fg=#d97757 bg=reset bold
-  9  40..78  fg=#a9a29a bg=reset
+  9   5..48  fg=#e8e3dc bg=reset
+  9  48..50  fg=#403a35 bg=reset
+  9  50..53  fg=#d97757 bg=reset bold
+  9  53..78  fg=#a9a29a bg=reset
   9  78..80  fg=#403a35 bg=reset
  10   3..5   fg=#a9a29a bg=reset
- 10   5..35  fg=#a9a29a bg=reset italic
- 10  35..37  fg=#403a35 bg=reset
- 10  37..40  fg=#d97757 bg=reset bold
- 10  40..78  fg=#a9a29a bg=reset
+ 10   5..48  fg=#a9a29a bg=reset italic
+ 10  48..50  fg=#403a35 bg=reset
+ 10  50..53  fg=#d97757 bg=reset bold
+ 10  53..78  fg=#a9a29a bg=reset
  10  78..80  fg=#403a35 bg=reset
  11   3..5   fg=#a9a29a bg=reset
- 11   5..35  fg=#e8e3dc bg=reset
- 11  35..37  fg=#403a35 bg=reset
- 11  37..40  fg=#d97757 bg=reset bold
- 11  40..78  fg=#a9a29a bg=reset
+ 11   5..48  fg=#e8e3dc bg=reset
+ 11  48..50  fg=#403a35 bg=reset
+ 11  50..53  fg=#d97757 bg=reset bold
+ 11  53..78  fg=#a9a29a bg=reset
  11  78..80  fg=#403a35 bg=reset
  12   2..3   fg=#d97757 bg=reset
  12   3..5   fg=#a9a29a bg=reset
- 12   5..35  fg=#d97757 bg=reset bold
- 12  35..37  fg=#403a35 bg=reset
- 12  37..40  fg=#d97757 bg=reset bold
- 12  40..78  fg=#a9a29a bg=reset
+ 12   5..48  fg=#d97757 bg=reset bold
+ 12  48..50  fg=#403a35 bg=reset
+ 12  50..53  fg=#d97757 bg=reset bold
+ 12  53..78  fg=#a9a29a bg=reset
  12  78..80  fg=#403a35 bg=reset
  13   0..1   fg=#e8e3dc bg=#2f2a26
  13   1..3   fg=#d97757 bg=#2f2a26
  13   3..5   fg=#a9a29a bg=#2f2a26
- 13   5..35  fg=#e8e3dc bg=#2f2a26
- 13  35..37  fg=#403a35 bg=reset
- 13  37..40  fg=#d97757 bg=reset bold
- 13  40..78  fg=#a9a29a bg=reset
+ 13   5..48  fg=#e8e3dc bg=#2f2a26
+ 13  48..50  fg=#403a35 bg=reset
+ 13  50..53  fg=#d97757 bg=reset bold
+ 13  53..78  fg=#a9a29a bg=reset
  13  78..79  fg=#403a35 bg=reset
  13  79..80  fg=#e8e3dc bg=#2f2a26
  14   3..5   fg=#a9a29a bg=reset
- 14   5..35  fg=#e8e3dc bg=reset
- 14  35..37  fg=#403a35 bg=reset
- 14  37..40  fg=#d97757 bg=reset bold
- 14  40..78  fg=#a9a29a bg=reset
+ 14   5..48  fg=#e8e3dc bg=reset
+ 14  48..50  fg=#403a35 bg=reset
+ 14  50..53  fg=#d97757 bg=reset bold
+ 14  53..78  fg=#a9a29a bg=reset
  14  78..80  fg=#403a35 bg=reset
- 15  35..37  fg=#403a35 bg=reset
- 15  37..40  fg=#d97757 bg=reset bold
- 15  40..78  fg=#a9a29a bg=reset
+ 15  48..50  fg=#403a35 bg=reset
+ 15  50..53  fg=#d97757 bg=reset bold
+ 15  53..78  fg=#a9a29a bg=reset
  15  78..80  fg=#403a35 bg=reset
- 16  35..37  fg=#403a35 bg=reset
- 16  37..40  fg=#d97757 bg=reset bold
- 16  40..78  fg=#a9a29a bg=reset
+ 16  48..50  fg=#403a35 bg=reset
+ 16  50..53  fg=#d97757 bg=reset bold
+ 16  53..78  fg=#a9a29a bg=reset
  16  78..80  fg=#403a35 bg=reset
- 17  35..37  fg=#403a35 bg=reset
- 17  37..40  fg=#d97757 bg=reset bold
- 17  40..78  fg=#a9a29a bg=reset
+ 17  48..50  fg=#403a35 bg=reset
+ 17  50..53  fg=#d97757 bg=reset bold
+ 17  53..78  fg=#a9a29a bg=reset
  17  78..80  fg=#403a35 bg=reset
- 18  35..37  fg=#403a35 bg=reset
- 18  37..40  fg=#d97757 bg=reset bold
- 18  40..78  fg=#a9a29a bg=reset
+ 18  48..50  fg=#403a35 bg=reset
+ 18  50..53  fg=#d97757 bg=reset bold
+ 18  53..78  fg=#a9a29a bg=reset
  18  78..80  fg=#403a35 bg=reset
- 19  35..37  fg=#403a35 bg=reset
- 19  37..40  fg=#d97757 bg=reset bold
- 19  40..78  fg=#a9a29a bg=reset
+ 19  48..50  fg=#403a35 bg=reset
+ 19  50..53  fg=#d97757 bg=reset bold
+ 19  53..78  fg=#a9a29a bg=reset
  19  78..80  fg=#403a35 bg=reset
- 20  35..80  fg=#403a35 bg=reset
+ 20  48..80  fg=#403a35 bg=reset
  21   0..80  fg=#403a35 bg=reset
  22   1..61  fg=#d97757 bg=reset bold
  22  61..80  fg=#a9a29a bg=reset
@@ -129,11 +128,11 @@ expression: "draw(&pending(w, h, &keys), &theme(name))"
  23   5..16  fg=#716b64 bg=reset
  23  16..17  fg=#a9a29a bg=reset
  23  17..26  fg=#716b64 bg=reset
- 23  26..31  fg=#a9a29a bg=reset
- 23  31..40  fg=#716b64 bg=reset
- 23  40..41  fg=#a9a29a bg=reset
- 23  41..52  fg=#716b64 bg=reset
- 23  52..55  fg=#a9a29a bg=reset
- 23  55..66  fg=#716b64 bg=reset
- 23  66..67  fg=#a9a29a bg=reset
- 23  67..80  fg=#716b64 bg=reset
+ 23  26..27  fg=#a9a29a bg=reset
+ 23  27..38  fg=#716b64 bg=reset
+ 23  38..39  fg=#a9a29a bg=reset
+ 23  39..52  fg=#716b64 bg=reset
+ 23  52..53  fg=#a9a29a bg=reset
+ 23  53..62  fg=#716b64 bg=reset
+ 23  62..63  fg=#a9a29a bg=reset
+ 23  63..80  fg=#716b64 bg=reset

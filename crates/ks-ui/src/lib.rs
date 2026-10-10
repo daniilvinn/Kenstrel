@@ -4,6 +4,7 @@ pub mod claude;
 pub mod fileops;
 pub mod format;
 pub mod help;
+mod hints;
 pub mod icons;
 pub mod images;
 pub mod list;

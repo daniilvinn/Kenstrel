@@ -110,8 +110,8 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::ForegroundDone { id, error } => {
             fileops::on_foreground_done(state, id, error, &mut effects);
         }
-        Msg::OpenHandlers { path, names } => {
-            fileops::on_open_handlers(state, path, names, &mut effects);
+        Msg::OpenHandlers { paths, names } => {
+            fileops::on_open_handlers(state, paths, names, &mut effects);
         }
         Msg::BulkPlanned(result) => fileops::on_bulk_planned(state, result, &mut effects),
         Msg::Preview(msg) => preview::on_preview(state, msg),
@@ -176,11 +176,15 @@ fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Eff
             state.which_key_visible = false;
             state.dirty = true;
             let gen = state.which_key_gen.bump();
-            effects.push(Effect::StartTimer {
-                kind: TimerKind::WhichKey,
-                gen,
-                delay: Duration::from_millis(state.config.ui.which_key_delay_ms),
-            });
+            // The popup belongs to the main screen: with an overlay on top (help's own
+            // `g g`, the pager, the jobs list) it would only float behind that overlay.
+            if state.overlays.is_empty() {
+                effects.push(Effect::StartTimer {
+                    kind: TimerKind::WhichKey,
+                    gen,
+                    delay: Duration::from_millis(state.config.ui.which_key_delay_ms),
+                });
+            }
         }
         // An unbound key with nothing pending changes nothing, so it costs no redraw.
         Resolution::NoMatch => {
@@ -250,6 +254,13 @@ pub(crate) fn set_status(
     text: String,
     effects: &mut Vec<Effect>,
 ) {
+    // Every status toast passes through here; warnings and errors also go to the log file so
+    // they can be found after the toast expired.
+    match level {
+        Level::Error => tracing::error!(status = %text, "error shown to the user"),
+        Level::Warning => tracing::warn!(status = %text, "warning shown to the user"),
+        _ => {}
+    }
     let gen = state.status_gen.bump();
     state.status = Some(Status { level, text, gen });
     state.dirty = true;
@@ -672,5 +683,63 @@ mod tests {
         assert!(s.keymap.apply_overrides(&overrides).is_empty());
         key(&mut s, "x");
         assert_eq!(s.quit, Some(QuitKind::Exit));
+    }
+
+    /// Every event a global capture subscriber saw: `(level, status text)`.
+    static CAPTURED: std::sync::Mutex<Vec<(tracing::Level, String)>> =
+        std::sync::Mutex::new(Vec::new());
+
+    struct Capture;
+
+    impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Capture {
+        fn on_event(
+            &self,
+            event: &tracing::Event<'_>,
+            _: tracing_subscriber::layer::Context<'_, S>,
+        ) {
+            struct Text(String);
+            impl tracing::field::Visit for Text {
+                fn record_debug(
+                    &mut self,
+                    field: &tracing::field::Field,
+                    value: &dyn std::fmt::Debug,
+                ) {
+                    if field.name() == "status" {
+                        self.0 = format!("{value:?}");
+                    }
+                }
+            }
+            let mut text = Text(String::new());
+            event.record(&mut text);
+            if let Ok(mut seen) = CAPTURED.lock() {
+                seen.push((*event.metadata().level(), text.0));
+            }
+        }
+    }
+
+    #[test]
+    fn warnings_and_errors_are_logged_but_info_is_not() {
+        use tracing_subscriber::layer::SubscriberExt;
+        // A global subscriber (not a scoped one) so that callsite interest caching by tests
+        // running in parallel cannot hide the events; the texts below are unique to this test.
+        let _ =
+            tracing::subscriber::set_global_default(tracing_subscriber::registry().with(Capture));
+        let mut s = state();
+        let mut fx = Vec::new();
+        set_status(&mut s, Level::Info, "log-test-fine".into(), &mut fx);
+        set_status(&mut s, Level::Warning, "log-test-careful".into(), &mut fx);
+        set_status(&mut s, Level::Error, "log-test-broken".into(), &mut fx);
+        let seen: Vec<_> = CAPTURED
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, text)| text.contains("log-test-"))
+            .cloned()
+            .collect();
+        assert_eq!(seen.len(), 2, "{seen:?}");
+        assert_eq!(seen[0].0, tracing::Level::WARN);
+        assert!(seen[0].1.contains("careful"));
+        assert_eq!(seen[1].0, tracing::Level::ERROR);
+        assert!(seen[1].1.contains("broken"));
     }
 }
