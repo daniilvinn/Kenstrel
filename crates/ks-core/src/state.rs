@@ -5,6 +5,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+use crate::claude::ClaudeState;
 use crate::config::Config;
 use crate::drives::DrivesView;
 use crate::generation::{Gen, GenCounter};
@@ -116,6 +117,8 @@ pub struct AppState {
     pub drives: DrivesView,
     /// Git status of `cwd`, when it is inside a repository.
     pub git: Option<GitSnapshot>,
+    /// Claude Code integration (PLAN section 10).
+    pub claude: ClaudeState,
     pub(crate) history: History,
     /// Where the cursor was in directories left earlier (by entry name).
     pub(crate) cursor_memory: HashMap<PathBuf, OsString>,
@@ -133,6 +136,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(params: StartParams) -> Self {
         let view = DirView::new(params.config.sort.clone(), params.config.files.show_hidden);
+        let claude = ClaudeState::new(&params.config.claude);
         Self {
             cwd: params.cwd,
             home: params.home,
@@ -155,6 +159,7 @@ impl AppState {
             show_drives: false,
             drives: DrivesView::default(),
             git: None,
+            claude,
             history: History::default(),
             cursor_memory: HashMap::new(),
             nav: None,
@@ -170,7 +175,11 @@ impl AppState {
 
     /// Rows available to the list at the current terminal size.
     pub fn viewport_height(&self) -> usize {
-        usize::from(layout::body_height(self.size))
+        // A bottom Claude pane takes rows from the list.
+        usize::from(crate::claude::list_height(
+            self,
+            layout::body_height(self.size),
+        ))
     }
 
     /// The keymap context that receives the next key: the topmost overlay, else the mode.

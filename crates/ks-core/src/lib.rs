@@ -4,6 +4,7 @@
 //! tested by feeding [`Msg`]s to [`update`] and asserting on the resulting [`AppState`].
 
 pub mod action;
+pub mod claude;
 pub mod config;
 pub mod cursor;
 pub mod drives;
@@ -23,6 +24,10 @@ pub mod update;
 pub mod view;
 
 pub use action::Action;
+pub use claude::{
+    ClaudeDialog, ClaudePhase, ClaudePreflight, ClaudeRequest, ClaudeResponse, ClaudeScreen,
+    ClaudeSpawn, ClaudeState, IpcContext,
+};
 pub use config::Config;
 pub use drives::{DriveInfo, DriveKind, DrivesView};
 pub use effect::Effect;

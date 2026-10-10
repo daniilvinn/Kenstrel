@@ -124,6 +124,18 @@ impl DirView {
         self.reveal = name;
     }
 
+    /// Moves the cursor onto the shown entry called `name` right now (no pending reveal).
+    /// Returns false when no shown entry has that name.
+    pub fn reveal_now(&mut self, name: &OsStr, height: usize) -> bool {
+        let Some(index) = self.position_of(name) else {
+            return false;
+        };
+        self.cursor.set(index, self.visible.len());
+        self.cursor.reveal(self.visible.len(), height);
+        self.moved(height);
+        true
+    }
+
     /// Adds a streamed chunk of a fresh listing.
     pub fn push_chunk(&mut self, mut chunk: Vec<Entry>, height: usize) {
         sort_entries(&mut chunk, &self.sort);

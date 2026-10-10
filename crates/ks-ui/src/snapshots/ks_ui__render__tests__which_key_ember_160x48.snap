@@ -49,7 +49,7 @@ expression: "draw(&s, &theme(name))"
 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  ›                                                                                                                                        g  12/13 · 1 selected
-   ‹g› Jump to top  ‹h› Go to home directory  ‹d› Go to Downloads  ‹D› Go to Desktop  ‹c› Go to config directory  ‹/› Go to This PC (drives)  ‹j› Jobs overlay
+   ‹g› Jump to top  ‹h› Go to home directory  ‹d› Go to Downloads  ‹D› Go to Desktop  ‹c› Go to config directory  ‹/› Go to This PC (drives)  ‹j› Jobs overlay…
 --- styles (row cols fg bg mods) ---
   0   1..26  fg=#a9a29a bg=reset
   0  26..143 fg=#e8e3dc bg=reset bold

@@ -108,6 +108,19 @@ actions! {
     // Claude Code (phase 10)
     ClaudeOpen => "claude.open", "Open Claude";
     ClaudeSendMarked => "claude.send_marked", "Send marked files to Claude";
+    ClaudeResume => "claude.resume", "Resume last Claude session";
+    ClaudeSplit => "claude.split", "Open Claude in Windows Terminal split";
+    ClaudeFocus => "claude.focus", "Toggle focus between explorer and Claude";
+    ClaudeClose => "claude.close", "Close Claude pane";
+    ClaudeGrow => "claude.grow", "Grow Claude pane";
+    ClaudeShrink => "claude.shrink", "Shrink Claude pane";
+    ClaudePosition => "claude.position", "Move Claude pane (bottom / right)";
+    ClaudeScrollUp => "claude.scroll_up", "Scroll Claude pane up";
+    ClaudeScrollDown => "claude.scroll_down", "Scroll Claude pane down";
+    ClaudeChanges => "claude.changes", "Claude changes";
+    ClaudeChangesClear => "claude.changes_clear", "Clear Claude changes";
+    ClaudeProceed => "claude.proceed", "Proceed with API billing anyway";
+    ClaudeChangesDiff => "claude.changes_diff", "Toggle the git diff in the Claude changes view";
     // Generic
     Cancel => "cancel", "Cancel / close";
     Accept => "accept", "Accept / confirm";

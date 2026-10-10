@@ -6,10 +6,11 @@
 use std::time::Duration;
 
 use crate::action::Action;
+use crate::claude;
 use crate::config::SortKey;
 use crate::effect::Effect;
 use crate::keymap::{Invocation, Resolution};
-use crate::mode::Mode;
+use crate::mode::{KeyContext, Mode};
 use crate::msg::{Msg, TimerKind};
 use crate::nav;
 use crate::state::{AppState, Level, QuitKind, Status};
@@ -29,6 +30,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             if state.size != size {
                 state.size = size;
                 nav::fit_viewport(state);
+                claude::sync_layout(state, &mut effects);
             }
             state.dirty = true;
         }
@@ -64,6 +66,26 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::ChildCounts { gen, counts } => nav::on_child_counts(state, gen, counts),
         Msg::DirChanged { gen } => nav::on_dir_changed(state, &mut effects, gen),
         Msg::GitStatus { gen, snapshot } => nav::on_git_status(state, gen, snapshot),
+        Msg::Paste(text) => claude::on_paste(state, text, &mut effects),
+        Msg::ClaudePreflight { generation, result } => {
+            claude::on_preflight(state, generation, result, &mut effects);
+        }
+        Msg::ClaudeStarted { generation } => claude::on_started(state, generation, &mut effects),
+        Msg::ClaudeLaunchFailed {
+            generation,
+            message,
+        } => claude::on_launch_failed(state, generation, &message, &mut effects),
+        Msg::ClaudeScreen { generation, screen } => claude::on_screen(state, generation, *screen),
+        Msg::ClaudePaneExited { generation, code } => {
+            claude::on_exited(state, generation, code, &mut effects);
+        }
+        Msg::ClaudeIpc { id, request } => claude::on_ipc(state, id, request, &mut effects),
+        Msg::ClaudeReveal { path } => claude::on_reveal(state, &path, &mut effects),
+        Msg::ClaudeDiff { path, text } => claude::on_diff(state, &path, text),
+        Msg::ClaudeSendPaths(paths) => claude::send_paths(state, paths, &mut effects),
+        Msg::ClaudeSendRange { path, start, end } => {
+            claude::send_range(state, path, start, end, &mut effects);
+        }
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
@@ -94,7 +116,10 @@ fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Eff
         }
         // An unbound key with nothing pending changes nothing, so it costs no redraw.
         Resolution::NoMatch => {
-            if clear_pending(state, effects) {
+            // The Claude pane has focus: whatever the keymap does not claim goes to Claude.
+            if ctx == KeyContext::Claude && state.pending.is_empty() {
+                claude::forward_key(state, key, effects);
+            } else if clear_pending(state, effects) {
                 state.dirty = true;
             }
         }
@@ -157,6 +182,9 @@ pub(crate) fn set_status(
 }
 
 fn run_action(state: &mut AppState, invocation: Invocation, effects: &mut Vec<Effect>) {
+    if claude::handle_action(state, invocation.action, effects) {
+        return;
+    }
     match invocation.action {
         Action::Quit => state.quit = Some(QuitKind::Exit),
         Action::QuitCd => state.quit = Some(QuitKind::ChangeDir),

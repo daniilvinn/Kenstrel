@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Context, Result};
 use crossterm::event::Event;
-use futures_util::{Stream, StreamExt};
+use futures_util::{FutureExt, Stream, StreamExt};
 use ks_core::{update, AppState, Msg, QuitKind};
 use ks_ui::Theme;
 use ratatui::backend::Backend;
@@ -15,8 +15,9 @@ use ratatui::Terminal;
 use tokio::sync::mpsc;
 use tokio::time::{interval, interval_at, sleep, Instant, MissedTickBehavior};
 
+use crate::claude::ClaudeOptions;
 use crate::effects::EffectRunner;
-use crate::input::translate_event;
+use crate::input::{coalesce_burst, is_paste_key, translate_event, translate_key};
 
 /// Redraws are capped at roughly 60 frames per second.
 pub const FRAME_INTERVAL: Duration = Duration::from_millis(16);
@@ -27,11 +28,14 @@ pub const CLOCK_INTERVAL: Duration = Duration::from_secs(30);
 
 const MSG_QUEUE: usize = 256;
 
+#[derive(Default)]
 pub struct LoopOptions {
     /// Messages to process before the first frame (start-up notices).
     pub startup: Vec<Msg>,
     /// Panic right after the first frame (`--debug-panic`).
     pub panic_after_first_frame: bool,
+    /// Where the Claude integration keeps its files.
+    pub claude: ClaudeOptions,
 }
 
 /// Runs until the state requests quit, returning how.
@@ -48,7 +52,7 @@ where
     E: Stream<Item = std::io::Result<Event>>,
 {
     let (tx, mut rx) = mpsc::channel::<Msg>(MSG_QUEUE);
-    let mut runner = EffectRunner::new(tx.clone());
+    let mut runner = EffectRunner::new(tx.clone()).with_claude(options.claude);
     spawn_interrupt_listener(tx);
     let mut events = std::pin::pin!(events);
 
@@ -101,15 +105,43 @@ where
             () = sleep(frame_due.unwrap_or_default()), if frame_due.is_some() => None,
         };
 
+        // Windows never reports bracketed pastes: with the Claude pane focused, a run of text
+        // keys that are all ready at once is turned into a paste (see `coalesce_burst`).
+        let mut ordered: std::collections::VecDeque<Msg> = std::collections::VecDeque::new();
+        match first {
+            Some(Msg::Key(chord)) if is_paste_key(chord) && ks_core::claude::has_focus(state) => {
+                let mut run = vec![chord];
+                let mut after = None;
+                while let Some(Some(Ok(event))) = events.next().now_or_never() {
+                    match event {
+                        Event::Key(key) => match translate_key(key) {
+                            Some(c) if is_paste_key(c) => run.push(c),
+                            Some(c) => {
+                                after = Some(Msg::Key(c));
+                                break;
+                            }
+                            None => {}
+                        },
+                        other => {
+                            after = translate_event(other);
+                            break;
+                        }
+                    }
+                }
+                ordered.extend(coalesce_burst(run));
+                ordered.extend(after);
+            }
+            other => ordered.extend(other),
+        }
+
         // Apply everything that is already waiting before drawing, so a burst of input
         // costs one frame.
-        let mut next = first;
         loop {
-            if let Some(msg) = next {
+            while let Some(msg) = ordered.pop_front() {
                 runner.run(update(state, msg));
             }
             match rx.try_recv() {
-                Ok(msg) => next = Some(msg),
+                Ok(msg) => ordered.push_back(msg),
                 Err(_) => break,
             }
         }
@@ -167,6 +199,7 @@ mod tests {
         LoopOptions {
             startup: Vec::new(),
             panic_after_first_frame: false,
+            claude: ClaudeOptions::default(),
         }
     }
 
@@ -248,6 +281,7 @@ mod tests {
                 text: "config.toml: bad".into(),
             }],
             panic_after_first_frame: false,
+            claude: ClaudeOptions::default(),
         };
         let (result, terminal) =
             drive(vec![key('q', KeyEventKind::Press)], &mut state, options).await;
@@ -264,6 +298,7 @@ mod tests {
                 text: "hello".into(),
             }],
             panic_after_first_frame: false,
+            claude: ClaudeOptions::default(),
         };
         let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
         let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
@@ -318,6 +353,7 @@ mod tests {
         let options = LoopOptions {
             startup: Vec::new(),
             panic_after_first_frame: true,
+            claude: ClaudeOptions::default(),
         };
         let _ = drive(vec![], &mut state, options).await;
     }

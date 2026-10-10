@@ -1,8 +1,10 @@
 //! Everything that can happen to the app, as plain data.
 
 use std::ffi::OsString;
+use std::path::PathBuf;
 use std::time::SystemTime;
 
+use crate::claude::{ClaudePreflight, ClaudeRequest, ClaudeScreen};
 use crate::drives::DriveInfo;
 use crate::entry::Entry;
 use crate::error::FsError;
@@ -80,5 +82,53 @@ pub enum Msg {
     GitStatus {
         gen: Gen,
         snapshot: Option<Box<GitSnapshot>>,
+    },
+    /// Text pasted into the terminal (bracketed paste, only enabled while a pane has focus).
+    Paste(String),
+    /// `claude auth status` finished.
+    ClaudePreflight {
+        generation: u64,
+        result: ClaudePreflight,
+    },
+    /// The embedded `claude` process is running.
+    ClaudeStarted {
+        generation: u64,
+    },
+    /// The embedded `claude` process could not be started.
+    ClaudeLaunchFailed {
+        generation: u64,
+        message: String,
+    },
+    /// The embedded terminal changed (coalesced and rate limited by the runner).
+    ClaudeScreen {
+        generation: u64,
+        screen: Box<ClaudeScreen>,
+    },
+    /// The embedded `claude` process exited.
+    ClaudePaneExited {
+        generation: u64,
+        code: Option<u32>,
+    },
+    /// A request from Claude's MCP / hook process; answer with `Effect::ClaudeIpcReply { id, .. }`.
+    ClaudeIpc {
+        id: u64,
+        request: ClaudeRequest,
+    },
+    /// Show `path` in the explorer, cursor on it (an MCP `reveal` that was verified to exist).
+    ClaudeReveal {
+        path: PathBuf,
+    },
+    /// The git diff of `path` for the Claude changes view (answer to `Effect::ClaudeDiff`).
+    ClaudeDiff {
+        path: PathBuf,
+        text: String,
+    },
+    /// Type `@` mentions for these paths into the pane (focusing it).
+    ClaudeSendPaths(Vec<PathBuf>),
+    /// Type an `@path#Lstart-end` mention (visual mode in the preview, a search hit).
+    ClaudeSendRange {
+        path: PathBuf,
+        start: usize,
+        end: usize,
     },
 }

@@ -32,6 +32,7 @@ pub enum Overlay {
     Confirm,
     Jobs,
     Claude,
+    ClaudeChanges,
 }
 
 /// Selects which keymap table handles a key press.
@@ -48,6 +49,7 @@ pub enum KeyContext {
     Confirm,
     Jobs,
     Claude,
+    ClaudeChanges,
 }
 
 impl KeyContext {
@@ -63,6 +65,7 @@ impl KeyContext {
         KeyContext::Confirm,
         KeyContext::Jobs,
         KeyContext::Claude,
+        KeyContext::ClaudeChanges,
     ];
 
     /// Name used for the `[keymap.<name>]` table in `config.toml`.
@@ -79,6 +82,7 @@ impl KeyContext {
             KeyContext::Confirm => "confirm",
             KeyContext::Jobs => "jobs",
             KeyContext::Claude => "claude",
+            KeyContext::ClaudeChanges => "claude_changes",
         }
     }
 
@@ -130,6 +134,7 @@ impl From<Overlay> for KeyContext {
             Overlay::Confirm => KeyContext::Confirm,
             Overlay::Jobs => KeyContext::Jobs,
             Overlay::Claude => KeyContext::Claude,
+            Overlay::ClaudeChanges => KeyContext::ClaudeChanges,
         }
     }
 }

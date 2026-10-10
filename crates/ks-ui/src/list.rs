@@ -142,10 +142,20 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
     if entry.is_dir {
         name.push('/');
     }
+    // A file Claude edited gets a glyph at the end of the name column (PLAN 10e).
+    let touched = crate::claude::touched_glyph(entry, state);
+    let name_width = if touched.is_some() {
+        name_width.saturating_sub(crate::claude::TOUCHED_WIDTH)
+    } else {
+        name_width
+    };
     let name = truncate_middle(&name, name_width, !entry.is_dir);
     let padding = name_width.saturating_sub(width(&name));
     spans.push(span(name, name_style));
     spans.push(span(" ".repeat(padding), Style::new()));
+    if let Some(glyph) = touched {
+        spans.push(span(format!(" {glyph}"), theme.accent_style()));
+    }
 
     if columns.size {
         spans.push(span(" ".into(), Style::new()));

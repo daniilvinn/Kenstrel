@@ -1,0 +1,199 @@
+---
+source: crates/ks-ui/src/claude.rs
+expression: rendered
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+──────────╭ Claude changes ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮──────────
+   ◆ curre│ ▌◆ Write new_pass.rs                                                                                                                     │5-02-02
+   ◆ passe│  ◆ Edit  vulkan_device.rs                                                                                                                │ 5h ago M
+   ◆ shade│ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── │5-03-12 !
+   ◆ a_rat│ diff --git a/vulkan_device.rs b/vulkan_device.rs                                                                                         │5-03-11
+   ◆ build│ --- a/vulkan_device.rs                                                                                                                   │5-03-05
+   ◆ descr│ +++ b/vulkan_device.rs                                                                                                                   │sterday +
+   ◆ mod.r│ @@ -1,3 +1,3 @@                                                                                                                          │4-02-08
+   ◆ new_p│  fn main() {                                                                                                                             │ 1m ago ?
+   ◆ photo│ -    old();                                                                                                                              │5-02-22
+   ◆ pipel│ +    new();                                                                                                                              │ust now
+  ●◆ swapc│  }                                                                                                                                       │12m ago
+ ▌ ◆ vulka│                                                                                                                                          │ 3h ago M
+   ◆ 日本語                                                                                                                                          │ 2h ago
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+          │                                                                                                                                          │
+──────────│  2 files · enter reveal · d hide diff · X clear · esc close                                                                              │──────────
+ ›        ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯ selected
+   ‹enter› reveal  ‹j› down  ‹k› up  ‹X› clear  ‹esc› close
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..143 fg=#e8e3dc bg=reset bold
+  0 143..148 fg=#a9a29a bg=reset bold
+  0 148..151 fg=#a9a29a bg=reset
+  0 151..154 fg=#92c07f bg=reset
+  0 154..157 fg=#e5b567 bg=reset
+  0 157..160 fg=#c9a27f bg=reset
+  1   0..10  fg=#403a35 bg=reset
+  1  10..12  fg=#8f5c47 bg=reset
+  1  12..27  fg=#d97757 bg=reset bold
+  1  27..150 fg=#8f5c47 bg=reset
+  1 150..160 fg=#403a35 bg=reset
+  2   3..5   fg=#7fa8c9 bg=reset
+  2   5..10  fg=#b799d9 bg=reset
+  2  10..12  fg=#8f5c47 bg=reset
+  2  12..15  fg=#d97757 bg=#2f2a26
+  2  15..21  fg=#a9a29a bg=#2f2a26
+  2  21..149 fg=#e8e3dc bg=#2f2a26
+  2 149..150 fg=#8f5c47 bg=reset
+  2 150..160 fg=#716b64 bg=reset
+  3   3..10  fg=#7fa8c9 bg=reset
+  3  10..13  fg=#8f5c47 bg=reset
+  3  13..15  fg=#d97757 bg=reset
+  3  15..21  fg=#a9a29a bg=reset
+  3  21..149 fg=#e8e3dc bg=reset
+  3 149..151 fg=#8f5c47 bg=reset
+  3 151..158 fg=#716b64 bg=reset
+  3 158..160 fg=#e5b567 bg=reset
+  4   3..10  fg=#7fa8c9 bg=reset
+  4  10..12  fg=#8f5c47 bg=reset
+  4  12..149 fg=#403a35 bg=reset
+  4 149..150 fg=#8f5c47 bg=reset
+  4 150..158 fg=#716b64 bg=reset
+  4 158..160 fg=#625c56 bg=reset
+  5   3..5   fg=#a9a29a bg=reset
+  5   5..10  fg=#e8e3dc bg=reset
+  5  10..12  fg=#8f5c47 bg=reset
+  5  12..149 fg=#e8e3dc bg=reset
+  5 149..150 fg=#8f5c47 bg=reset
+  5 150..160 fg=#716b64 bg=reset
+  6   3..10  fg=#92c07f bg=reset
+  6  10..12  fg=#8f5c47 bg=reset
+  6  12..149 fg=#a9a29a bg=reset
+  6 149..150 fg=#8f5c47 bg=reset
+  6 150..160 fg=#716b64 bg=reset
+  7   3..5   fg=#a9a29a bg=reset
+  7   5..10  fg=#e8e3dc bg=reset
+  7  10..12  fg=#8f5c47 bg=reset
+  7  12..149 fg=#a9a29a bg=reset
+  7 149..150 fg=#8f5c47 bg=reset
+  7 150..158 fg=#716b64 bg=reset
+  7 158..160 fg=#92c07f bg=reset
+  8   3..5   fg=#a9a29a bg=reset
+  8   5..10  fg=#e8e3dc bg=reset
+  8  10..12  fg=#8f5c47 bg=reset
+  8  12..149 fg=#d97757 bg=reset
+  8 149..150 fg=#8f5c47 bg=reset
+  8 150..160 fg=#716b64 bg=reset
+  9   3..5   fg=#a9a29a bg=reset
+  9   5..10  fg=#e8e3dc bg=reset
+  9  10..13  fg=#8f5c47 bg=reset
+  9  13..149 fg=#e8e3dc bg=reset
+  9 149..151 fg=#8f5c47 bg=reset
+  9 151..158 fg=#716b64 bg=reset
+  9 158..160 fg=#c9a27f bg=reset
+ 10   3..5   fg=#a9a29a bg=reset
+ 10   5..10  fg=#a9a29a bg=reset italic
+ 10  10..12  fg=#8f5c47 bg=reset
+ 10  12..149 fg=#e8707a bg=reset
+ 10 149..150 fg=#8f5c47 bg=reset
+ 10 150..160 fg=#716b64 bg=reset
+ 11   3..5   fg=#a9a29a bg=reset
+ 11   5..10  fg=#e8e3dc bg=reset
+ 11  10..12  fg=#8f5c47 bg=reset
+ 11  12..149 fg=#92c07f bg=reset
+ 11 149..150 fg=#8f5c47 bg=reset
+ 11 150..160 fg=#716b64 bg=reset
+ 12   2..3   fg=#d97757 bg=reset
+ 12   3..5   fg=#a9a29a bg=reset
+ 12   5..10  fg=#d97757 bg=reset bold
+ 12  10..13  fg=#8f5c47 bg=reset
+ 12  13..149 fg=#e8e3dc bg=reset
+ 12 149..150 fg=#8f5c47 bg=reset
+ 12 150..160 fg=#716b64 bg=reset
+ 13   0..1   fg=#e8e3dc bg=#2f2a26
+ 13   1..3   fg=#d97757 bg=#2f2a26
+ 13   3..5   fg=#a9a29a bg=#2f2a26
+ 13   5..10  fg=#e8e3dc bg=#2f2a26
+ 13  10..150 fg=#8f5c47 bg=reset
+ 13 150..157 fg=#716b64 bg=#2f2a26
+ 13 157..158 fg=#e8e3dc bg=#2f2a26
+ 13 158..159 fg=#e5b567 bg=#2f2a26
+ 13 159..160 fg=#e8e3dc bg=#2f2a26
+ 14   3..5   fg=#a9a29a bg=reset
+ 14   5..149 fg=#e8e3dc bg=reset
+ 14 149..151 fg=#8f5c47 bg=reset
+ 14 151..160 fg=#716b64 bg=reset
+ 15  10..160 fg=#8f5c47 bg=reset
+ 16  10..160 fg=#8f5c47 bg=reset
+ 17  10..160 fg=#8f5c47 bg=reset
+ 18  10..160 fg=#8f5c47 bg=reset
+ 19  10..160 fg=#8f5c47 bg=reset
+ 20  10..160 fg=#8f5c47 bg=reset
+ 21  10..160 fg=#8f5c47 bg=reset
+ 22  10..160 fg=#8f5c47 bg=reset
+ 23  10..160 fg=#8f5c47 bg=reset
+ 24  10..160 fg=#8f5c47 bg=reset
+ 25  10..160 fg=#8f5c47 bg=reset
+ 26  10..160 fg=#8f5c47 bg=reset
+ 27  10..160 fg=#8f5c47 bg=reset
+ 28  10..160 fg=#8f5c47 bg=reset
+ 29  10..160 fg=#8f5c47 bg=reset
+ 30  10..160 fg=#8f5c47 bg=reset
+ 31  10..160 fg=#8f5c47 bg=reset
+ 32  10..160 fg=#8f5c47 bg=reset
+ 33  10..160 fg=#8f5c47 bg=reset
+ 34  10..160 fg=#8f5c47 bg=reset
+ 35  10..160 fg=#8f5c47 bg=reset
+ 36  10..160 fg=#8f5c47 bg=reset
+ 37  10..160 fg=#8f5c47 bg=reset
+ 38  10..160 fg=#8f5c47 bg=reset
+ 39  10..160 fg=#8f5c47 bg=reset
+ 40  10..160 fg=#8f5c47 bg=reset
+ 41  10..160 fg=#8f5c47 bg=reset
+ 42  10..160 fg=#8f5c47 bg=reset
+ 43  10..160 fg=#8f5c47 bg=reset
+ 44  10..160 fg=#8f5c47 bg=reset
+ 45   0..10  fg=#403a35 bg=reset
+ 45  10..13  fg=#8f5c47 bg=reset
+ 45  13..149 fg=#716b64 bg=reset
+ 45 149..150 fg=#8f5c47 bg=reset
+ 45 150..160 fg=#403a35 bg=reset
+ 46   1..10  fg=#d97757 bg=reset bold
+ 46  10..151 fg=#8f5c47 bg=reset
+ 46 151..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..9   fg=#a9a29a bg=reset
+ 47   9..20  fg=#716b64 bg=reset
+ 47  20..21  fg=#a9a29a bg=reset
+ 47  21..30  fg=#716b64 bg=reset
+ 47  30..31  fg=#a9a29a bg=reset
+ 47  31..38  fg=#716b64 bg=reset
+ 47  38..39  fg=#a9a29a bg=reset
+ 47  39..49  fg=#716b64 bg=reset
+ 47  49..52  fg=#a9a29a bg=reset
+ 47  52..160 fg=#716b64 bg=reset

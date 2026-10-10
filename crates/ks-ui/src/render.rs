@@ -44,7 +44,12 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
 
     render_header(frame, header, state, theme);
     render_rule(frame, top_rule, theme);
-    render_list(frame, body, state, theme);
+    // The Claude pane takes its room first; later layout (the preview) splits the list area.
+    let (list_area, pane) = crate::claude::split_body(body, state);
+    render_list(frame, list_area, state, theme);
+    if let Some((pane_rect, split)) = pane {
+        crate::claude::render_pane(frame, pane_rect, split, state, theme);
+    }
     render_rule(frame, bottom_rule, theme);
     render_prompt(frame, prompt, state, theme);
     if show_hint {
@@ -53,6 +58,7 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
         // No hint line on a short terminal: the choices replace the lower rule instead.
         render_hints(frame, bottom_rule, state, theme);
     }
+    crate::claude::render_overlays(frame, state, theme);
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
@@ -273,6 +279,19 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::HiddenToggle, "hidden"),
             (Action::GoDrives, "drives"),
             (Action::Quit, "quit"),
+        ],
+        (KeyContext::Claude, _) => &[
+            (Action::ClaudeFocus, "explorer"),
+            (Action::ClaudeGrow, "grow"),
+            (Action::ClaudeShrink, "shrink"),
+            (Action::ClaudeScrollUp, "scroll"),
+        ],
+        (KeyContext::ClaudeChanges, _) => &[
+            (Action::Accept, "reveal"),
+            (Action::CursorDown, "down"),
+            (Action::CursorUp, "up"),
+            (Action::ClaudeChangesClear, "clear"),
+            (Action::Cancel, "close"),
         ],
         (KeyContext::Visual, _) => &[
             (Action::CursorDown, "down"),

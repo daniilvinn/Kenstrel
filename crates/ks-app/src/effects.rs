@@ -10,6 +10,8 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 
 use ks_core::{Effect, Gen, Level, Msg, TimerKind};
+
+use crate::claude::{ClaudeHost, ClaudeOptions};
 use ks_fs::DirWatcher;
 use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
@@ -31,16 +33,31 @@ pub struct EffectRunner {
     shutdown: CancellationToken,
     timers: HashMap<TimerKind, CancellationToken>,
     slots: HashMap<Slot, CancellationToken>,
+    /// Performs the `Effect::Claude*` requests (PLAN section 10).
+    claude: ClaudeHost,
 }
 
 impl EffectRunner {
     pub fn new(tx: Sender<Msg>) -> Self {
         Self {
+            claude: ClaudeHost::new(tx.clone(), ClaudeOptions::default()),
             tx,
             shutdown: CancellationToken::new(),
             timers: HashMap::new(),
             slots: HashMap::new(),
         }
+    }
+
+    /// Replaces the Claude host with one using `options` (file locations).
+    #[must_use]
+    pub fn with_claude(mut self, options: ClaudeOptions) -> Self {
+        self.claude = ClaudeHost::new(self.tx.clone(), options);
+        self
+    }
+
+    /// The Claude host, for tests.
+    pub fn claude(&mut self) -> &mut ClaudeHost {
+        &mut self.claude
     }
 
     /// Starts the given effects. Must be called from within a tokio runtime.
@@ -78,12 +95,27 @@ impl EffectRunner {
                 }
                 Effect::GitStatus { gen, dir } => self.git_status(gen, dir),
                 Effect::CountChildren { gen, dir, names } => self.count_children(gen, dir, names),
+                claude @ (Effect::SetBracketedPaste(_)
+                | Effect::ClaudePreflight { .. }
+                | Effect::ClaudeLaunch { .. }
+                | Effect::ClaudeWtSplit { .. }
+                | Effect::ClaudeKey(_)
+                | Effect::ClaudePaste(_)
+                | Effect::ClaudeSendPaths { .. }
+                | Effect::ClaudeSendRange { .. }
+                | Effect::ClaudeResize { .. }
+                | Effect::ClaudeScroll { .. }
+                | Effect::ClaudeClose { .. }
+                | Effect::ClaudeIpcReply { .. }
+                | Effect::ClaudeDiff { .. }
+                | Effect::ClaudeIpcWork { .. }) => self.claude.run(claude),
             }
         }
     }
 
     /// Cancels everything still running.
     pub fn shutdown(&mut self) {
+        self.claude.shutdown();
         self.shutdown.cancel();
         self.timers.clear();
         self.slots.clear();

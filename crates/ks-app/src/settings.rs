@@ -94,6 +94,28 @@ pub fn discover_places(paths: &AppPaths, home: Option<PathBuf>) -> Places {
     }
 }
 
+/// Rebinds the Claude focus toggle to `[claude] focus_key` in the contexts where it lives. An
+/// explicit `[keymap.*]` entry in the same config still wins (it is applied afterwards).
+pub fn apply_claude_focus_key(keymap: &mut Keymap, focus_key: &str) {
+    use ks_core::config::DEFAULT_CLAUDE_FOCUS_KEY;
+    if focus_key == DEFAULT_CLAUDE_FOCUS_KEY {
+        return;
+    }
+    let tables = ["normal", "claude"].map(|ctx| {
+        (
+            ctx.to_owned(),
+            std::collections::BTreeMap::from([
+                (DEFAULT_CLAUDE_FOCUS_KEY.to_owned(), "none".to_owned()),
+                (focus_key.to_owned(), "claude.focus".to_owned()),
+            ]),
+        )
+    });
+    let issues = keymap.apply_overrides(&tables.into_iter().collect());
+    for issue in issues {
+        tracing::warn!(issue, "claude focus key rejected");
+    }
+}
+
 /// Everything needed to run, plus start-up messages for the status line.
 pub struct Session {
     pub state: AppState,
@@ -118,6 +140,7 @@ pub fn build_session(inputs: SessionInputs<'_>) -> Session {
     let mut problems: Vec<String> = loaded.problem.into_iter().collect();
 
     let mut keymap = Keymap::defaults();
+    apply_claude_focus_key(&mut keymap, &loaded.config.claude.focus_key);
     let issues = keymap.apply_overrides(&loaded.config.keymap);
     for issue in &issues {
         tracing::warn!(issue, "keymap override rejected");
@@ -298,6 +321,43 @@ mod tests {
         let session = build_session(inputs(&paths, ColorDepth::Indexed256));
         assert_eq!(session.startup, [Msg::Start]);
         assert_eq!(session.theme.name, "ember");
+    }
+
+    #[test]
+    fn the_claude_focus_key_is_configurable() {
+        use ks_core::config::DEFAULT_CLAUDE_FOCUS_KEY;
+        use ks_core::keymap::{Invocation, Resolution};
+
+        let (_dir, paths) = paths();
+        write_config(
+            &paths,
+            "[claude]
+focus_key = \"ctrl-]\"
+",
+        );
+        let session = build_session(inputs(&paths, ColorDepth::TrueColor));
+        assert_eq!(session.startup, [Msg::Start], "the config is valid");
+        let focus = Resolution::Action(Invocation {
+            action: Action::ClaudeFocus,
+            arg: None,
+        });
+        let keymap = &session.state.keymap;
+        for ctx in [KeyContext::Normal, KeyContext::Claude] {
+            assert_eq!(keymap.resolve(ctx, &[], "ctrl-]".parse().unwrap()), focus);
+            // The old key is free again (in the pane it reaches Claude).
+            assert_eq!(
+                keymap.resolve(ctx, &[], DEFAULT_CLAUDE_FOCUS_KEY.parse().unwrap()),
+                Resolution::NoMatch
+            );
+        }
+        // Unchanged default: nothing is rewritten.
+        let defaults = Keymap::defaults();
+        let mut same = Keymap::defaults();
+        apply_claude_focus_key(&mut same, DEFAULT_CLAUDE_FOCUS_KEY);
+        assert_eq!(
+            same.bindings(KeyContext::Claude).len(),
+            defaults.bindings(KeyContext::Claude).len()
+        );
     }
 
     #[test]

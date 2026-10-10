@@ -475,6 +475,14 @@ pub const DEFAULT_BINDINGS: &[(KeyContext, &str, &str)] = &[
     (C::Normal, "K", "preview.scroll_up"),
     (C::Normal, "c", "claude.open"),
     (C::Normal, "C", "claude.send_marked"),
+    (C::Normal, "g r", "claude.resume"),
+    (C::Normal, "g w", "claude.split"),
+    (C::Normal, "g a", "claude.changes"),
+    (C::Normal, "g X", "claude.close"),
+    (C::Normal, "g p", "claude.position"),
+    (C::Normal, "ctrl-\\", "claude.focus"),
+    (C::Normal, "alt-=", "claude.grow"),
+    (C::Normal, "alt--", "claude.shrink"),
     (C::Normal, "q", "quit"),
     (C::Normal, "Q", "quit.cd"),
     (C::Normal, "ctrl-c", "quit"),
@@ -504,9 +512,33 @@ pub const DEFAULT_BINDINGS: &[(KeyContext, &str, &str)] = &[
     (C::Confirm, "esc", "cancel"),
     (C::Confirm, "ctrl-c", "cancel"),
     (C::Confirm, "enter", "accept"),
+    // The Claude billing warning needs an explicit `y` (enter only closes information dialogs).
+    (C::Confirm, "y", "claude.proceed"),
     (C::Jobs, "esc", "cancel"),
     (C::Jobs, "q", "cancel"),
     (C::Jobs, "x", "job.cancel"),
+    // Claude pane (P10). While the pane has focus every key that is not bound here goes to
+    // Claude verbatim, so only the keys below are ever intercepted.
+    (C::Claude, "ctrl-\\", "claude.focus"),
+    (C::Claude, "alt-=", "claude.grow"),
+    (C::Claude, "alt--", "claude.shrink"),
+    (C::Claude, "shift-pageup", "claude.scroll_up"),
+    (C::Claude, "shift-pagedown", "claude.scroll_down"),
+    // "Claude changes" view.
+    (C::ClaudeChanges, "esc", "cancel"),
+    (C::ClaudeChanges, "q", "cancel"),
+    (C::ClaudeChanges, "ctrl-c", "cancel"),
+    (C::ClaudeChanges, "enter", "accept"),
+    (C::ClaudeChanges, "j", "cursor.down"),
+    (C::ClaudeChanges, "down", "cursor.down"),
+    (C::ClaudeChanges, "k", "cursor.up"),
+    (C::ClaudeChanges, "up", "cursor.up"),
+    (C::ClaudeChanges, "g g", "cursor.top"),
+    (C::ClaudeChanges, "home", "cursor.top"),
+    (C::ClaudeChanges, "G", "cursor.bottom"),
+    (C::ClaudeChanges, "end", "cursor.bottom"),
+    (C::ClaudeChanges, "X", "claude.changes_clear"),
+    (C::ClaudeChanges, "d", "claude.changes_diff"),
 ];
 
 impl Keymap {

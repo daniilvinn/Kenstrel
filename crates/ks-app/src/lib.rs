@@ -3,10 +3,12 @@
 //! The binary (`ks`) is a thin wrapper around [`run`]; everything else lives here so it can
 //! be tested.
 
+pub mod claude;
 pub mod cli;
 pub mod effects;
 pub mod event_loop;
 pub mod input;
+pub mod ipc_work;
 pub mod logging;
 pub mod paths;
 pub mod settings;
@@ -71,6 +73,10 @@ pub fn run(cli: &Cli) -> Result<()> {
             LoopOptions {
                 startup: session.startup,
                 panic_after_first_frame: cli.debug_panic,
+                claude: claude::ClaudeOptions {
+                    sessions_file: Some(claude::sessions_file(paths.state_dir())),
+                    ..claude::ClaudeOptions::default()
+                },
             },
         ))
     };

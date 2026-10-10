@@ -173,6 +173,71 @@ impl Default for UiConfig {
     }
 }
 
+/// Where the embedded Claude pane sits relative to the file list.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PanePosition {
+    /// Below the list.
+    #[default]
+    Bottom,
+    /// To the right of the list.
+    Right,
+}
+
+impl PanePosition {
+    pub const fn toggled(self) -> Self {
+        match self {
+            PanePosition::Bottom => PanePosition::Right,
+            PanePosition::Right => PanePosition::Bottom,
+        }
+    }
+}
+
+/// Environment variables removed from every `claude` child so the subscription login is used
+/// (PLAN §10.1). Kept in sync with `ks_claude::DEFAULT_STRIP_ENV` by a test in `ks-app`.
+pub const DEFAULT_CLAUDE_STRIP_ENV: &[&str] = &[
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "CLAUDE_CODE_USE_FOUNDRY",
+];
+
+/// The default key that moves keyboard focus between the explorer and the Claude pane.
+pub const DEFAULT_CLAUDE_FOCUS_KEY: &str = "ctrl-\\";
+
+/// Claude Code integration (PLAN §10).
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ClaudeConfig {
+    /// Path of the `claude` executable. Empty means: look it up on `PATH`.
+    pub binary: String,
+    /// Environment variables removed from the `claude` child process.
+    pub strip_env: Vec<String>,
+    /// Where the embedded pane is drawn.
+    pub pane_position: PanePosition,
+    /// Share of the body the pane takes, in percent (15..=85).
+    pub pane_percent: u16,
+    /// Key that toggles focus between the explorer and the pane.
+    pub focus_key: String,
+}
+
+impl Default for ClaudeConfig {
+    fn default() -> Self {
+        Self {
+            binary: String::new(),
+            strip_env: DEFAULT_CLAUDE_STRIP_ENV
+                .iter()
+                .map(|s| (*s).to_owned())
+                .collect(),
+            pane_position: PanePosition::Bottom,
+            pane_percent: 40,
+            focus_key: DEFAULT_CLAUDE_FOCUS_KEY.to_owned(),
+        }
+    }
+}
+
 /// `[keymap.<context>]` tables: key sequence to action id (or `"none"`).
 pub type KeymapOverrides = BTreeMap<String, BTreeMap<String, String>>;
 
@@ -189,6 +254,7 @@ pub struct Config {
     pub layout: LayoutConfig,
     pub editor: EditorConfig,
     pub ui: UiConfig,
+    pub claude: ClaudeConfig,
     pub keymap: KeymapOverrides,
 }
 
@@ -203,6 +269,7 @@ impl Default for Config {
             layout: LayoutConfig::default(),
             editor: EditorConfig::default(),
             ui: UiConfig::default(),
+            claude: ClaudeConfig::default(),
             keymap: KeymapOverrides::new(),
         }
     }
@@ -230,6 +297,28 @@ impl Config {
         }
         if self.theme.trim().is_empty() {
             return Err(ConfigError::Invalid("theme must not be empty".to_owned()));
+        }
+        let claude = &self.claude;
+        if !(15..=85).contains(&claude.pane_percent) {
+            return Err(ConfigError::Invalid(format!(
+                "claude.pane_percent must be between 15 and 85, got {}",
+                claude.pane_percent
+            )));
+        }
+        if claude.focus_key.parse::<crate::key::KeyChord>().is_err() {
+            return Err(ConfigError::Invalid(format!(
+                "claude.focus_key `{}` is not a valid key",
+                claude.focus_key
+            )));
+        }
+        if let Some(bad) = claude
+            .strip_env
+            .iter()
+            .find(|n| n.is_empty() || n.contains('='))
+        {
+            return Err(ConfigError::Invalid(format!(
+                "claude.strip_env entry `{bad}` is not a variable name"
+            )));
         }
         Ok(())
     }
@@ -289,6 +378,10 @@ mod tests {
             ("[layout]\nlist_percent = 5", "list_percent"),
             ("[preview]\nmax_lines = 0", "max_lines"),
             ("theme = \"\"", "theme"),
+            ("[claude]\npane_percent = 99", "pane_percent"),
+            ("[claude]\nfocus_key = \"ctrl-wat\"", "focus_key"),
+            ("[claude]\nstrip_env = [\"A=B\"]", "strip_env"),
+            ("[claude]\npane_position = \"top\"", "top"),
         ] {
             let err = Config::from_toml(text).unwrap_err().to_string();
             assert!(err.contains(needle), "`{text}` -> {err}");
