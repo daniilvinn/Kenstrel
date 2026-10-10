@@ -26,6 +26,8 @@ pub const SPINNER_INTERVAL: Duration = Duration::from_millis(100);
 pub const CLOCK_INTERVAL: Duration = Duration::from_secs(30);
 
 const MSG_QUEUE: usize = 256;
+/// How long quitting waits for the state files to be written.
+const STATE_FLUSH_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub struct LoopOptions {
     /// Messages to process before the first frame (start-up notices).
@@ -34,7 +36,8 @@ pub struct LoopOptions {
     pub panic_after_first_frame: bool,
 }
 
-/// Runs until the state requests quit, returning how.
+/// Runs until the state requests quit, returning how. Bookmarks and frecency are neither
+/// loaded nor saved (see [`run_with_state`]).
 pub async fn run<B, E>(
     terminal: &mut Terminal<B>,
     events: E,
@@ -47,8 +50,29 @@ where
     B::Error: Send + Sync + 'static,
     E: Stream<Item = std::io::Result<Event>>,
 {
+    run_with_state(terminal, events, state, theme, options, None).await
+}
+
+/// [`run`], persisting bookmarks and frecency in `state_dir` (loaded in the background after
+/// start, the last changes flushed on exit).
+pub async fn run_with_state<B, E>(
+    terminal: &mut Terminal<B>,
+    events: E,
+    state: &mut AppState,
+    theme: &Theme,
+    options: LoopOptions,
+    state_dir: Option<std::path::PathBuf>,
+) -> Result<QuitKind>
+where
+    B: Backend,
+    B::Error: Send + Sync + 'static,
+    E: Stream<Item = std::io::Result<Event>>,
+{
     let (tx, mut rx) = mpsc::channel::<Msg>(MSG_QUEUE);
     let mut runner = EffectRunner::new(tx.clone());
+    if let Some(dir) = state_dir {
+        runner.set_state_dir(dir);
+    }
     spawn_interrupt_listener(tx);
     let mut events = std::pin::pin!(events);
 
@@ -115,7 +139,13 @@ where
         }
     };
 
+    // The last visits are still inside the save debounce: write them now.
+    runner.run(ks_core::pending_writes(state));
     runner.shutdown();
+    let finish = tokio::task::spawn_blocking(move || {
+        runner.finish_state_writes(STATE_FLUSH_TIMEOUT);
+    });
+    let _ = finish.await;
     Ok(outcome)
 }
 

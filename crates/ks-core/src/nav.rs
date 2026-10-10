@@ -94,7 +94,7 @@ pub(crate) fn start(state: &mut AppState, effects: &mut Vec<Effect>) {
     request(state, effects, Location::Dir(cwd), NavKind::Visit, None);
 }
 
-fn request(
+pub(crate) fn request(
     state: &mut AppState,
     effects: &mut Vec<Effect>,
     target: Location,
@@ -128,7 +128,7 @@ fn request(
 
 /// Cancels a pending history move, putting the entry it popped back where it came from so
 /// a superseding navigation does not lose it.
-fn abandon_history_nav(state: &mut AppState) {
+pub(crate) fn abandon_history_nav(state: &mut AppState) {
     let Some(pending) = state
         .nav
         .take_if(|p| matches!(p.kind, NavKind::Back(_) | NavKind::Forward(_)))
@@ -241,7 +241,7 @@ pub(crate) fn go_place(state: &mut AppState, effects: &mut Vec<Effect>, action: 
     }
 }
 
-fn refresh(state: &mut AppState, effects: &mut Vec<Effect>) {
+pub(crate) fn refresh(state: &mut AppState, effects: &mut Vec<Effect>) {
     let cwd = state.cwd.clone();
     request(state, effects, Location::Dir(cwd), NavKind::Refresh, None);
 }
@@ -294,6 +294,7 @@ fn commit_dir(state: &mut AppState, effects: &mut Vec<Effect>, pending: PendingN
         return;
     };
     leave_current(state, &pending.kind, &Location::Dir(path.clone()));
+    crate::aids::record_visit(state, effects, &path);
     state.cwd = path.clone();
     state.show_drives = false;
     let mut view = DirView::new(state.view.sort.clone(), state.view.show_hidden);
@@ -417,7 +418,12 @@ fn navigation_failed(
     match &target {
         // A directory in the way vanished while we climbed out of another one: keep climbing.
         Location::Dir(path) if climbing && vanished(error) => climb(state, effects, path.clone()),
-        _ => report_open_failure(state, effects, &target, error),
+        _ => {
+            if let (Location::Dir(path), true) = (&target, vanished(error)) {
+                crate::aids::forget_dir(state, effects, path);
+            }
+            report_open_failure(state, effects, &target, error);
+        }
     }
 }
 

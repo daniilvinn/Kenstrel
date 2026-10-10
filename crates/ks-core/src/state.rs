@@ -5,6 +5,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+use crate::aids::NavAids;
 use crate::config::Config;
 use crate::drives::DrivesView;
 use crate::generation::{Gen, GenCounter};
@@ -14,6 +15,7 @@ use crate::keymap::Keymap;
 use crate::layout;
 use crate::mode::{KeyContext, Mode, Overlay};
 use crate::nav::{History, PendingNav};
+use crate::tabs::Tabs;
 use crate::view::DirView;
 
 /// Terminal size in cells.
@@ -111,6 +113,10 @@ pub struct AppState {
     pub utc_offset_secs: i32,
     /// Entries of `cwd`.
     pub view: DirView,
+    /// The other tabs (the active tab's data is in the fields of this struct).
+    pub tabs: Tabs,
+    /// Bookmarks, frecency database and the overlays built on them.
+    pub aids: NavAids,
     /// The "This PC" view is shown instead of `view`.
     pub show_drives: bool,
     pub drives: DrivesView,
@@ -152,6 +158,8 @@ impl AppState {
             now: params.now,
             utc_offset_secs: params.utc_offset_secs,
             view,
+            tabs: Tabs::default(),
+            aids: NavAids::default(),
             show_drives: false,
             drives: DrivesView::default(),
             git: None,

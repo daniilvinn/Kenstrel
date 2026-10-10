@@ -456,6 +456,7 @@ pub const DEFAULT_BINDINGS: &[(KeyContext, &str, &str)] = &[
     (C::Normal, "S e", "sort.ext"),
     (C::Normal, "m <char>", "bookmark.set"),
     (C::Normal, "' <char>", "bookmark.jump"),
+    (C::Normal, "M", "bookmark.list"),
     (C::Normal, "z", "frecency.jump"),
     (C::Normal, "t", "tab.new"),
     (C::Normal, "1", "tab.goto:1"),
@@ -507,6 +508,27 @@ pub const DEFAULT_BINDINGS: &[(KeyContext, &str, &str)] = &[
     (C::Jobs, "esc", "cancel"),
     (C::Jobs, "q", "cancel"),
     (C::Jobs, "x", "job.cancel"),
+    // Bookmark list.
+    (C::Bookmarks, "esc", "cancel"),
+    (C::Bookmarks, "ctrl-c", "cancel"),
+    (C::Bookmarks, "q", "cancel"),
+    (C::Bookmarks, "enter", "accept"),
+    (C::Bookmarks, "j", "cursor.down"),
+    (C::Bookmarks, "down", "cursor.down"),
+    (C::Bookmarks, "k", "cursor.up"),
+    (C::Bookmarks, "up", "cursor.up"),
+    (C::Bookmarks, "d", "bookmark.delete"),
+    (C::Bookmarks, "delete", "bookmark.delete"),
+    // Frecency jump: every other key is text for the query.
+    (C::Jump, "esc", "cancel"),
+    (C::Jump, "ctrl-c", "cancel"),
+    (C::Jump, "enter", "accept"),
+    (C::Jump, "down", "cursor.down"),
+    (C::Jump, "ctrl-n", "cursor.down"),
+    (C::Jump, "ctrl-j", "cursor.down"),
+    (C::Jump, "up", "cursor.up"),
+    (C::Jump, "ctrl-p", "cursor.up"),
+    (C::Jump, "ctrl-k", "cursor.up"),
 ];
 
 impl Keymap {

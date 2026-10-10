@@ -7,6 +7,7 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use crate::aids::StateFile;
 use crate::generation::Gen;
 use crate::msg::TimerKind;
 
@@ -41,4 +42,9 @@ pub enum Effect {
         dir: PathBuf,
         names: Vec<OsString>,
     },
+    /// Read the bookmarks and the frecency database from the state directory, reporting
+    /// `Msg::NavDataLoaded`.
+    LoadNavData,
+    /// Atomically replace a state file with `contents`. Writes are applied in order.
+    WriteState { file: StateFile, contents: String },
 }

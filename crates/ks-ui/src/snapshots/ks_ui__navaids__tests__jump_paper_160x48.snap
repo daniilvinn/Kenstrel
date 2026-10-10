@@ -1,0 +1,166 @@
+---
+source: crates/ks-ui/src/navaids.rs
+expression: "draw(&s, &theme(name))"
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   ◆ current/                                                                                                                                      2025-02-02
+   ◆ passes/                                                                                                                                     7     5h ago M
+   ◆ shaders/                                                                                                                                   12 2025-03-12 !
+   ◆ a_rather_long_file_name_that_must_be_cut_in_the_middle_of_the_list_row.rs                                                             75.2 KB 2025-03-11
+   ◆ build.ps1                                                                                                                              1.9 KB 2025-03-05
+   ◆ descriptors.rs                                                                                                                         6.1 KB  yesterday +
+   ◆ mod.rs                                                                                                                                  412 B 2024-02-08
+   ◆ new_pass.rs                                                                                                                               0 B     1m ago ?
+   ◆ photo_from_phone.jpg                                                                                                                   4.0 MB 2025-02-22
+   ◆ pipeline_cache.rs                                                                                                                      3.3 KB   just now
+  ●◆ swapchain.rs                                                                                                                           9.8 KB    12m ago
+ ▌ ◆ vulkan_device.rs                                                                                                                      14.2 KB     3h ago M
+   ◆ 日本語のメモ.txt                                                                                                                        220 B     2h ago
+                              ╭ Jump to directory ───────────────────────────────────────────────────────────────────────────────╮
+                              │ ›                                                                                              6 │
+                              │──────────────────────────────────────────────────────────────────────────────────────────────────│
+                              │▌ ~/code/kestrel                                                                                  │
+                              │  ~/Downloads                                                                                     │
+                              │  ~/code/kestrel/crates/ks-core                                                                   │
+                              │  /mnt/work/a/very/long/path/that/will/not/fit/in/the/box/at/all/ever/projects                    │
+                              │  D:/Games/日本語のフォルダ                                                                       │
+                              │                                                                                                  │
+                              │                                                                                                  │
+                              │                                                                                                  │
+                              │                                                                                                  │
+                              │                                                                                                  │
+                              │                                                                                                  │
+                              │                                                                                                  │
+                              │                                                                                                  │
+                              │                                                                                                  │
+                              ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                                           12/13 · 1 selected
+   ‹enter› jump  ‹down› next  ‹up› previous  ‹esc› close
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..143 fg=#2b2724 bg=reset bold
+  0 143..148 fg=#6b645d bg=reset bold
+  0 148..151 fg=#6b645d bg=reset
+  0 151..154 fg=#3d7a3a bg=reset
+  0 154..157 fg=#a86f12 bg=reset
+  0 157..160 fg=#8a6a3f bg=reset
+  1   0..160 fg=#d4ccc2 bg=reset
+  2   3..5   fg=#2f6690 bg=reset
+  2   5..147 fg=#7a4fa3 bg=reset
+  2 147..160 fg=#958e86 bg=reset
+  3   3..145 fg=#2f6690 bg=reset
+  3 145..151 fg=#6b645d bg=reset
+  3 151..158 fg=#958e86 bg=reset
+  3 158..160 fg=#a86f12 bg=reset
+  4   3..144 fg=#2f6690 bg=reset
+  4 144..147 fg=#6b645d bg=reset
+  4 147..158 fg=#958e86 bg=reset
+  4 158..160 fg=#a39c94 bg=reset
+  5   3..5   fg=#6b645d bg=reset
+  5   5..139 fg=#2b2724 bg=reset
+  5 139..147 fg=#6b645d bg=reset
+  5 147..160 fg=#958e86 bg=reset
+  6   3..140 fg=#3d7a3a bg=reset
+  6 140..147 fg=#6b645d bg=reset
+  6 147..160 fg=#958e86 bg=reset
+  7   3..5   fg=#6b645d bg=reset
+  7   5..140 fg=#2b2724 bg=reset
+  7 140..148 fg=#6b645d bg=reset
+  7 148..158 fg=#958e86 bg=reset
+  7 158..160 fg=#3d7a3a bg=reset
+  8   3..5   fg=#6b645d bg=reset
+  8   5..141 fg=#2b2724 bg=reset
+  8 141..147 fg=#6b645d bg=reset
+  8 147..160 fg=#958e86 bg=reset
+  9   3..5   fg=#6b645d bg=reset
+  9   5..143 fg=#2b2724 bg=reset
+  9 143..151 fg=#6b645d bg=reset
+  9 151..158 fg=#958e86 bg=reset
+  9 158..160 fg=#8a6a3f bg=reset
+ 10   3..5   fg=#6b645d bg=reset
+ 10   5..140 fg=#6b645d bg=reset italic
+ 10 140..147 fg=#6b645d bg=reset
+ 10 147..160 fg=#958e86 bg=reset
+ 11   3..5   fg=#6b645d bg=reset
+ 11   5..140 fg=#2b2724 bg=reset
+ 11 140..149 fg=#6b645d bg=reset
+ 11 149..160 fg=#958e86 bg=reset
+ 12   2..3   fg=#c4623f bg=reset
+ 12   3..5   fg=#6b645d bg=reset
+ 12   5..140 fg=#c4623f bg=reset bold
+ 12 140..150 fg=#6b645d bg=reset
+ 12 150..160 fg=#958e86 bg=reset
+ 13   0..1   fg=#2b2724 bg=#ece5dc
+ 13   1..3   fg=#c4623f bg=#ece5dc
+ 13   3..5   fg=#6b645d bg=#ece5dc
+ 13   5..137 fg=#2b2724 bg=#ece5dc
+ 13 137..146 fg=#6b645d bg=#ece5dc
+ 13 146..147 fg=#2b2724 bg=#ece5dc
+ 13 147..157 fg=#958e86 bg=#ece5dc
+ 13 157..158 fg=#2b2724 bg=#ece5dc
+ 13 158..159 fg=#a86f12 bg=#ece5dc
+ 13 159..160 fg=#2b2724 bg=#ece5dc
+ 14   3..5   fg=#6b645d bg=reset
+ 14   5..141 fg=#2b2724 bg=reset
+ 14 141..151 fg=#6b645d bg=reset
+ 14 151..160 fg=#958e86 bg=reset
+ 15  30..32  fg=#d4ccc2 bg=reset
+ 15  32..50  fg=#2b2724 bg=reset bold
+ 15  50..160 fg=#d4ccc2 bg=reset
+ 16  30..32  fg=#d4ccc2 bg=reset
+ 16  32..127 fg=#c4623f bg=reset bold
+ 16 127..129 fg=#958e86 bg=reset
+ 16 129..160 fg=#d4ccc2 bg=reset
+ 17  30..160 fg=#d4ccc2 bg=reset
+ 18  30..31  fg=#d4ccc2 bg=reset
+ 18  31..32  fg=#c4623f bg=#ece5dc
+ 18  32..129 fg=#2b2724 bg=#ece5dc
+ 18 129..160 fg=#d4ccc2 bg=reset
+ 19  30..33  fg=#d4ccc2 bg=reset
+ 19  33..129 fg=#2b2724 bg=reset
+ 19 129..160 fg=#d4ccc2 bg=reset
+ 20  30..33  fg=#d4ccc2 bg=reset
+ 20  33..129 fg=#2b2724 bg=reset
+ 20 129..160 fg=#d4ccc2 bg=reset
+ 21  30..33  fg=#d4ccc2 bg=reset
+ 21  33..129 fg=#2b2724 bg=reset
+ 21 129..160 fg=#d4ccc2 bg=reset
+ 22  30..33  fg=#d4ccc2 bg=reset
+ 22  33..129 fg=#2b2724 bg=reset
+ 22 129..160 fg=#d4ccc2 bg=reset
+ 23  30..160 fg=#d4ccc2 bg=reset
+ 24  30..160 fg=#d4ccc2 bg=reset
+ 25  30..160 fg=#d4ccc2 bg=reset
+ 26  30..160 fg=#d4ccc2 bg=reset
+ 27  30..160 fg=#d4ccc2 bg=reset
+ 28  30..160 fg=#d4ccc2 bg=reset
+ 29  30..160 fg=#d4ccc2 bg=reset
+ 30  30..160 fg=#d4ccc2 bg=reset
+ 31  30..160 fg=#d4ccc2 bg=reset
+ 32  30..160 fg=#d4ccc2 bg=reset
+ 45   0..160 fg=#d4ccc2 bg=reset
+ 46   1..141 fg=#c4623f bg=reset bold
+ 46 141..160 fg=#6b645d bg=reset
+ 47   3..4   fg=#958e86 bg=reset
+ 47   4..9   fg=#6b645d bg=reset
+ 47   9..18  fg=#958e86 bg=reset
+ 47  18..22  fg=#6b645d bg=reset
+ 47  22..31  fg=#958e86 bg=reset
+ 47  31..33  fg=#6b645d bg=reset
+ 47  33..46  fg=#958e86 bg=reset
+ 47  46..49  fg=#6b645d bg=reset
+ 47  49..160 fg=#958e86 bg=reset

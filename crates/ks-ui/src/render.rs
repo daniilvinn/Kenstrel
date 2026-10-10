@@ -53,11 +53,12 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
         // No hint line on a short terminal: the choices replace the lower rule instead.
         render_hints(frame, bottom_rule, state, theme);
     }
+    crate::navaids::render_overlays(frame, state, theme);
 }
 
 fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme) {
     // The git summary sits on the right and is never elided; the path gives way.
-    let right = if state.show_drives {
+    let mut right = if state.show_drives {
         Vec::new()
     } else {
         state
@@ -66,6 +67,13 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme)
             .map(|git| git_summary(git, state.config.icons, theme))
             .unwrap_or_default()
     };
+    let tabs = crate::navaids::tab_strip(state, theme);
+    if !tabs.is_empty() {
+        if !right.is_empty() {
+            right.push(Span::raw("  "));
+        }
+        right.extend(tabs);
+    }
     let right_width: usize = right.iter().map(|s| width(&s.content)).sum();
     let reserved = if right_width > 0 { right_width + 3 } else { 0 };
     let budget = usize::from(area.width).saturating_sub(2 + reserved);
@@ -279,6 +287,17 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::CursorUp, "up"),
             (Action::VisualToggle, "done"),
             (Action::Cancel, "cancel"),
+        ],
+        (KeyContext::Bookmarks, _) => &[
+            (Action::Accept, "jump"),
+            (Action::BookmarkDelete, "delete"),
+            (Action::Cancel, "close"),
+        ],
+        (KeyContext::Jump, _) => &[
+            (Action::Accept, "jump"),
+            (Action::CursorDown, "next"),
+            (Action::CursorUp, "previous"),
+            (Action::Cancel, "close"),
         ],
         _ => &[(Action::Cancel, "cancel")],
     }

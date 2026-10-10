@@ -3,6 +3,7 @@
 pub mod format;
 pub mod icons;
 pub mod list;
+pub mod navaids;
 pub mod render;
 pub mod text;
 pub mod theme;

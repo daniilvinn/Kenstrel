@@ -18,6 +18,11 @@ pub struct Cli {
     #[arg(long, value_name = "FILE")]
     pub cwd_file: Option<PathBuf>,
 
+    /// Print the shell function that makes `Q` change the shell's directory, then exit.
+    /// Add its output to your profile (see the README).
+    #[arg(long, value_name = "SHELL", value_enum)]
+    pub print_shell_init: Option<crate::shell_init::Shell>,
+
     /// Panic right after the first frame, to test that the terminal is restored.
     #[arg(long, hide = true)]
     pub debug_panic: bool,
@@ -40,6 +45,18 @@ mod tests {
     fn defaults_are_empty() {
         let cli = Cli::try_parse_from(["ks"]).unwrap();
         assert!(cli.path.is_none() && cli.cwd_file.is_none() && !cli.debug_panic);
+        assert!(cli.print_shell_init.is_none());
+    }
+
+    #[test]
+    fn print_shell_init_takes_a_shell() {
+        use crate::shell_init::Shell;
+        let cli = Cli::try_parse_from(["ks", "--print-shell-init", "powershell"]).unwrap();
+        assert_eq!(cli.print_shell_init, Some(Shell::Powershell));
+        let cli = Cli::try_parse_from(["ks", "--print-shell-init=bash"]).unwrap();
+        assert_eq!(cli.print_shell_init, Some(Shell::Bash));
+        assert!(Cli::try_parse_from(["ks", "--print-shell-init", "cmd"]).is_err());
+        assert!(Cli::try_parse_from(["ks", "--print-shell-init"]).is_err());
     }
 
     #[test]

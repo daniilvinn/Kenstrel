@@ -100,6 +100,8 @@ actions! {
     // Navigation aids
     BookmarkSet => "bookmark.set", "Set bookmark";
     BookmarkJump => "bookmark.jump", "Jump to bookmark";
+    BookmarkList => "bookmark.list", "List bookmarks";
+    BookmarkDelete => "bookmark.delete", "Delete bookmark";
     FrecencyJump => "frecency.jump", "Frecency jump";
     // Tabs
     TabNew => "tab.new", "New tab";

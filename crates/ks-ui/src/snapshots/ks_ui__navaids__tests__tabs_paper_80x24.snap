@@ -1,0 +1,91 @@
+---
+source: crates/ks-ui/src/navaids.rs
+expression: "draw(&s, &theme(name))"
+---
+ ~/projects/omniforce/src/renderer                                      1 ▏2 ▏3
+────────────────────────────────────────────────────────────────────────────────
+   ◆ current/
+   ◆ passes/                                                                7
+   ◆ shaders/                                                              12
+   ◆ a_rather_long_file_name_that_must_be_cut_in_the_middle…_row.rs   75.2 KB
+   ◆ build.ps1                                                         1.9 KB
+   ◆ descriptors.rs                                                    6.1 KB
+   ◆ mod.rs                                                             412 B
+   ◆ new_pass.rs                                                          0 B
+   ◆ photo_from_phone.jpg                                              4.0 MB
+   ◆ pipeline_cache.rs                                                 3.3 KB
+   ◆ swapchain.rs                                                      9.8 KB
+ ▌ ◆ vulkan_device.rs                                                 14.2 KB
+   ◆ 日本語のメモ.txt                                                   220 B
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ›                                                                        12/13
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..72  fg=#2b2724 bg=reset bold
+  0  72..74  fg=#6b645d bg=reset
+  0  74..75  fg=#958e86 bg=reset
+  0  75..77  fg=#c4623f bg=reset bold
+  0  77..78  fg=#958e86 bg=reset
+  0  78..80  fg=#6b645d bg=reset
+  1   0..80  fg=#d4ccc2 bg=reset
+  2   3..5   fg=#2f6690 bg=reset
+  2   5..80  fg=#7a4fa3 bg=reset
+  3   3..76  fg=#2f6690 bg=reset
+  3  76..80  fg=#6b645d bg=reset
+  4   3..75  fg=#2f6690 bg=reset
+  4  75..80  fg=#6b645d bg=reset
+  5   3..5   fg=#6b645d bg=reset
+  5   5..70  fg=#2b2724 bg=reset
+  5  70..80  fg=#6b645d bg=reset
+  6   3..71  fg=#3d7a3a bg=reset
+  6  71..80  fg=#6b645d bg=reset
+  7   3..5   fg=#6b645d bg=reset
+  7   5..71  fg=#2b2724 bg=reset
+  7  71..80  fg=#6b645d bg=reset
+  8   3..5   fg=#6b645d bg=reset
+  8   5..72  fg=#2b2724 bg=reset
+  8  72..80  fg=#6b645d bg=reset
+  9   3..5   fg=#6b645d bg=reset
+  9   5..74  fg=#2b2724 bg=reset
+  9  74..80  fg=#6b645d bg=reset
+ 10   3..5   fg=#6b645d bg=reset
+ 10   5..71  fg=#6b645d bg=reset italic
+ 10  71..80  fg=#6b645d bg=reset
+ 11   3..5   fg=#6b645d bg=reset
+ 11   5..71  fg=#2b2724 bg=reset
+ 11  71..80  fg=#6b645d bg=reset
+ 12   3..5   fg=#6b645d bg=reset
+ 12   5..71  fg=#2b2724 bg=reset
+ 12  71..80  fg=#6b645d bg=reset
+ 13   0..1   fg=#2b2724 bg=#ece5dc
+ 13   1..3   fg=#c4623f bg=#ece5dc
+ 13   3..5   fg=#6b645d bg=#ece5dc
+ 13   5..68  fg=#2b2724 bg=#ece5dc
+ 13  68..77  fg=#6b645d bg=#ece5dc
+ 13  77..80  fg=#2b2724 bg=#ece5dc
+ 14   3..5   fg=#6b645d bg=reset
+ 14   5..72  fg=#2b2724 bg=reset
+ 14  72..80  fg=#6b645d bg=reset
+ 21   0..80  fg=#d4ccc2 bg=reset
+ 22   1..74  fg=#c4623f bg=reset bold
+ 22  74..80  fg=#6b645d bg=reset
+ 23   3..4   fg=#958e86 bg=reset
+ 23   4..5   fg=#6b645d bg=reset
+ 23   5..16  fg=#958e86 bg=reset
+ 23  16..17  fg=#6b645d bg=reset
+ 23  17..26  fg=#958e86 bg=reset
+ 23  26..31  fg=#6b645d bg=reset
+ 23  31..40  fg=#958e86 bg=reset
+ 23  40..41  fg=#6b645d bg=reset
+ 23  41..52  fg=#958e86 bg=reset
+ 23  52..55  fg=#6b645d bg=reset
+ 23  55..66  fg=#958e86 bg=reset
+ 23  66..67  fg=#6b645d bg=reset
+ 23  67..80  fg=#958e86 bg=reset
