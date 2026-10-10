@@ -103,7 +103,8 @@ pub fn resume() -> io::Result<()> {
 }
 
 /// Installs a panic hook that first runs `cleanup` (restoring the terminal), then logs the
-/// panic with a backtrace, then chains to the previous hook, which prints it to stderr.
+/// panic with a backtrace, then, for UI-thread panics only, chains to the previous hook,
+/// which prints it to stderr.
 ///
 /// `cleanup` runs only for panics on the calling (UI) thread: a panic in a background task
 /// is contained by tokio and the app keeps running, so it must not tear the terminal down.
@@ -111,7 +112,8 @@ pub fn install_panic_hook(cleanup: impl Fn() + Send + Sync + 'static) {
     let ui_thread = std::thread::current().id();
     let previous = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
-        if std::thread::current().id() == ui_thread {
+        let on_ui = std::thread::current().id() == ui_thread;
+        if on_ui {
             cleanup();
         }
         tracing::error!(
@@ -119,6 +121,11 @@ pub fn install_panic_hook(cleanup: impl Fn() + Send + Sync + 'static) {
             backtrace = %std::backtrace::Backtrace::force_capture(),
             "panic"
         );
-        previous(info);
+        // The default hook writes to stderr, which is the live screen while the TUI runs: only
+        // the UI thread's panic (after the terminal was restored above) may print. A worker
+        // panic is contained and only goes to the log file.
+        if on_ui {
+            previous(info);
+        }
     }));
 }

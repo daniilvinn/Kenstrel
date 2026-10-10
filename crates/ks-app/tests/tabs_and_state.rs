@@ -320,3 +320,42 @@ async fn the_event_loop_saves_state_on_exit() {
     );
     assert!(loaded.frecency.get(dir.path()).is_some());
 }
+
+/// An error exit (here: the input stream fails) still flushes the debounced state.
+#[tokio::test(flavor = "multi_thread")]
+async fn error_exits_still_flush_state() {
+    let dir = project();
+    let state_dir = tempfile::tempdir().unwrap();
+    let mut state = new_state(dir.path());
+    let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+    let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
+    let events = stream::iter([key('m'), key('b')])
+        .chain(stream::once(async {
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            Err(std::io::Error::other("console gone"))
+        }))
+        .chain(stream::pending());
+    let result = run_with_state(
+        &mut terminal,
+        events,
+        &mut state,
+        &theme,
+        LoopOptions {
+            startup: vec![Msg::Start],
+            panic_after_first_frame: false,
+            foreground: None,
+            claude: ks_app::claude::ClaudeOptions::default(),
+        },
+        None,
+        Some(state_dir.path().to_owned()),
+    )
+    .await;
+    assert!(result.is_err());
+
+    let loaded = StateStore::new(state_dir.path().to_owned()).load();
+    assert_eq!(
+        loaded.bookmarks.get('b').map(PathBuf::from).as_deref(),
+        Some(dir.path())
+    );
+    assert!(loaded.frecency.get(dir.path()).is_some());
+}

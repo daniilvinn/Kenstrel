@@ -160,7 +160,7 @@ In the grep overlay `alt-m` marks the highlighted hit and `alt-c` sends the mark
 | `g j` | jobs overlay: progress, throughput and ETA; `x` cancels the selected job, `c` clears finished ones |
 
 Copy, move and delete run as background jobs with progress in the prompt line. A name conflict
-asks: `o` overwrite, `s` skip, `r` rename, `k` keep both, `a` apply to all remaining, `c` cancel
+asks: `O` (shift) overwrite, `s` skip, `r` rename, `k` keep both, `a` apply to all remaining, `c` cancel
 (`enter` keeps both, `esc` cancels the job). Quitting while jobs run asks first.
 
 The editor is `[editor] open` if set, else `$VISUAL`, then `$EDITOR`, then `code`, then

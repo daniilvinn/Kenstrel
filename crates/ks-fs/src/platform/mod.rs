@@ -75,3 +75,32 @@ mod tests {
         assert_eq!(reparse_tag(&dir), None);
     }
 }
+
+#[cfg(all(test, windows))]
+mod copy_tests {
+    use super::*;
+
+    #[test]
+    fn copy_file_ex_reports_progress_and_can_cancel() {
+        let td = tempfile::tempdir().unwrap();
+        let src = td.path().join("big.bin");
+        std::fs::write(&src, vec![7u8; 64 * 1024 * 1024]).unwrap();
+        let mut calls = 0u32;
+        let mut total = 0u64;
+        let ok = copy_file_ex(&src, &td.path().join("a.bin"), &mut |n| {
+            calls += 1;
+            total += n;
+            true
+        })
+        .unwrap();
+        assert!(ok);
+        assert_eq!(total, 64 * 1024 * 1024);
+        assert!(calls > 1, "progress arrives in chunks");
+        let cancelled = td.path().join("b.bin");
+        let ok = copy_file_ex(&src, &cancelled, &mut |_| false).unwrap();
+        assert!(!ok);
+        assert!(!cancelled.exists(), "system removes the cancelled target");
+        let exists = copy_file_ex(&src, &td.path().join("a.bin"), &mut |_| true);
+        assert!(exists.is_err(), "never overwrites");
+    }
+}

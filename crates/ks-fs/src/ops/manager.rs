@@ -384,6 +384,7 @@ fn empty_report(e: &Entry) -> JobReport {
         bytes_done: 0,
         errors: Vec::new(),
         outcomes: Vec::new(),
+        consumed_sources: Vec::new(),
         elapsed: Duration::ZERO,
     }
 }

@@ -18,8 +18,9 @@ use windows::Win32::Security::{
     LookupAccountSidW, OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID, SID_NAME_USE,
 };
 use windows::Win32::Storage::FileSystem::{
-    FindClose, FindFirstFileW, GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDrives,
-    GetVolumeInformationW, WIN32_FIND_DATAW,
+    CopyFileExW, FindClose, FindFirstFileW, GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDrives,
+    GetVolumeInformationW, COPYPROGRESSROUTINE_PROGRESS, COPY_FILE_ALLOW_DECRYPTED_DESTINATION,
+    COPY_FILE_FAIL_IF_EXISTS, WIN32_FIND_DATAW,
 };
 use windows::Win32::System::Diagnostics::Debug::{SetThreadErrorMode, SEM_FAILCRITICALERRORS};
 use windows::Win32::System::Threading::{
@@ -281,6 +282,85 @@ fn sid_string(sid: PSID) -> Option<String> {
     // SAFETY: allocated by ConvertSidToStringSidW with LocalAlloc.
     let _ = unsafe { LocalFree(Some(HLOCAL(text.0.cast()))) };
     out
+}
+
+/// Progress sink for [`copy_file_ex`]: receives the number of bytes transferred since the
+/// previous call and returns `false` to cancel the copy.
+pub type CopyProgress<'a> = dyn FnMut(u64) -> bool + 'a;
+
+struct CopyState<'a> {
+    progress: &'a mut CopyProgress<'a>,
+    last: i64,
+}
+
+unsafe extern "system" fn copy_routine(
+    _total_size: i64,
+    total_transferred: i64,
+    _stream_size: i64,
+    _stream_transferred: i64,
+    _stream_number: u32,
+    _reason: windows::Win32::Storage::FileSystem::LPPROGRESS_ROUTINE_CALLBACK_REASON,
+    _src: windows::Win32::Foundation::HANDLE,
+    _dst: windows::Win32::Foundation::HANDLE,
+    data: *const core::ffi::c_void,
+) -> COPYPROGRESSROUTINE_PROGRESS {
+    // SAFETY: `data` is the `CopyState` pointer handed to CopyFileExW by `copy_file_ex`,
+    // which outlives the call and is only touched from this (the calling) thread.
+    let state = unsafe { &mut *(data as *mut CopyState<'_>) };
+    let delta = (total_transferred - state.last).max(0) as u64;
+    state.last = total_transferred;
+    if (state.progress)(delta) {
+        windows::Win32::Storage::FileSystem::PROGRESS_CONTINUE
+    } else {
+        windows::Win32::Storage::FileSystem::PROGRESS_CANCEL
+    }
+}
+
+/// Copy a file with `CopyFileExW`, which carries alternate data streams, attributes, creation
+/// time and security info along. Fails if `dst` exists. Returns `Ok(false)` if `progress`
+/// cancelled (the partial `dst` is removed by the system or left for the caller to remove).
+pub fn copy_file_ex(
+    src: &Path,
+    dst: &Path,
+    progress: &mut CopyProgress<'_>,
+) -> std::io::Result<bool> {
+    let wide = |p: &Path| -> Vec<u16> { p.as_os_str().encode_wide().chain(Some(0)).collect() };
+    // Verbatim (`\?\`) paths so deep trees beyond MAX_PATH copy like they do with std.
+    // Only the parent is canonicalized: the final component must stay as given so a link is
+    // never silently resolved to its target here.
+    let verbatim = |p: &Path| -> std::io::Result<std::path::PathBuf> {
+        match (p.parent(), p.file_name()) {
+            (Some(parent), Some(name)) if !parent.as_os_str().is_empty() => {
+                Ok(std::fs::canonicalize(parent)?.join(name))
+            }
+            _ => Ok(p.to_path_buf()),
+        }
+    };
+    let src = verbatim(src)?;
+    let dst = verbatim(dst)?;
+    let (s, d) = (wide(&src), wide(&dst));
+    let mut state = CopyState { progress, last: 0 };
+    // SAFETY: both paths are NUL-terminated and live across the call; `state` outlives it and
+    // the routine only dereferences it as a `CopyState`.
+    let r = unsafe {
+        CopyFileExW(
+            PCWSTR(s.as_ptr()),
+            PCWSTR(d.as_ptr()),
+            Some(copy_routine),
+            Some((&mut state as *mut CopyState<'_>).cast_const().cast()),
+            None,
+            // A decrypted destination is allowed so EFS files still copy to FAT/exFAT or shares.
+            COPY_FILE_FAIL_IF_EXISTS | COPY_FILE_ALLOW_DECRYPTED_DESTINATION,
+        )
+    };
+    match r {
+        Ok(()) => Ok(true),
+        // ERROR_REQUEST_ABORTED (1235): the progress routine asked to cancel.
+        Err(e) if e.code().0 as u32 & 0xFFFF == 1235 => Ok(false),
+        Err(e) => Err(std::io::Error::from_raw_os_error(
+            (e.code().0 as u32 & 0xFFFF) as i32,
+        )),
+    }
 }
 
 #[cfg(test)]

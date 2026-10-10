@@ -8,10 +8,12 @@ use crate::fileops::BulkRetry;
 use crate::fileops::{
     BulkPlanResult, ConflictInfo, ForegroundSpec, ItemMeta, JobDone, JobProgress,
 };
+use crate::generation::Gen;
 use crate::key::KeyChord;
 use crate::keymap::Invocation;
 use crate::keymap::Keymap;
 use crate::msg::Msg;
+use crate::msg::TimerKind;
 use crate::state::{Places, StartParams};
 use crate::update::update;
 
@@ -192,10 +194,9 @@ fn paste_of_a_cut_moves_and_empties_the_register() {
         s.fileops.register.is_some(),
         "a cancelled move keeps the cut"
     );
-    update(
-        &mut s,
-        Msg::Job(JobMsg::Finished(done(2, OpKind::Move, JobStatus::Done))),
-    );
+    let mut finished = done(2, OpKind::Move, JobStatus::Done);
+    finished.removed = vec![PathBuf::from("/elsewhere/x.txt")];
+    update(&mut s, Msg::Job(JobMsg::Finished(finished)));
     assert!(s.fileops.register.is_none());
 
     // Cutting something from this very directory and pasting it here does nothing.
@@ -441,6 +442,24 @@ fn conflict(job: u64) -> Msg {
     }))
 }
 
+/// Lets the grace timer of the front conflict dialog fire.
+fn arm(state: &mut AppState) {
+    let gen = state.fileops.arm_gen.current();
+    update(
+        state,
+        Msg::Timer {
+            kind: TimerKind::ConflictArm,
+            gen,
+        },
+    );
+}
+
+/// A conflict arrives and its grace period passes.
+fn show_conflict(state: &mut AppState, job: u64) {
+    update(state, conflict(job));
+    arm(state);
+}
+
 fn started(job: u64) -> Msg {
     Msg::Job(JobMsg::Started {
         id: JobId(job),
@@ -466,7 +485,7 @@ fn resolves(effects: &[Effect]) -> Vec<(JobId, ConflictAnswer, bool)> {
 #[test]
 fn conflict_dialog_answers_with_single_keys() {
     for (key, expected) in [
-        ("o", ConflictAnswer::Overwrite),
+        ("O", ConflictAnswer::Overwrite),
         ("s", ConflictAnswer::Skip),
         ("k", ConflictAnswer::KeepBoth),
         ("c", ConflictAnswer::Cancel),
@@ -475,7 +494,7 @@ fn conflict_dialog_answers_with_single_keys() {
     ] {
         let mut s = state();
         update(&mut s, started(1));
-        update(&mut s, conflict(1));
+        show_conflict(&mut s, 1);
         assert_eq!(s.overlays, vec![Overlay::Conflict]);
         assert_eq!(s.fileops.jobs[0].status, JobStatus::AwaitingConflict);
         let effects = keys(&mut s, key);
@@ -493,7 +512,7 @@ fn conflict_dialog_answers_with_single_keys() {
 fn apply_to_all_is_a_toggle_that_rides_along() {
     let mut s = state();
     update(&mut s, started(1));
-    update(&mut s, conflict(1));
+    show_conflict(&mut s, 1);
     keys(&mut s, "a");
     assert!(s.fileops.conflicts[0].apply_to_all);
     keys(&mut s, "a");
@@ -510,7 +529,7 @@ fn apply_to_all_is_a_toggle_that_rides_along() {
 fn conflict_rename_uses_an_inline_prompt() {
     let mut s = state();
     update(&mut s, started(1));
-    update(&mut s, conflict(1));
+    show_conflict(&mut s, 1);
     keys(&mut s, "r");
     let input = s.fileops.conflicts[0].rename.as_ref().unwrap();
     assert_eq!(input.text(), "report.final.txt");
@@ -544,14 +563,19 @@ fn conflicts_queue_and_finished_jobs_drop_their_dialog() {
     let mut s = state();
     update(&mut s, started(1));
     update(&mut s, started(2));
-    update(&mut s, conflict(1));
-    update(&mut s, conflict(2));
+    show_conflict(&mut s, 1);
+    show_conflict(&mut s, 2);
     assert_eq!(s.fileops.conflicts.len(), 2);
     assert_eq!(s.overlays, vec![Overlay::Conflict]);
 
-    let effects = keys(&mut s, "o");
+    let effects = keys(&mut s, "O");
     assert_eq!(resolves(&effects)[0].0, JobId(1));
     assert_eq!(s.overlays, vec![Overlay::Conflict], "the next one is shown");
+    assert!(
+        !s.fileops.conflicts[0].armed,
+        "the next one gets its own grace period"
+    );
+    arm(&mut s);
     assert_eq!(s.fileops.conflicts[0].info.job, JobId(2));
 
     // Job 2 is cancelled from the Jobs overlay meanwhile: its question is moot.
@@ -580,6 +604,7 @@ fn done(id: u64, kind: OpKind, status: JobStatus) -> JobDone {
         errors: Vec::new(),
         created: Vec::new(),
         removed: Vec::new(),
+        consumed_sources: Vec::new(),
         is_undo: false,
         elapsed_ms: 5,
     }
@@ -1206,7 +1231,7 @@ fn printable_keys_never_reach_the_keymap_from_any_text_input() {
     // The inline rename of a conflict dialog.
     let mut s = state();
     update(&mut s, started(1));
-    update(&mut s, conflict(1));
+    show_conflict(&mut s, 1);
     keys(&mut s, "r");
     typed(&mut s, "qosk");
     assert_eq!(s.quit, None);
@@ -1279,4 +1304,217 @@ fn invalid_bulk_rename_with_a_kept_file_reopens_or_discards_it() {
     }));
     assert!(s.overlays.is_empty());
     assert_eq!(status(&s), "Bulk rename discarded");
+}
+
+#[test]
+fn a_fresh_conflict_dialog_swallows_keys_typed_before_it_appeared() {
+    let mut s = state();
+    update(&mut s, started(1));
+    update(&mut s, conflict(1));
+    assert!(!s.fileops.conflicts[0].armed);
+    // The user was typing "foOs" into something; none of it answers the question.
+    for k in ["f", "o", "O", "s", "k", "c", "a", "r", "enter", "esc"] {
+        let effects = keys(&mut s, k);
+        assert!(resolves(&effects).is_empty(), "{k}");
+        assert!(
+            effects.iter().any(|e| matches!(
+                e,
+                Effect::StartTimer {
+                    kind: TimerKind::ConflictArm,
+                    ..
+                }
+            )),
+            "{k}: typing keeps postponing the arming"
+        );
+    }
+    assert_eq!(s.overlays, vec![Overlay::Conflict]);
+    assert!(!s.fileops.conflicts[0].apply_to_all);
+    assert!(s.fileops.conflicts[0].rename.is_none());
+
+    // A timer from before the last key is stale.
+    let stale = Gen::from_raw(s.fileops.arm_gen.current().raw() - 1);
+    update(
+        &mut s,
+        Msg::Timer {
+            kind: TimerKind::ConflictArm,
+            gen: stale,
+        },
+    );
+    assert!(!s.fileops.conflicts[0].armed);
+    arm(&mut s);
+    assert!(s.fileops.conflicts[0].armed);
+    let effects = keys(&mut s, "s");
+    assert_eq!(
+        resolves(&effects),
+        vec![(JobId(1), ConflictAnswer::Skip, false)]
+    );
+}
+
+#[test]
+fn overwrite_needs_shift_o() {
+    let mut s = state();
+    update(&mut s, started(1));
+    show_conflict(&mut s, 1);
+    assert!(resolves(&keys(&mut s, "o")).is_empty(), "plain o is inert");
+    assert_eq!(s.overlays, vec![Overlay::Conflict]);
+    assert_eq!(
+        resolves(&keys(&mut s, "O")),
+        vec![(JobId(1), ConflictAnswer::Overwrite, false)]
+    );
+}
+
+#[test]
+fn finishing_a_move_keeps_a_newer_cut() {
+    let mut s = state();
+    s.fileops.register = Some(Register {
+        paths: vec![PathBuf::from("/elsewhere/b.txt")],
+        cut: true,
+    });
+    // The first move (of a.txt) completes after the user cut b.txt.
+    let mut finished = done(1, OpKind::Move, JobStatus::Done);
+    finished.removed = vec![PathBuf::from("/elsewhere/a.txt")];
+    update(&mut s, Msg::Job(JobMsg::Finished(finished)));
+    assert_eq!(
+        s.fileops.register.as_ref().map(|r| r.paths.clone()),
+        Some(vec![PathBuf::from("/elsewhere/b.txt")])
+    );
+}
+
+#[test]
+fn finishing_a_move_consumes_replaced_and_merged_sources() {
+    let mut s = state();
+    s.fileops.register = Some(Register {
+        paths: vec![PathBuf::from("/elsewhere/A")],
+        cut: true,
+    });
+    // Overwrite/merge moves list the source only in `consumed_sources`.
+    let mut finished = done(1, OpKind::Move, JobStatus::Done);
+    finished.consumed_sources = vec![PathBuf::from("/elsewhere/A")];
+    update(&mut s, Msg::Job(JobMsg::Finished(finished)));
+    assert!(s.fileops.register.is_none());
+}
+
+#[test]
+fn disarmed_conflict_dialog_blocks_ctrl_c_and_each_key_restarts_the_timer() {
+    let mut s = state();
+    update(&mut s, started(1));
+    update(&mut s, conflict(1));
+    let gens = |effects: &[Effect]| -> Vec<u64> {
+        effects
+            .iter()
+            .filter_map(|e| match e {
+                Effect::StartTimer {
+                    kind: TimerKind::ConflictArm,
+                    gen,
+                    ..
+                } => Some(gen.raw()),
+                _ => None,
+            })
+            .collect()
+    };
+    let a = gens(&keys(&mut s, "ctrl-c"));
+    assert!(resolves(&keys(&mut s, "ctrl-c")).is_empty());
+    let b = gens(&keys(&mut s, "x"));
+    assert_eq!(a.len(), 1);
+    assert_eq!(b.len(), 1);
+    assert!(b[0] > a[0], "a newer key supersedes the older timer");
+    assert!(!s.fileops.conflicts[0].armed);
+}
+
+#[test]
+fn a_queued_conflict_dialog_gets_its_own_grace_period() {
+    let mut s = state();
+    update(&mut s, started(1));
+    update(&mut s, started(2));
+    show_conflict(&mut s, 1);
+    update(&mut s, conflict(2));
+    let effects = keys(&mut s, "s");
+    assert_eq!(resolves(&effects)[0].0, JobId(1));
+    assert!(effects.iter().any(|e| matches!(
+        e,
+        Effect::StartTimer {
+            kind: TimerKind::ConflictArm,
+            ..
+        }
+    )));
+    assert!(!s.fileops.conflicts[0].armed);
+    // A key pressed right away does not answer job 2.
+    assert!(resolves(&keys(&mut s, "s")).is_empty());
+    assert_eq!(s.fileops.conflicts.len(), 1);
+
+    // Job 3 queues behind job 2; job 2 finishing elsewhere re-arms the next front dialog.
+    update(&mut s, started(3));
+    update(&mut s, conflict(3));
+    let effects = update(
+        &mut s,
+        Msg::Job(JobMsg::Finished(done(
+            2,
+            OpKind::Copy,
+            JobStatus::Cancelled,
+        ))),
+    );
+    assert!(effects.iter().any(|e| matches!(
+        e,
+        Effect::StartTimer {
+            kind: TimerKind::ConflictArm,
+            ..
+        }
+    )));
+    assert!(!s.fileops.conflicts[0].armed);
+    assert_eq!(s.fileops.conflicts[0].info.job, JobId(3));
+}
+
+#[test]
+fn file_op_completion_does_not_relist_over_a_results_list() {
+    let mut s = state();
+    let listing = |effects: &[Effect]| effects.iter().any(|e| matches!(e, Effect::ListDir { .. }));
+    let mut finished = done(1, OpKind::Delete, JobStatus::Done);
+    finished.removed = vec![p("a.txt")];
+
+    // Control: in the plain directory view the finished delete re-lists.
+    let effects = update(&mut s, Msg::Job(JobMsg::Finished(finished.clone())));
+    assert!(listing(&effects), "{effects:?}");
+
+    // A find/grep results list (a labelled view) keeps its rows.
+    let mut s = state();
+    s.view.label = Some("find: foo".into());
+    let effects = update(&mut s, Msg::Job(JobMsg::Finished(finished)));
+    assert!(!listing(&effects), "{effects:?}");
+}
+
+#[test]
+fn file_op_completion_prunes_removed_rows_from_a_results_list() {
+    let mut s = state();
+    s.view.label = Some("find: foo".into());
+    let entry = |n: &str| Entry::new(n, crate::entry::EntryKind::File);
+    s.view
+        .replace_entries(vec![entry("a.txt"), entry("sub/b.txt"), entry("c.txt")], 20);
+    s.view.finish_loading();
+    let mut finished = done(1, OpKind::Delete, JobStatus::Done);
+    finished.removed = vec![p("a.txt"), PathBuf::from("/work/proj").join("sub/b.txt")];
+    let _ = update(&mut s, Msg::Job(JobMsg::Finished(finished)));
+    let names: Vec<_> = s.view.entries().iter().map(|e| e.name.clone()).collect();
+    assert_eq!(names, vec![std::ffi::OsString::from("c.txt")]);
+}
+
+#[test]
+fn file_op_completion_renames_rows_in_a_results_list() {
+    let mut s = state();
+    s.view.label = Some("find: foo".into());
+    let entry = |n: &str| Entry::new(n, crate::entry::EntryKind::File);
+    s.view
+        .replace_entries(vec![entry("a.txt"), entry("c.txt")], 20);
+    s.view.finish_loading();
+    let mut finished = done(1, OpKind::Rename, JobStatus::Done);
+    finished.removed = vec![p("a.txt")];
+    finished.created = vec![p("z.txt")];
+    let _ = update(&mut s, Msg::Job(JobMsg::Finished(finished)));
+    let names: Vec<_> = s.view.entries().iter().map(|e| e.name.clone()).collect();
+    assert_eq!(
+        names,
+        vec![
+            std::ffi::OsString::from("c.txt"),
+            std::ffi::OsString::from("z.txt")
+        ]
+    );
 }

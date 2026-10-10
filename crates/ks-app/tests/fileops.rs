@@ -220,6 +220,7 @@ async fn yank_paste_cut_paste_and_the_conflict_dialog() {
     h.keys("p");
     h.until("the conflict dialog", |s| {
         s.overlays.last() == Some(&Overlay::Conflict)
+            && s.fileops.conflicts.front().is_some_and(|d| d.armed)
     })
     .await;
     let dialog = &h.state.fileops.conflicts[0];
@@ -263,9 +264,11 @@ async fn conflict_answers_overwrite_skip_and_rename() {
     h.start().await;
     h.state.fileops.register = Some(register.clone());
     h.keys("p");
-    h.until("the conflict dialog", |s| !s.fileops.conflicts.is_empty())
-        .await;
-    h.keys("a o");
+    h.until("the conflict dialog", |s| {
+        s.fileops.conflicts.front().is_some_and(|d| d.armed)
+    })
+    .await;
+    h.keys("a O");
     h.jobs_idle().await;
     for name in ["one", "two", "three"] {
         assert_eq!(read(dst.join(name)), format!("new {name}"));
@@ -279,8 +282,10 @@ async fn conflict_answers_overwrite_skip_and_rename() {
     h.start().await;
     h.state.fileops.register = Some(register.clone());
     h.keys("p");
-    h.until("the conflict dialog", |s| !s.fileops.conflicts.is_empty())
-        .await;
+    h.until("the conflict dialog", |s| {
+        s.fileops.conflicts.front().is_some_and(|d| d.armed)
+    })
+    .await;
     h.keys("a s");
     h.jobs_idle().await;
     for name in ["one", "two", "three"] {
@@ -295,8 +300,10 @@ async fn conflict_answers_overwrite_skip_and_rename() {
     h.keys("p");
     let mut answered = 0;
     while answered < 3 {
-        h.until("a conflict dialog", |s| !s.fileops.conflicts.is_empty())
-            .await;
+        h.until("a conflict dialog", |s| {
+            s.fileops.conflicts.front().is_some_and(|d| d.armed)
+        })
+        .await;
         let name = h.state.fileops.conflicts[0]
             .info
             .dst
@@ -311,7 +318,7 @@ async fn conflict_answers_overwrite_skip_and_rename() {
                 h.keys("enter");
             }
             "two" => h.keys("s"),
-            _ => h.keys("o"),
+            _ => h.keys("O"),
         }
         answered += 1;
         // Wait for the dialog of this job to go away before looking for the next one.
@@ -340,8 +347,10 @@ async fn escape_in_the_conflict_dialog_cancels_the_job() {
         cut: false,
     });
     h.keys("p");
-    h.until("the conflict dialog", |s| !s.fileops.conflicts.is_empty())
-        .await;
+    h.until("the conflict dialog", |s| {
+        s.fileops.conflicts.front().is_some_and(|d| d.armed)
+    })
+    .await;
     h.keys("esc");
     h.jobs_idle().await;
     assert_eq!(h.state.fileops.jobs[0].status, JobStatus::Cancelled);
@@ -442,10 +451,10 @@ async fn move_undo() {
     assert!(!root.join("dest/m.txt").exists());
 }
 
-/// Restores from the machine's real Recycle Bin, which other processes and a bin with
-/// hundreds of items make unreliable; run it by hand with `--ignored`.
+/// Trash and restore through the machine's real Recycle Bin. Deterministic: every step waits
+/// for the job to finish (the undo entry exists only then) rather than for a fixed time, and
+/// the restore looks the item up by its original path, so other bin contents do not matter.
 #[tokio::test]
-#[ignore = "depends on the state of the real Recycle Bin"]
 async fn trash_undo() {
     let dir = tempfile::tempdir().unwrap();
     let root = canonical(&dir);
@@ -985,8 +994,10 @@ async fn copy_keep_both_with_enter_then_undo_removes_the_copy() {
         cut: false,
     });
     h.keys("p");
-    h.until("the conflict dialog", |s| !s.fileops.conflicts.is_empty())
-        .await;
+    h.until("the conflict dialog", |s| {
+        s.fileops.conflicts.front().is_some_and(|d| d.armed)
+    })
+    .await;
     // Enter is the documented default answer: keep both.
     h.keys("enter");
     h.jobs_idle().await;

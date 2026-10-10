@@ -54,6 +54,7 @@ pub(crate) struct Runner {
     pub items_skipped: usize,
     pub errors: Vec<ItemError>,
     pub outcomes: Vec<Outcome>,
+    pub consumed_sources: Vec<PathBuf>,
     pub buf: Vec<u8>,
     tmp_counter: u64,
     /// Set by a cross-volume move once its copy phase finished (only the source delete remains).
@@ -92,6 +93,7 @@ impl Runner {
             items_skipped: 0,
             errors: Vec::new(),
             outcomes: Vec::new(),
+            consumed_sources: Vec::new(),
             buf: Vec::new(),
             tmp_counter: 0,
             copy_complete: false,
@@ -249,6 +251,7 @@ impl Runner {
             bytes_done: self.bytes_done,
             errors: self.errors,
             outcomes: self.outcomes,
+            consumed_sources: self.consumed_sources,
             elapsed: self.started.elapsed(),
         }
     }

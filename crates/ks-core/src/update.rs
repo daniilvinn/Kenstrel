@@ -240,6 +240,7 @@ fn on_timer(
                 state.dirty = true;
             }
         }
+        TimerKind::ConflictArm => crate::fileops::on_arm_timer(state, gen),
         TimerKind::StatusExpiry => {
             if state.status_gen.is_current(gen) && state.status.take().is_some() {
                 state.dirty = true;

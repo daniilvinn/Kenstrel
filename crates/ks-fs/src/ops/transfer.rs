@@ -305,15 +305,24 @@ impl Runner {
         if let Some(bak) = backup {
             match &res {
                 Ok(true) => force_remove(&bak),
+                Ok(false) if self.copy_complete => {
+                    // The new copy is complete (only removing a move's source failed).
+                    force_remove(&bak);
+                }
                 Ok(false) => {
-                    // Partly failed: keep the old item next to the result rather than lose it.
-                    self.error(
-                        &dst,
-                        format!(
-                            "replace incomplete; previous version kept at {}",
-                            bak.display()
+                    // All-or-nothing: drop whatever partial result exists and put the old
+                    // item back under its name.
+                    force_remove(&dst);
+                    match fs::rename(&bak, &dst) {
+                        Ok(()) => self.error(&dst, "replace failed; previous version restored"),
+                        Err(e) => self.error(
+                            &dst,
+                            format!(
+                                "replace failed and restore failed ({e}); previous version kept at {}",
+                                bak.display()
+                            ),
                         ),
-                    );
+                    }
                 }
                 Err(_) if self.copy_complete => force_remove(&bak), // new copy is complete
                 Err(_) => {
@@ -327,6 +336,9 @@ impl Runner {
         let ok = res?;
         if ok {
             self.items_done += 1;
+            if op == Op::Move {
+                self.consumed_sources.push(src.to_path_buf());
+            }
             if !replaced {
                 self.record(op, src, &dst);
             }
@@ -350,7 +362,9 @@ impl Runner {
         }
         if op == Op::Move {
             // Succeeds only if everything moved out; leftovers (skipped/failed) stay.
-            let _ = fs::remove_dir(src);
+            if fs::remove_dir(src).is_ok() {
+                self.consumed_sources.push(src.to_path_buf());
+            }
             self.files_done += 1;
         }
         Ok(())
@@ -500,6 +514,63 @@ impl Runner {
 
     /// `Ok(false)` means cancelled.
     fn copy_file_inner(
+        &mut self,
+        src: &Path,
+        smeta: &Metadata,
+        tmp: &Path,
+        buf: &mut [u8],
+    ) -> io::Result<bool> {
+        #[cfg(windows)]
+        {
+            let _ = &buf;
+            self.copy_file_native(src, smeta, tmp)
+        }
+        #[cfg(not(windows))]
+        self.copy_file_portable(src, smeta, tmp, buf)
+    }
+
+    /// CopyFileExW keeps alternate data streams, attributes and ACLs, which matters most for
+    /// the cross-volume move (copy, then delete the source).
+    #[cfg(windows)]
+    fn copy_file_native(&mut self, src: &Path, smeta: &Metadata, tmp: &Path) -> io::Result<bool> {
+        let mut cancelled = false;
+        let res = crate::platform::copy_file_ex(src, tmp, &mut |n| {
+            if n > 0 {
+                self.add_bytes(n);
+            }
+            if self.check().is_err() {
+                cancelled = true;
+            }
+            !cancelled
+        });
+        match res {
+            Ok(true) => {
+                // CopyFileExW does not carry the creation time over.
+                use std::os::windows::fs::FileTimesExt;
+                if let Ok(created) = smeta.created() {
+                    let readonly = fs::metadata(tmp).is_ok_and(|m| m.permissions().readonly());
+                    if readonly {
+                        clear_readonly(tmp);
+                    }
+                    if let Ok(f) = OpenOptions::new().write(true).open(tmp) {
+                        let _ = f.set_times(fs::FileTimes::new().set_created(created));
+                    }
+                    if readonly {
+                        let _ = fs::set_permissions(tmp, smeta.permissions());
+                    }
+                }
+                Ok(true)
+            }
+            Ok(false) => {
+                let _ = fs::remove_file(tmp);
+                Ok(false)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    #[cfg_attr(windows, allow(dead_code))]
+    fn copy_file_portable(
         &mut self,
         src: &Path,
         smeta: &Metadata,

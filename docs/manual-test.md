@@ -148,7 +148,7 @@ Work in a scratch directory.
 - [ ] **Jobs view.** `g j` during the copy. Expect: the job with a progress bar; `x` cancels it, and
   the partial `.part` file disappears. `esc` closes the view.
 - [ ] **Conflicts.** Copy files into a directory that already has the same names. Expect: a dialog
-  with `o` overwrite, `s` skip, `r` rename, `k` keep both, `a` apply to all, `c` cancel; `enter`
+  with `O` (shift) overwrite, `s` skip, `r` rename, `k` keep both, `a` apply to all, `c` cancel; `enter`
   keeps both, `esc` cancels the job. Try each key once.
 - [ ] **Delete and undo.** `d` on a file: it goes to the Recycle Bin (check it there). `u` restores
   it.

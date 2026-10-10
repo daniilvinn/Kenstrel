@@ -129,6 +129,7 @@ fn conflict_dialog(rename: bool) -> ConflictDialog {
         },
         apply_to_all: true,
         rename: rename.then(|| PromptInput::with_text("report.final.docx", 12)),
+        armed: true,
     }
 }
 
@@ -321,6 +322,11 @@ fn conflict_overlay_snapshots() {
     snap("conflict", |w, h| conflict_state(w, h, false, 0));
     snap("conflict_rename", |w, h| conflict_state(w, h, true, 0));
     snap("conflict_queue", |w, h| conflict_state(w, h, false, 2));
+    snap("conflict_disarmed", |w, h| {
+        let mut s = conflict_state(w, h, false, 0);
+        s.fileops.conflicts[0].armed = false;
+        s
+    });
 }
 
 #[test]

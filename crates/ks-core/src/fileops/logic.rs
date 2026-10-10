@@ -20,6 +20,7 @@ use crate::effect::Effect;
 use crate::key::{Key, KeyChord, Modifiers};
 use crate::keymap::Invocation;
 use crate::mode::{Mode, Overlay, PromptKind};
+use crate::msg::TimerKind;
 use crate::nav;
 use crate::state::{AppState, JobId, Level, QuitKind, Size};
 use crate::update::set_status;
@@ -772,6 +773,11 @@ fn conflict_action(state: &mut AppState, action: Action, effects: &mut Vec<Effec
         remove_overlay(state, Overlay::Conflict);
         return true;
     };
+    if !dialog.armed {
+        arm_later(state, effects);
+        state.dirty = true;
+        return true;
+    }
     match action {
         Action::Cancel => {
             if dialog.rename.take().is_none() {
@@ -813,6 +819,37 @@ fn answer_conflict(state: &mut AppState, effects: &mut Vec<Effect>, answer: Conf
     });
     if state.fileops.conflicts.is_empty() {
         remove_overlay(state, Overlay::Conflict);
+    } else {
+        ensure_arming(state, effects);
+    }
+}
+
+/// Grace period before a conflict dialog (or the next one in the queue) accepts keys.
+const CONFLICT_ARM_DELAY: std::time::Duration = std::time::Duration::from_millis(600);
+
+fn arm_later(state: &mut AppState, effects: &mut Vec<Effect>) {
+    effects.push(Effect::StartTimer {
+        kind: TimerKind::ConflictArm,
+        gen: state.fileops.arm_gen.bump(),
+        delay: CONFLICT_ARM_DELAY,
+    });
+}
+
+/// Starts the grace timer when the front dialog is not armed yet.
+fn ensure_arming(state: &mut AppState, effects: &mut Vec<Effect>) {
+    if state.fileops.conflicts.front().is_some_and(|d| !d.armed) {
+        arm_later(state, effects);
+    }
+}
+
+/// The grace timer fired: the front dialog now reacts to keys.
+pub(crate) fn on_arm_timer(state: &mut AppState, gen: crate::generation::Gen) {
+    if !state.fileops.arm_gen.is_current(gen) {
+        return;
+    }
+    if let Some(dialog) = state.fileops.conflicts.front_mut() {
+        dialog.armed = true;
+        state.dirty = true;
     }
 }
 
@@ -959,6 +996,12 @@ fn conflict_key(state: &mut AppState, key: KeyChord, effects: &mut Vec<Effect>) 
     let Some(dialog) = state.fileops.conflicts.front_mut() else {
         return false;
     };
+    if !dialog.armed {
+        // Typed before the dialog was usable (or still typing): swallow, and wait for a
+        // quiet moment before arming.
+        arm_later(state, effects);
+        return true;
+    }
     if let Some(input) = dialog.rename.as_mut() {
         return input.handle_key(key);
     }
@@ -969,7 +1012,10 @@ fn conflict_key(state: &mut AppState, key: KeyChord, effects: &mut Vec<Effect>) 
         return false;
     }
     match c {
-        'o' => answer_conflict(state, effects, ConflictAnswer::Overwrite),
+        // Shift-O on purpose: the destructive choice must not be a letter that is also
+        // part of ordinary typing. Plain `o` is swallowed.
+        'O' => answer_conflict(state, effects, ConflictAnswer::Overwrite),
+        'o' => {}
         's' => answer_conflict(state, effects, ConflictAnswer::Skip),
         'k' => answer_conflict(state, effects, ConflictAnswer::KeepBoth),
         'c' => answer_conflict(state, effects, ConflictAnswer::Cancel),
@@ -1105,8 +1151,12 @@ pub(crate) fn on_job(state: &mut AppState, msg: JobMsg, effects: &mut Vec<Effect
                 info,
                 apply_to_all: false,
                 rename: None,
+                armed: false,
             });
             push_overlay(state, Overlay::Conflict);
+            if state.fileops.conflicts.len() == 1 {
+                arm_later(state, effects);
+            }
         }
         JobMsg::Finished(done) => finish_job(state, effects, &done),
     }
@@ -1172,12 +1222,20 @@ pub fn job_summary(done: &JobDone) -> (Level, String) {
 
 fn finish_job(state: &mut AppState, effects: &mut Vec<Effect>, done: &JobDone) {
     state.jobs.remove(&done.id);
-    if done.kind == OpKind::Move
-        && !done.is_undo
-        && done.status == JobStatus::Done
-        && state.fileops.register.as_ref().is_some_and(|r| r.cut)
-    {
-        state.fileops.register = None;
+    if done.kind == OpKind::Move && !done.is_undo && done.status == JobStatus::Done {
+        // Consume only the cut items this job moved; a newer cut register stays.
+        if let Some(register) = state.fileops.register.as_mut().filter(|r| r.cut) {
+            register.paths.retain(|p| {
+                !done
+                    .removed
+                    .iter()
+                    .chain(&done.consumed_sources)
+                    .any(|m| same_path(p, m))
+            });
+            if register.paths.is_empty() {
+                state.fileops.register = None;
+            }
+        }
     }
     let (level, text) = job_summary(done);
     if let Some(row) = row_mut(state, done.id) {
@@ -1192,6 +1250,8 @@ fn finish_job(state: &mut AppState, effects: &mut Vec<Effect>, done: &JobDone) {
     state.fileops.conflicts.retain(|d| d.info.job != done.id);
     if state.fileops.conflicts.is_empty() {
         remove_overlay(state, Overlay::Conflict);
+    } else {
+        ensure_arming(state, effects);
     }
     set_status(state, level, text, effects);
     crate::preview::invalidate_paths(state, &done.created, &done.removed, effects);
@@ -1206,6 +1266,38 @@ fn refresh_after(state: &mut AppState, effects: &mut Vec<Effect>, done: &JobDone
         return;
     }
     let cwd = state.cwd.clone();
+    // A results list is never re-listed, but rows the job deleted or moved away are pruned.
+    if state.view.label.is_some() {
+        let names: Vec<std::ffi::OsString> = done
+            .removed
+            .iter()
+            .filter_map(|p| p.strip_prefix(&cwd).ok())
+            .map(|rel| rel.as_os_str().to_owned())
+            .collect();
+        let height = state.viewport_height();
+        // Moves and renames pair their removed source with the created target: the row
+        // keeps its place in the list under the new name when the target is below the cwd.
+        let mut renames: Vec<(std::ffi::OsString, std::ffi::OsString)> = Vec::new();
+        if matches!(
+            done.kind,
+            OpKind::Move | OpKind::Rename | OpKind::BulkRename
+        ) && done.removed.len() == done.created.len()
+        {
+            for (from, to) in done.removed.iter().zip(&done.created) {
+                if let (Ok(old), Ok(new)) = (from.strip_prefix(&cwd), to.strip_prefix(&cwd)) {
+                    renames.push((old.as_os_str().to_owned(), new.as_os_str().to_owned()));
+                }
+            }
+        }
+        let names: Vec<_> = names
+            .into_iter()
+            .filter(|n| !renames.iter().any(|(old, _)| old == n))
+            .collect();
+        state.view.rename_names(&renames, height);
+        state.view.remove_names(&names, height);
+        state.dirty = true;
+        return;
+    }
     let in_cwd = |p: &&PathBuf| p.parent().is_some_and(|parent| same_path(parent, &cwd));
     let touched =
         done.created.iter().any(|p| in_cwd(&p)) || done.removed.iter().any(|p| in_cwd(&p));

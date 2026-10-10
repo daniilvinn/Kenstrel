@@ -192,6 +192,46 @@ impl DirView {
         self.reposition(height, |view| view.entries = fresh);
     }
 
+    /// Drops the entries with these names (a results list after a file op removed them),
+    /// keeping the cursor on the same name when it survives.
+    pub fn remove_names(&mut self, names: &[OsString], height: usize) {
+        if names.is_empty() {
+            return;
+        }
+        self.marks.retain(|m| !names.contains(m));
+        self.reposition(height, |view| {
+            view.entries.retain(|e| !names.contains(&e.name));
+        });
+    }
+
+    /// Renames entries of a results list in place (`old -> new` relative names): the row keeps
+    /// its metadata under the new name. Rows that are not in the list are ignored.
+    pub fn rename_names(&mut self, pairs: &[(OsString, OsString)], height: usize) {
+        if pairs.is_empty() {
+            return;
+        }
+        for (old, new) in pairs {
+            if self.marks.remove(old) {
+                self.marks.insert(new.clone());
+            }
+        }
+        self.reposition(height, |view| {
+            for (old, new) in pairs {
+                if let Some(pos) = view.entries.iter().position(|e| &e.name == old) {
+                    let old_entry = &view.entries[pos];
+                    let mut fresh = Entry::new(new.clone(), old_entry.kind);
+                    fresh.is_dir = old_entry.is_dir;
+                    fresh.size = old_entry.size;
+                    fresh.mtime = old_entry.mtime;
+                    fresh.attrs = old_entry.attrs;
+                    fresh.children = old_entry.children;
+                    view.entries[pos] = fresh;
+                }
+            }
+            sort_entries(&mut view.entries, &view.sort);
+        });
+    }
+
     /// Records lazily computed child counts.
     pub fn apply_child_counts(&mut self, counts: Vec<(OsString, u32)>) {
         let by_name: HashMap<OsString, u32> = counts.into_iter().collect();

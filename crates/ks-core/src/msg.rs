@@ -31,6 +31,8 @@ pub enum TimerKind {
     StateSave,
     /// The 120 ms quiet period of the content-search query (PLAN 6.3).
     GrepDebounce,
+    /// The grace period after which a freshly opened conflict dialog accepts keys.
+    ConflictArm,
 }
 
 /// Input to [`update`](crate::update::update).
