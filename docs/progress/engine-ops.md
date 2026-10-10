@@ -105,7 +105,7 @@ let id = mgr.submit(JobSpec::copy_into(&sources, &dest_dir), Generation(gen));
   tests: copy/delete/move never touch the junction target).
 - Cross-volume move verified for real (C: temp dir -> E: build dir).
 - Gates: `cargo fmt --all` clean, `cargo clippy --workspace --all-targets -- -D warnings` clean, `cargo test --workspace`
-  clean (ks-fs: 28 unit + 5 paths + 24 transfer + 6 delete/create + 14 undo tests incl. `track_trash_ids=false`; 1 ignored bench).
+  clean (ks-fs: 32 unit + 5 paths + 24 transfer + 6 delete/create + 14 undo + 9 review tests incl. `track_trash_ids=false`; 1 ignored bench).
 
 ## Added dependencies
 
