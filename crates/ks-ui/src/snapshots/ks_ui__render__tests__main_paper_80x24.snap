@@ -1,0 +1,37 @@
+---
+source: crates/ks-ui/src/render.rs
+expression: rendered
+---
+ ~/projects/omniforce/src/renderer
+────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ›
+   ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..80  fg=#2b2724 bg=reset bold
+  1   0..80  fg=#d4ccc2 bg=reset
+ 21   0..80  fg=#d4ccc2 bg=reset
+ 22   1..80  fg=#c4623f bg=reset bold
+ 23   3..4   fg=#958e86 bg=reset
+ 23   4..5   fg=#6b645d bg=reset
+ 23   5..80  fg=#958e86 bg=reset

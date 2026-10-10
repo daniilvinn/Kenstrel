@@ -1,0 +1,26 @@
+# Ember: dark theme with a warm terracotta accent.
+# `bg = "reset"` keeps the terminal's own background (Windows Terminal theme, transparency).
+
+[colors]
+bg = "reset"
+fg = "#e8e3dc"
+fg_dim = "#a9a29a"
+fg_muted = "#716b64"
+accent = "#d97757"
+accent_fg = "#1f1b18"
+selection_bg = "#2f2a26"
+border = "#403a35"
+border_focus = "#8f5c47"
+dir = "#7fa8c9"
+exec = "#92c07f"
+symlink = "#b799d9"
+hidden = "#625c56"
+success = "#92c07f"
+warning = "#e5b567"
+error = "#e8707a"
+git_added = "#92c07f"
+git_modified = "#e5b567"
+git_untracked = "#c9a27f"
+git_ignored = "#625c56"
+git_conflict = "#e8707a"
+match = "#f4a582"

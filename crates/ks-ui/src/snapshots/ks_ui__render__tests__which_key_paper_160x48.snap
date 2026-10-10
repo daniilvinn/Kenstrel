@@ -1,0 +1,73 @@
+---
+source: crates/ks-ui/src/render.rs
+expression: "draw(&s, &theme(name))"
+---
+ ~/projects/omniforce/src/renderer
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                                                            g
+   ‹g› Jump to top  ‹h› Go to home directory  ‹d› Go to Downloads  ‹D› Go to Desktop  ‹c› Go to config directory  ‹/› Go to This PC (drives)  ‹j› Jobs overlay
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..160 fg=#2b2724 bg=reset bold
+  1   0..160 fg=#d4ccc2 bg=reset
+ 45   0..160 fg=#d4ccc2 bg=reset
+ 46   1..160 fg=#c4623f bg=reset bold
+ 47   3..4   fg=#958e86 bg=reset
+ 47   4..5   fg=#6b645d bg=reset
+ 47   5..21  fg=#958e86 bg=reset
+ 47  21..22  fg=#6b645d bg=reset
+ 47  22..47  fg=#958e86 bg=reset
+ 47  47..48  fg=#6b645d bg=reset
+ 47  48..68  fg=#958e86 bg=reset
+ 47  68..69  fg=#6b645d bg=reset
+ 47  69..87  fg=#958e86 bg=reset
+ 47  87..88  fg=#6b645d bg=reset
+ 47  88..115 fg=#958e86 bg=reset
+ 47 115..116 fg=#6b645d bg=reset
+ 47 116..143 fg=#958e86 bg=reset
+ 47 143..144 fg=#6b645d bg=reset
+ 47 144..160 fg=#958e86 bg=reset

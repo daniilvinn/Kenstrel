@@ -1,0 +1,239 @@
+//! Width-aware text helpers. All alignment uses terminal cell widths, never `len()`.
+
+use std::path::{Component, Path};
+
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+const ELLIPSIS: &str = "…";
+
+/// Display width in terminal cells.
+pub fn width(s: &str) -> usize {
+    UnicodeWidthStr::width(s)
+}
+
+/// Truncates the end of `s` with `…` so that it fits in `max` cells.
+pub fn truncate_end(s: &str, max: usize) -> String {
+    if width(s) <= max {
+        return s.to_owned();
+    }
+    if max == 0 {
+        return String::new();
+    }
+    let mut out = String::new();
+    let mut used = 0;
+    for c in s.chars() {
+        let w = c.width().unwrap_or(0);
+        if used + w + 1 > max {
+            break;
+        }
+        out.push(c);
+        used += w;
+    }
+    out.push_str(ELLIPSIS);
+    out
+}
+
+/// Truncates the start of `s` with `…` so that it fits in `max` cells.
+pub fn truncate_start(s: &str, max: usize) -> String {
+    if width(s) <= max {
+        return s.to_owned();
+    }
+    if max == 0 {
+        return String::new();
+    }
+    let mut kept: Vec<char> = Vec::new();
+    let mut used = 0;
+    for c in s.chars().rev() {
+        let w = c.width().unwrap_or(0);
+        if used + w + 1 > max {
+            break;
+        }
+        kept.push(c);
+        used += w;
+    }
+    kept.push('…');
+    kept.iter().rev().collect()
+}
+
+/// Strips `home` from the front of `path`, component by component. Windows paths compare
+/// case-insensitively (`c:\users\me` is the same place as `C:\Users\me`).
+fn strip_home<'a>(path: &'a Path, home: &Path) -> Option<&'a Path> {
+    if !cfg!(windows) {
+        return path.strip_prefix(home).ok();
+    }
+    let mut rest = path.components();
+    for h in home.components() {
+        let p = rest.next()?;
+        if !p
+            .as_os_str()
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&h.as_os_str().to_string_lossy())
+        {
+            return None;
+        }
+    }
+    Some(rest.as_path())
+}
+
+/// The segments of `path` for display: `~` replaces the home directory, `\\?\` prefixes are
+/// stripped and the separator is always `/` (PLAN §4.2).
+fn breadcrumb_segments(path: &Path, home: Option<&Path>) -> Vec<String> {
+    let path = dunce::simplified(path);
+    let home = home.map(dunce::simplified);
+
+    let mut segments = Vec::new();
+    let mut rest = path;
+    if let Some(stripped) = home.and_then(|h| strip_home(path, h)) {
+        segments.push("~".to_owned());
+        rest = stripped;
+    }
+    let mut saw_root = false;
+    let mut has_normal = false;
+    for component in rest.components() {
+        match component {
+            Component::Prefix(p) => segments.push(p.as_os_str().to_string_lossy().into_owned()),
+            Component::RootDir => {
+                saw_root = true;
+                if segments.is_empty() {
+                    segments.push(String::new()); // unix root: joins to a leading `/`
+                }
+            }
+            Component::Normal(name) => {
+                has_normal = true;
+                segments.push(name.to_string_lossy().into_owned());
+            }
+            Component::CurDir => segments.push(".".to_owned()),
+            Component::ParentDir => segments.push("..".to_owned()),
+        }
+    }
+    // A bare root (`/` or `C:/`) needs a trailing empty segment to join as `/` or `C:/`.
+    if saw_root && !has_normal {
+        segments.push(String::new());
+    }
+    segments
+}
+
+/// Formats a path for the header, shortened to at most `max` cells by eliding middle
+/// segments with `…` (`~/…/renderer`), and as a last resort truncating from the left.
+pub fn breadcrumb(path: &Path, home: Option<&Path>, max: usize) -> String {
+    let segments = breadcrumb_segments(path, home);
+    let full = join(&segments);
+    if width(&full) <= max || segments.len() < 2 {
+        return truncate_start(&full, max);
+    }
+    // Keep the first segment, an ellipsis, and as many trailing segments as fit.
+    for keep in (1..segments.len()).rev() {
+        let mut shortened = vec![segments[0].clone(), ELLIPSIS.to_owned()];
+        shortened.extend_from_slice(&segments[segments.len() - keep..]);
+        let candidate = join(&shortened);
+        if width(&candidate) <= max {
+            return candidate;
+        }
+    }
+    truncate_start(&full, max)
+}
+
+fn join(segments: &[String]) -> String {
+    segments.join("/")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn truncation_respects_cell_width() {
+        assert_eq!(truncate_end("hello", 10), "hello");
+        assert_eq!(truncate_end("hello world", 8), "hello w…");
+        assert_eq!(truncate_end("hello", 0), "");
+        assert_eq!(truncate_start("hello world", 8), "…o world");
+        // Wide characters occupy two cells and are never split.
+        assert_eq!(truncate_end("日本語テキスト", 7), "日本語…");
+        assert_eq!(truncate_end("日本語テキスト", 6), "日本…");
+        assert_eq!(truncate_start("日本語テキスト", 7), "…キスト");
+    }
+
+    fn p(s: &str) -> PathBuf {
+        PathBuf::from(s)
+    }
+
+    #[test]
+    fn home_is_abbreviated() {
+        let home = p("/home/me");
+        assert_eq!(
+            breadcrumb(&p("/home/me/projects/kestrel"), Some(&home), 80),
+            "~/projects/kestrel"
+        );
+        assert_eq!(breadcrumb(&p("/home/me"), Some(&home), 80), "~");
+        assert_eq!(
+            breadcrumb(&p("/etc/hosts.d"), Some(&home), 80),
+            "/etc/hosts.d"
+        );
+        // A sibling that merely shares a string prefix is not under home.
+        assert_eq!(
+            breadcrumb(&p("/home/mellow/x"), Some(&home), 80),
+            "/home/mellow/x"
+        );
+    }
+
+    #[test]
+    fn root_paths() {
+        assert_eq!(breadcrumb(&p("/"), None, 80), "/");
+    }
+
+    #[test]
+    fn long_paths_elide_the_middle() {
+        let home = p("/home/me");
+        let path = p("/home/me/projects/omniforce/src/renderer");
+        assert_eq!(
+            breadcrumb(&path, Some(&home), 80),
+            "~/projects/omniforce/src/renderer"
+        );
+        assert_eq!(
+            breadcrumb(&path, Some(&home), 28),
+            "~/…/omniforce/src/renderer"
+        );
+        assert_eq!(breadcrumb(&path, Some(&home), 14), "~/…/renderer");
+        // Even the last segment does not fit: truncate from the left.
+        let narrow = breadcrumb(&path, Some(&home), 6);
+        assert_eq!(width(&narrow), 6);
+        assert!(narrow.starts_with('…'));
+    }
+
+    #[test]
+    fn never_exceeds_the_budget() {
+        let path = p("/a/bb/ccc/dddd/eeeee/ffffff");
+        for max in 0..40 {
+            assert!(width(&breadcrumb(&path, None, max)) <= max, "max={max}");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_drive_and_verbatim_paths() {
+        assert_eq!(
+            breadcrumb(&p(r"C:\Users\me\dev"), None, 80),
+            "C:/Users/me/dev"
+        );
+        assert_eq!(
+            breadcrumb(&p(r"\\?\C:\Users\me\dev"), None, 80),
+            "C:/Users/me/dev"
+        );
+        assert_eq!(breadcrumb(&p(r"C:\"), None, 80), "C:/");
+        // Windows paths are case-insensitive: the typed casing may differ from the home's.
+        assert_eq!(
+            breadcrumb(&p(r"c:\users\me\dev"), Some(&p(r"C:\Users\Me")), 80),
+            "~/dev"
+        );
+        assert_eq!(
+            breadcrumb(&p(r"C:\Users\mellow"), Some(&p(r"C:\Users\me")), 80),
+            "C:/Users/mellow"
+        );
+        assert_eq!(
+            breadcrumb(&p(r"\\?\C:\Users\me\dev"), Some(&p(r"C:\Users\me")), 80),
+            "~/dev"
+        );
+    }
+}

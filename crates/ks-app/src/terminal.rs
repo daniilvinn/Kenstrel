@@ -1,0 +1,84 @@
+//! Raw mode, the alternate screen and the panic hook that undoes them.
+//!
+//! Mouse capture is intentionally never enabled (PLAN §0.2).
+
+use std::io::{self, Stdout};
+use std::panic;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+use crossterm::cursor::Show;
+use crossterm::execute;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
+use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
+
+pub type Tui = Terminal<CrosstermBackend<Stdout>>;
+
+/// True while the terminal is in TUI mode; makes [`restore`] idempotent so the panic hook
+/// and `Drop` can both call it.
+static ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Owns the terminal for the lifetime of the TUI. Dropping it restores the terminal, so
+/// every exit path (return, `?`, unwinding) leaves the shell usable.
+pub struct TerminalSession {
+    terminal: Tui,
+}
+
+impl TerminalSession {
+    pub fn enter() -> io::Result<Self> {
+        enable_raw_mode()?;
+        ACTIVE.store(true, Ordering::SeqCst);
+        let built = execute!(io::stdout(), EnterAlternateScreen)
+            .and_then(|()| Terminal::new(CrosstermBackend::new(io::stdout())));
+        match built {
+            Ok(terminal) => Ok(Self { terminal }),
+            Err(e) => {
+                restore();
+                Err(e)
+            }
+        }
+    }
+
+    pub fn terminal(&mut self) -> &mut Tui {
+        &mut self.terminal
+    }
+}
+
+impl Drop for TerminalSession {
+    fn drop(&mut self) {
+        restore();
+    }
+}
+
+/// Leaves the alternate screen, shows the cursor and disables raw mode. Safe to call more
+/// than once and from a panic hook; failures are ignored because there is nothing left to
+/// do about them.
+pub fn restore() {
+    if ACTIVE.swap(false, Ordering::SeqCst) {
+        let _ = execute!(io::stdout(), LeaveAlternateScreen, Show);
+        let _ = disable_raw_mode();
+    }
+}
+
+/// Installs a panic hook that first runs `cleanup` (restoring the terminal), then logs the
+/// panic with a backtrace, then chains to the previous hook, which prints it to stderr.
+///
+/// `cleanup` runs only for panics on the calling (UI) thread: a panic in a background task
+/// is contained by tokio and the app keeps running, so it must not tear the terminal down.
+pub fn install_panic_hook(cleanup: impl Fn() + Send + Sync + 'static) {
+    let ui_thread = std::thread::current().id();
+    let previous = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
+        if std::thread::current().id() == ui_thread {
+            cleanup();
+        }
+        tracing::error!(
+            panic = %info,
+            backtrace = %std::backtrace::Backtrace::force_capture(),
+            "panic"
+        );
+        previous(info);
+    }));
+}

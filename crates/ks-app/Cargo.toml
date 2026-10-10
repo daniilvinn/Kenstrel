@@ -1,0 +1,37 @@
+[package]
+name = "ks-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "ks_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ks"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+ks-core.workspace = true
+ks-ui.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+crossterm.workspace = true
+directories.workspace = true
+dunce.workspace = true
+futures-util.workspace = true
+ratatui.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

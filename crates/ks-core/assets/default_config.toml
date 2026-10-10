@@ -1,0 +1,50 @@
+# Kestrel configuration.
+#
+# Every setting is shown below with its default value, commented out. Uncomment a line
+# and change it to override the default. Delete this file to get a fresh copy.
+# A mistake in this file never stops Kestrel from starting: it falls back to the
+# defaults and shows the error in the status line. Run "Reload config" after editing.
+
+# Theme name: a built-in ("ember" dark, "paper" light) or a file themes/<name>.toml
+# next to this file.
+# theme = "ember"
+
+# Icon set: "nerd" (needs a Nerd Font), "unicode" or "ascii".
+# icons = "nerd"
+
+[sort]
+# key = "name"        # "name" | "size" | "mtime" | "ext"
+# reverse = false
+# dirs_first = true
+
+[files]
+# show_hidden = false   # dotfiles and hidden/system files
+# show_ignored = false  # gitignored files in find/search
+# size_base = 1024      # 1024 (KiB-style) or 1000 (SI)
+
+[preview]
+# enabled = true
+# max_bytes = 262144    # read at most this much of a text file
+# max_lines = 2000
+
+[layout]
+# list_percent = 40     # width of the list pane, 10..=90
+# parent_column = false
+
+[editor]
+# Commands; {file} and {line} are substituted. Empty "open" means $VISUAL, then $EDITOR,
+# then "code", then "notepad".
+# open = ""
+# open_at_line = "code -g {file}:{line}"
+
+[ui]
+# which_key_delay_ms = 300
+
+# Key bindings. Keys are space-separated sequences: "g g", "ctrl-p", "m <char>".
+# The value is an action id, optionally with a one-character argument ("tab.goto:3"),
+# or "none" to remove a binding. Contexts: normal, visual, prompt, filter, finder, grep,
+# palette, help, confirm, jobs, claude.
+#
+# [keymap.normal]
+# "g g" = "cursor.top"
+# "q" = "none"

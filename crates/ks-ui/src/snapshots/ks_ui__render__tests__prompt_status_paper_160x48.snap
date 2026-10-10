@@ -1,0 +1,63 @@
+---
+source: crates/ks-ui/src/render.rs
+expression: rendered
+---
+ ~/projects/omniforce/src/renderer
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                   g  ⠋ 1 job  config.toml: expected a string
+   ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..160 fg=#2b2724 bg=reset bold
+  1   0..160 fg=#d4ccc2 bg=reset
+ 45   0..160 fg=#d4ccc2 bg=reset
+ 46   1..120 fg=#c4623f bg=reset bold
+ 46 120..129 fg=#c4623f bg=reset
+ 46 129..160 fg=#b8333f bg=reset
+ 47   3..4   fg=#958e86 bg=reset
+ 47   4..5   fg=#6b645d bg=reset
+ 47   5..160 fg=#958e86 bg=reset
