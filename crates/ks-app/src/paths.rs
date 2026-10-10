@@ -47,6 +47,11 @@ impl AppPaths {
         self.config_dir.join("themes")
     }
 
+    /// `%LOCALAPPDATA%\kestrel\state`: bookmarks, frecency, logs.
+    pub fn state_dir(&self) -> &Path {
+        &self.state_dir
+    }
+
     pub fn log_dir(&self) -> PathBuf {
         self.state_dir.join("logs")
     }

@@ -11,6 +11,8 @@ use std::path::PathBuf;
 
 use ks_core::{Effect, Gen, Level, Msg, TimerKind};
 use ks_fs::DirWatcher;
+
+use crate::persist::{StateStore, StateWriter};
 use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
@@ -31,6 +33,8 @@ pub struct EffectRunner {
     shutdown: CancellationToken,
     timers: HashMap<TimerKind, CancellationToken>,
     slots: HashMap<Slot, CancellationToken>,
+    /// Where bookmarks and frecency live; without it state effects are ignored (tests).
+    store: Option<(StateStore, StateWriter)>,
 }
 
 impl EffectRunner {
@@ -40,6 +44,21 @@ impl EffectRunner {
             shutdown: CancellationToken::new(),
             timers: HashMap::new(),
             slots: HashMap::new(),
+            store: None,
+        }
+    }
+
+    /// Enables loading and saving of the state files in `dir`.
+    pub fn set_state_dir(&mut self, dir: PathBuf) {
+        let store = StateStore::new(dir);
+        let writer = StateWriter::spawn(store.clone());
+        self.store = Some((store, writer));
+    }
+
+    /// Waits (at most `timeout`) for queued state writes to reach the disk.
+    pub fn finish_state_writes(&mut self, timeout: std::time::Duration) {
+        if let Some((_, writer)) = self.store.take() {
+            writer.finish(timeout);
         }
     }
 
@@ -82,6 +101,12 @@ impl EffectRunner {
                 // performs them before effects reach the runner.
                 Effect::SetTheme { .. } | Effect::ReloadConfig => {
                     tracing::debug!("loop-level effect reached the runner; ignored");
+                }
+                Effect::LoadNavData => self.load_nav_data(),
+                Effect::WriteState { file, contents } => {
+                    if let Some((_, writer)) = &self.store {
+                        writer.send(file, contents);
+                    }
                 }
             }
         }
@@ -190,6 +215,19 @@ impl EffectRunner {
                     snapshot: snapshot.map(Box::new),
                 })
                 .await;
+        });
+    }
+
+    fn load_nav_data(&mut self) {
+        let Some((store, _)) = &self.store else {
+            return;
+        };
+        let store = store.clone();
+        let tx = self.tx.clone();
+        // Reading touches the disk, so it stays off the loop; the result arrives as a message.
+        tokio::task::spawn_blocking(move || {
+            let loaded = store.load();
+            let _ = tx.blocking_send(Msg::NavDataLoaded(Box::new(loaded)));
         });
     }
 

@@ -1,11 +1,12 @@
 ---
 source: crates/ks-ui/src/help.rs
-expression: "draw(&s, &theme(\"paper\"))"
+assertion_line: 266
+expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    ◆ current/            ╭─ Help ─────────────────────────────────────────────────────────────────────────────────────────────────────╮            2025-02-02
-   ◆ passes/             │ / sort                                                                                            32 shown │          7     5h ago M
+   ◆ passes/             │ / sort                                                                                            34 shown │          7     5h ago M
    ◆ shaders/            │ Navigation                                                                                                 │         12 2025-03-12 !
    ◆ a_rather_long_file_n│   j, down             Move cursor down                    Move the cursor one row down.                    │    75.2 KB 2025-03-11
    ◆ build.ps1           │   k, up               Move cursor up                      Move the cursor one row up.                      │     1.9 KB 2025-03-05
@@ -40,14 +41,14 @@ expression: "draw(&s, &theme(\"paper\"))"
                          │                                                                                                            │
                          │ Tabs and bookmarks                                                                                         │
                          │   m <char>            Set bookmark                        Remember this directory under a key.             │
+                         │   M                   List bookmarks                      List the saved bookmarks and jump to one.        │
+                         │   —                   Delete bookmark                     Delete the selected bookmark in the bookmark li… │
                          │   1-9                 Switch to tab                       Switch to a numbered tab.                        │
                          │   ctrl-w              Close tab                           Close the current tab.                           │
                          │                                                                                                            │
                          │ Claude Code                                                                                                │
                          │   C                   Send marked files to Claude         Send the marked files to Claude as @ mentions.   │
-                         │                                                                                                            │
-                         │ Application                                                                                                │
-─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 45 ─╯─────────────────────────
+─────────────────────────╰──────────────────────────────────────────────────────────────────────────────────────────────── 1-41 / 47 ─╯─────────────────────────
  ›                                                                                                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -277,22 +278,28 @@ expression: "draw(&s, &theme(\"paper\"))"
  38  85..134 fg=#958e86 bg=reset
  38 134..160 fg=#c4623f bg=reset
  39  25..29  fg=#c4623f bg=reset
- 39  29..49  fg=#2b2724 bg=reset bold
+ 39  29..49  fg=#958e86 bg=reset
  39  49..85  fg=#6b645d bg=reset
  39  85..134 fg=#958e86 bg=reset
  39 134..160 fg=#c4623f bg=reset
- 40  25..160 fg=#c4623f bg=reset
- 41  25..27  fg=#c4623f bg=reset
- 41  27..134 fg=#c4623f bg=reset bold
+ 40  25..29  fg=#c4623f bg=reset
+ 40  29..49  fg=#2b2724 bg=reset bold
+ 40  49..85  fg=#6b645d bg=reset
+ 40  85..134 fg=#958e86 bg=reset
+ 40 134..160 fg=#c4623f bg=reset
+ 41  25..29  fg=#c4623f bg=reset
+ 41  29..49  fg=#2b2724 bg=reset bold
+ 41  49..85  fg=#6b645d bg=reset
+ 41  85..134 fg=#958e86 bg=reset
  41 134..160 fg=#c4623f bg=reset
- 42  25..29  fg=#c4623f bg=reset
- 42  29..49  fg=#2b2724 bg=reset bold
- 42  49..85  fg=#6b645d bg=reset
- 42  85..134 fg=#958e86 bg=reset
- 42 134..160 fg=#c4623f bg=reset
- 43  25..160 fg=#c4623f bg=reset
- 44  25..27  fg=#c4623f bg=reset
- 44  27..134 fg=#c4623f bg=reset bold
+ 42  25..160 fg=#c4623f bg=reset
+ 43  25..27  fg=#c4623f bg=reset
+ 43  27..134 fg=#c4623f bg=reset bold
+ 43 134..160 fg=#c4623f bg=reset
+ 44  25..29  fg=#c4623f bg=reset
+ 44  29..49  fg=#2b2724 bg=reset bold
+ 44  49..85  fg=#6b645d bg=reset
+ 44  85..134 fg=#958e86 bg=reset
  44 134..160 fg=#c4623f bg=reset
  45   0..25  fg=#d4ccc2 bg=reset
  45  25..123 fg=#c4623f bg=reset

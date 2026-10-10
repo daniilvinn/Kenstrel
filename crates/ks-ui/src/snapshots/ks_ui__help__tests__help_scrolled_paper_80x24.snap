@@ -1,5 +1,6 @@
 ---
 source: crates/ks-ui/src/help.rs
+assertion_line: 256
 expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
@@ -23,7 +24,7 @@ expression: "draw(&s, &theme(name))"
   │   p                   Paste                                              │
   │   Y                   Copy path to clipboard                             │
   │   r                   Rename                                             │
-──╰───────────────────────────────────────────────────────────── 17-33 / 79 ─╯──
+──╰───────────────────────────────────────────────────────────── 17-33 / 81 ─╯──
  ›                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---

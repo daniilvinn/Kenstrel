@@ -6,6 +6,7 @@
 use std::time::Duration;
 
 use crate::action::Action;
+use crate::aids;
 use crate::config::SortKey;
 use crate::effect::Effect;
 use crate::keymap::{Invocation, Resolution};
@@ -13,6 +14,7 @@ use crate::mode::{Mode, Overlay};
 use crate::msg::{Msg, TimerKind};
 use crate::nav;
 use crate::state::{AppState, Level, QuitKind, Status};
+use crate::tabs;
 use crate::{help, palette};
 
 /// How long informational messages stay on the status line.
@@ -52,7 +54,11 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             state.dirty = true;
         }
         Msg::Interrupt => state.quit = Some(QuitKind::Exit),
-        Msg::Start => nav::start(state, &mut effects),
+        Msg::Start => {
+            nav::start(state, &mut effects);
+            effects.push(Effect::LoadNavData);
+        }
+        Msg::NavDataLoaded(loaded) => aids::on_loaded(state, &mut effects, *loaded),
         Msg::Clock {
             now,
             utc_offset_secs,
@@ -122,7 +128,8 @@ fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Eff
             {
                 return;
             }
-            if clear_pending(state, effects) {
+            let pending = clear_pending(state, effects);
+            if aids::on_unbound_key(state, key) || pending {
                 state.dirty = true;
             }
         }
@@ -150,6 +157,7 @@ fn on_timer(
 ) {
     match kind {
         TimerKind::GitRefresh => nav::on_git_timer(state, effects, gen),
+        TimerKind::StateSave => aids::on_save_timer(state, gen, effects),
         TimerKind::WhichKey => {
             if state.which_key_gen.is_current(gen) && !state.pending.is_empty() {
                 state.which_key_visible = true;
@@ -202,6 +210,17 @@ pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: 
         Action::Quit => state.quit = Some(QuitKind::Exit),
         Action::QuitCd => state.quit = Some(QuitKind::ChangeDir),
         Action::Cancel => cancel(state),
+        Action::CursorDown if aids::owns_overlay(state) => aids::move_selection(state, 1),
+        Action::CursorUp if aids::owns_overlay(state) => aids::move_selection(state, -1),
+        Action::Accept if aids::owns_overlay(state) => aids::accept(state, effects),
+        Action::BookmarkSet => aids::set_bookmark(state, effects, invocation.arg),
+        Action::BookmarkJump => aids::jump_bookmark(state, effects, invocation.arg),
+        Action::BookmarkList => aids::open_bookmarks(state),
+        Action::BookmarkDelete => aids::delete_bookmark(state, effects),
+        Action::FrecencyJump => aids::open_jump(state),
+        Action::TabNew => tabs::new_tab(state, effects),
+        Action::TabGoto => tabs::goto(state, effects, invocation.arg),
+        Action::TabClose => tabs::close(state, effects),
         Action::CursorDown => nav::move_cursor(state, 1),
         Action::CursorUp => nav::move_cursor(state, -1),
         Action::CursorTop => nav::cursor_edge(state, false),

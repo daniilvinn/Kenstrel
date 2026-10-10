@@ -106,6 +106,8 @@ the palette (`Reload config`).
 |---|---|---|---|
 | `m <char>` | Set bookmark | `bookmark.set` | Remember this directory under a key. |
 | `' <char>` | Jump to bookmark | `bookmark.jump` | Jump to the directory saved under a key. |
+| `M` | List bookmarks | `bookmark.list` | List the saved bookmarks and jump to one. |
+| — | Delete bookmark | `bookmark.delete` | Delete the selected bookmark in the bookmark list. |
 | `z` | Frecency jump | `frecency.jump` | Jump to a frequently or recently used directory. |
 | `t` | New tab | `tab.new` | Open a new tab in this directory. |
 | `1-9` | Switch to tab | `tab.goto` | Switch to a numbered tab. |
@@ -225,3 +227,32 @@ the palette (`Reload config`).
 | `esc` | `cancel` |
 | `q` | `cancel` |
 | `x` | `job.cancel` |
+
+### `bookmarks`
+
+| Keys | Command |
+|---|---|
+| `esc` | `cancel` |
+| `ctrl-c` | `cancel` |
+| `q` | `cancel` |
+| `enter` | `accept` |
+| `j` | `cursor.down` |
+| `down` | `cursor.down` |
+| `k` | `cursor.up` |
+| `up` | `cursor.up` |
+| `d` | `bookmark.delete` |
+| `delete` | `bookmark.delete` |
+
+### `jump`
+
+| Keys | Command |
+|---|---|
+| `esc` | `cancel` |
+| `ctrl-c` | `cancel` |
+| `enter` | `accept` |
+| `down` | `cursor.down` |
+| `ctrl-n` | `cursor.down` |
+| `ctrl-j` | `cursor.down` |
+| `up` | `cursor.up` |
+| `ctrl-p` | `cursor.up` |
+| `ctrl-k` | `cursor.up` |

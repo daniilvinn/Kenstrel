@@ -9,8 +9,10 @@ pub mod event_loop;
 pub mod input;
 pub mod logging;
 pub mod paths;
+pub mod persist;
 pub mod reload;
 pub mod settings;
+pub mod shell_init;
 pub mod startup;
 pub mod terminal;
 
@@ -73,7 +75,7 @@ pub fn run(cli: &Cli) -> Result<()> {
     let outcome = {
         // Dropping the session restores the terminal on every path out of this block.
         let mut tui = TerminalSession::enter().context("cannot initialise the terminal")?;
-        runtime.block_on(event_loop::run_with(
+        runtime.block_on(event_loop::run_with_state(
             tui.terminal(),
             EventStream::new(),
             &mut state,
@@ -83,6 +85,7 @@ pub fn run(cli: &Cli) -> Result<()> {
                 panic_after_first_frame: cli.debug_panic,
             },
             Some(Reloader::new(paths.clone(), depth)),
+            Some(paths.state_dir().to_owned()),
         ))
     };
     // A listing stuck in a blocking syscall (an offline network share) cannot be cancelled;

@@ -4,6 +4,7 @@ pub mod format;
 pub mod help;
 pub mod icons;
 pub mod list;
+pub mod navaids;
 pub mod palette;
 pub mod popup;
 pub mod render;

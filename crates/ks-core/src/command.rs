@@ -263,6 +263,16 @@ const COMMANDS: &[(Action, Category, &str)] = &[
         "Jump to the directory saved under a key.",
     ),
     (
+        Action::BookmarkList,
+        C::TabsAndBookmarks,
+        "List the saved bookmarks and jump to one.",
+    ),
+    (
+        Action::BookmarkDelete,
+        C::TabsAndBookmarks,
+        "Delete the selected bookmark in the bookmark list.",
+    ),
+    (
         Action::FrecencyJump,
         C::TabsAndBookmarks,
         "Jump to a frequently or recently used directory.",

@@ -29,6 +29,8 @@ pub const SPINNER_INTERVAL: Duration = Duration::from_millis(100);
 pub const CLOCK_INTERVAL: Duration = Duration::from_secs(30);
 
 const MSG_QUEUE: usize = 256;
+/// How long quitting waits for the state files to be written.
+const STATE_FLUSH_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub struct LoopOptions {
     /// Messages to process before the first frame (start-up notices).
@@ -37,8 +39,8 @@ pub struct LoopOptions {
     pub panic_after_first_frame: bool,
 }
 
-/// Runs until the state requests quit, returning how. Config reloads and theme switches
-/// are unavailable (use [`run_with`] to provide a [`Reloader`]).
+/// Runs until the state requests quit, returning how. Config reloads, theme switches and
+/// state persistence are unavailable (see [`run_with`] and [`run_with_state`]).
 pub async fn run<B, E>(
     terminal: &mut Terminal<B>,
     events: E,
@@ -159,6 +161,25 @@ where
     B::Error: Send + Sync + 'static,
     E: Stream<Item = std::io::Result<Event>>,
 {
+    run_with_state(terminal, events, state, theme, options, reloader, None).await
+}
+
+/// [`run_with`], persisting bookmarks and frecency in `state_dir` (loaded in the background
+/// after start, the last changes flushed on exit).
+pub async fn run_with_state<B, E>(
+    terminal: &mut Terminal<B>,
+    events: E,
+    state: &mut AppState,
+    theme: &Theme,
+    options: LoopOptions,
+    reloader: Option<Reloader>,
+    state_dir: Option<std::path::PathBuf>,
+) -> Result<QuitKind>
+where
+    B: Backend,
+    B::Error: Send + Sync + 'static,
+    E: Stream<Item = std::io::Result<Event>>,
+{
     let mut theme = theme.clone();
     let reloader = reloader.map(Arc::new);
     let reloader = reloader.as_ref();
@@ -166,6 +187,9 @@ where
     let (side_tx, mut side_rx) = mpsc::unbounded_channel::<Side>();
     let loop_tx = tx.clone();
     let mut runner = EffectRunner::new(tx.clone());
+    if let Some(dir) = state_dir {
+        runner.set_state_dir(dir);
+    }
     spawn_interrupt_listener(tx);
     let mut events = std::pin::pin!(events);
 
@@ -239,7 +263,13 @@ where
         }
     };
 
+    // The last visits are still inside the save debounce: write them now.
+    runner.run(ks_core::pending_writes(state));
     runner.shutdown();
+    let finish = tokio::task::spawn_blocking(move || {
+        runner.finish_state_writes(STATE_FLUSH_TIMEOUT);
+    });
+    let _ = finish.await;
     Ok(outcome)
 }
 

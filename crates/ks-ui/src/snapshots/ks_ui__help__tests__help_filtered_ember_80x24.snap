@@ -1,11 +1,12 @@
 ---
 source: crates/ks-ui/src/help.rs
+assertion_line: 266
 expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────
   ╭─ Help ───────────────────────────────────────────────────────────────────╮
-  │ / sort                                                          32 shown │M
+  │ / sort                                                          34 shown │M
   │ Navigation                                                               │!
   │   j, down             Move cursor down                                   │
   │   k, up               Move cursor up                                     │
@@ -23,7 +24,7 @@ expression: "draw(&s, &theme(name))"
   │ File operations                                                          │
   │   y                   Copy                                               │
   │   p                   Paste                                              │
-──╰────────────────────────────────────────────────────────────── 1-17 / 45 ─╯──
+──╰────────────────────────────────────────────────────────────── 1-17 / 47 ─╯──
  ›                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---

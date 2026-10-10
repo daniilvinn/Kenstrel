@@ -380,3 +380,15 @@ only; features `Win32_Foundation`, `Win32_Storage_FileSystem`, `Win32_System_Tim
 `Win32_System_Diagnostics_Debug`); `tokio` with the `process` feature in `ks-fs`; `dunce`,
 `tracing`, `tokio-util` in `ks-fs`; `ks-fs` as a dependency of `ks-app`; `tempfile` as a
 dev-dependency of `ks-fs`.
+
+## Integration: P5 + P7 merge
+
+Merged `phase/p7` (tabs, bookmarks, frecency, shell init) onto main (with P5). Resolution decisions:
+
+- **Event loop**: P5's `dispatch`/`Side`/theme ownership kept as the only way messages reach `update`. P7's persistence hooks into it unchanged (`LoadNavData`/`WriteState` fall through `dispatch` to the runner; the exit flush `pending_writes` + `finish_state_writes` stays after the loop). Entry points: `run` -> `run_with(.., reloader)` -> `run_with_state(.., reloader, state_dir)`. `ks_app::run` calls `run_with_state` with both; `tests/tabs_and_state.rs` passes `None` for the reloader.
+- **Effects**: `EffectRunner::run` handles both families (P5's loop-level `SetTheme`/`ReloadConfig` are ignored there, P7's `LoadNavData`/`WriteState` are executed).
+- **Tab state**: P7 swaps per-tab fields in `AppState`, so P5 overlays needed no accessor changes. P5's `palette`, `help` and `themes` fields are classified as shared in the exhaustive `classify_state_fields` guard in `tabs.rs`.
+- **Key routing** (`update::on_key`): help filter field -> keymap resolution for the top overlay's context (overlay -> mode -> global) -> on `NoMatch`, unbound keys are text for the palette query first, otherwise `aids::on_unbound_key` (jump query); `run_action` dispatches P5's palette/help handlers first, then P7's guarded `Accept/CursorDown/CursorUp` arms for the bookmark and jump overlays. Palette runs a command only after popping itself, so `List bookmarks`, `Frecency jump` and `New tab` work from it (new test `palette_reaches_the_tab_and_bookmark_overlays`).
+- **Registry**: `bookmark.list` and `bookmark.delete` had no `COMMANDS` row (the registry test caught it); both added under "Tabs and bookmarks", so they appear in the palette, help and `docs/keymap.md` (regenerated). The other P7 actions already had rows.
+- **UI**: render order is palette, help, then bookmark/jump overlays; hint lines for the Bookmarks and Jump contexts live next to P5's Palette/Help ones. Snapshots changed only by the new commands/counts (palette `1/74`, help `/81`, two extra rows in the help view) and the `m`/`'` pending prefix now shows P5's which-key popup; all re-accepted after inspection.
+- `Cargo.lock`: took ours and let cargo regenerate (no changes needed).

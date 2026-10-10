@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::time::SystemTime;
 
+use crate::aids::LoadedNavData;
 use crate::config::Config;
 use crate::drives::DriveInfo;
 use crate::entry::Entry;
@@ -22,6 +23,8 @@ pub enum TimerKind {
     StatusExpiry,
     /// The debounce for re-running `git status` after the directory changed.
     GitRefresh,
+    /// The debounce before the frecency database is written.
+    StateSave,
 }
 
 /// Input to [`update`](crate::update::update).
@@ -93,4 +96,6 @@ pub enum Msg {
     ThemesAvailable(Vec<String>),
     /// The named theme is now the active one.
     ThemeApplied(String),
+    /// Bookmarks and frecency read from the state directory (`Effect::LoadNavData`).
+    NavDataLoaded(Box<LoadedNavData>),
 }

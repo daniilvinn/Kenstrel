@@ -606,6 +606,25 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn palette_reaches_the_tab_and_bookmark_overlays() {
+        for (query, expected) in [
+            ("list bookmarks", Overlay::Bookmarks),
+            ("frecency", Overlay::Jump),
+        ] {
+            let mut s = state();
+            key(&mut s, ":");
+            type_text(&mut s, query);
+            key(&mut s, "enter");
+            assert_eq!(s.overlays, [expected], "{query}");
+        }
+        let mut s = state();
+        key(&mut s, ":");
+        type_text(&mut s, "new tab");
+        key(&mut s, "enter");
+        assert_eq!(s.tabs.count(), 2);
+    }
+
+    #[test]
     fn enter_runs_the_command_and_closes() {
         let mut s = state();
         key(&mut s, ":");
