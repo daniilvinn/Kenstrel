@@ -1,6 +1,6 @@
 # Engine: preview (phase P2 backend)
 
-Crate `crates/ks-preview`. Self-contained, terminal-agnostic, does not depend on ks-core/ks-ui/ks-app/ks-fs. Gates (fmt, clippy `-D warnings`, `cargo test --workspace`) are clean. Nothing committed.
+Crate `crates/ks-preview`. Self-contained, terminal-agnostic, does not depend on ks-core/ks-ui/ks-app/ks-fs. Gates (fmt, clippy `-D warnings`, `cargo test --workspace`) are clean. Committed on branch engine/preview.
 
 ## Review follow-ups (this round)
 
@@ -13,7 +13,7 @@ Crate `crates/ks-preview`. Self-contained, terminal-agnostic, does not depend on
 - Unavailable reasons: TooLarge (text/md/binary > 100 MiB, image file > 64 MiB or > 100 MP), CloudPlaceholder (attrs 0x400000 / 0x1000 / 0x40000, never opened), PermissionDenied, Locked (os error 32/33), NotFound, Io.
 - Fallbacks: corrupt image / corrupt zip become the hex view with `BinaryPreview::note` set.
 - All text from file content (lines, names in dir listings, archive entry names, link targets) is sanitized: tabs expanded to stops, C0 controls become control pictures (U+2400..), DEL/C1/bidi controls/U+2028-9 become U+FFFD. ESC can never reach the terminal.
-- Tests: 17 unit + 20 integration (UTF-16 file, binary, zip built in-test, markdown, over-limit file, cache hit / miss / invalidate / bound of 64, cancellation, stale-generation, escape sanitisation, images incl. downscale + pixel guard + corrupt, hidden/readonly attrs on Windows, dir sorting/cap, timing).
+- Tests: 27 unit + 31 integration (UTF-16 file, binary, zip built in-test, markdown, over-limit file, cache hit / miss / invalidate / bound of 64, cancellation, stale-generation, escape sanitisation, images incl. downscale + pixel guard + corrupt, hidden/readonly attrs on Windows, dir sorting/cap, timing).
 
 ## Public API overview (how the wiring should use it)
 
