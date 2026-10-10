@@ -27,6 +27,9 @@ pub struct DriveInfo {
     /// Capacity in bytes, `None` when the drive cannot be queried (e.g. no disc).
     pub total: Option<u64>,
     pub free: Option<u64>,
+    /// The drive did not answer in time (a dead network share): it is listed without
+    /// details and can still be tried.
+    pub unavailable: bool,
 }
 
 impl DriveInfo {
@@ -38,6 +41,7 @@ impl DriveInfo {
             kind: DriveKind::Unknown,
             total: None,
             free: None,
+            unavailable: false,
         }
     }
 

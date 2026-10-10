@@ -6,15 +6,18 @@
 
 pub mod attrs;
 pub mod children;
+pub mod drives;
 pub mod git;
 pub mod launch;
 pub mod listing;
 pub mod ops;
 mod platform;
+pub mod stat;
 pub mod watcher;
 
 pub use children::count_children;
 pub use git::read_status as git_status;
 pub use listing::{link_target, list_dir};
 pub use platform::{list_drives, utc_offset_secs};
+pub use stat::{stat_entries, EntryStat};
 pub use watcher::DirWatcher;

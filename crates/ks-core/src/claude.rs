@@ -1081,10 +1081,12 @@ pub(crate) fn on_ipc(
         } => {
             if let Some(file) = file_path {
                 let root = ipc_context(state).root;
-                state
-                    .claude
-                    .changes
-                    .record(resolve(&root, &file), &tool_name);
+                let path = resolve(&root, &file);
+                // The finder's cache must see the edit (a created file shows up in find file).
+                effects.push(Effect::WalkCacheChanges(vec![
+                    ks_search::PathChange::Touched(path.clone()),
+                ]));
+                state.claude.changes.record(path, &tool_name);
                 state.dirty = true;
             }
             effects.push(reply(ClaudeResponse::Ok));
@@ -2140,10 +2142,13 @@ mod tests {
         let effects = hook(&mut s, "Edit", Some(&file.to_string_lossy()));
         assert_eq!(
             effects,
-            vec![Effect::ClaudeIpcReply {
-                id: 3,
-                response: ClaudeResponse::Ok
-            }]
+            vec![
+                Effect::WalkCacheChanges(vec![ks_search::PathChange::Touched(file.clone())]),
+                Effect::ClaudeIpcReply {
+                    id: 3,
+                    response: ClaudeResponse::Ok
+                }
+            ]
         );
         assert!(s.claude.changes.contains(&file));
         assert!(s.claude.changes.contains_below(&cwd().join("src")));

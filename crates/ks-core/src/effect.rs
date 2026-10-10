@@ -39,6 +39,22 @@ pub enum Effect {
     WatchDir { gen: Gen, path: PathBuf },
     /// Stop watching.
     StopWatching,
+    /// Read size and modification time of `dir/<name>` for each name (names may be relative
+    /// paths), reporting `Msg::EntryStats` in batches. Replaces a running count of children
+    /// or an earlier stat run. Used by the search results list, whose entries start without
+    /// metadata.
+    StatEntries {
+        gen: Gen,
+        dir: PathBuf,
+        names: Vec<OsString>,
+    },
+    /// Watch exactly these directories (the dirs of the parked tabs, at most one per tab) in
+    /// addition to the one of [`Effect::WatchDir`], reporting `Msg::ParkedDirChanged { path }`.
+    /// Replaces the previous set; paths that stay in the set keep their watch.
+    WatchParked { paths: Vec<PathBuf> },
+    /// List the directory of a parked tab in the background, reporting the same messages as
+    /// [`Effect::ListDir`] but without touching the running listing of the active tab.
+    ListParked { gen: Gen, path: PathBuf },
     /// Run `git status` in `dir`, reporting `Msg::GitStatus`. Replaces a running one.
     GitStatus { gen: Gen, dir: PathBuf },
     /// Count the children of the directories `names` below `dir`, reporting

@@ -37,6 +37,15 @@ pub fn tab_strip(state: &AppState, theme: &Theme) -> Vec<Span<'static>> {
             theme.dim()
         };
         spans.push(Span::styled((index + 1).to_string(), style));
+        if state.tabs.is_stale(index) {
+            // The tab's directory changed while it was in the background.
+            let mark = if state.config.icons == IconSet::Ascii {
+                "*"
+            } else {
+                "•"
+            };
+            spans.push(Span::styled(mark, theme.muted()));
+        }
     }
     spans
 }
@@ -401,6 +410,50 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn stale_tab_marker_snapshots() {
+        for name in THEMES {
+            for (w, h) in SIZES {
+                let mut s = listing_state(w, h);
+                press(&mut s, "t t 2");
+                let path = s.cwd.clone();
+                update(&mut s, Msg::ParkedDirChanged { path });
+                assert!(s.tabs.is_stale(0));
+                insta::assert_snapshot!(
+                    format!("tabs_stale_{name}_{w}x{h}"),
+                    draw(&s, &theme(name))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_parked_tab_that_changed_is_marked_in_the_strip() {
+        let mut s = listing_state(80, 24);
+        press(&mut s, "t t 2");
+        let plain: String = tab_strip(&s, &theme("ember"))
+            .iter()
+            .map(|sp| sp.content.to_string())
+            .collect();
+        assert!(!plain.contains('•'), "{plain}");
+        // Tabs 1 and 3 are parked in the same directory as the active tab 2.
+        let path = s.cwd.clone();
+        update(&mut s, Msg::ParkedDirChanged { path });
+        assert!(s.tabs.is_stale(0) && s.tabs.is_stale(2) && !s.tabs.is_stale(1));
+        let marked: String = tab_strip(&s, &theme("ember"))
+            .iter()
+            .map(|sp| sp.content.to_string())
+            .collect();
+        assert!(marked.contains('•'), "{marked}");
+        let mut ascii = s;
+        ascii.config.icons = IconSet::Ascii;
+        let marked: String = tab_strip(&ascii, &theme("ember"))
+            .iter()
+            .map(|sp| sp.content.to_string())
+            .collect();
+        assert!(marked.contains('*') && !marked.contains('•'), "{marked}");
     }
 
     #[test]

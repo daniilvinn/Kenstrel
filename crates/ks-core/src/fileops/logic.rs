@@ -1164,6 +1164,7 @@ fn finish_job(state: &mut AppState, effects: &mut Vec<Effect>, done: &JobDone) {
         remove_overlay(state, Overlay::Conflict);
     }
     set_status(state, level, text, effects);
+    crate::search::cache_after_job(effects, &done.created, &done.removed);
     refresh_after(state, effects, done);
 }
 

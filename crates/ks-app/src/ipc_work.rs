@@ -158,6 +158,9 @@ pub fn search_files(
     let options = FinderOptions {
         show_hidden: ctx.show_hidden,
         respect_gitignore: ctx.respect_gitignore,
+        // This host clears its own cache on hook events and after a TTL; a reply must not wait
+        // for a background re-walk.
+        refresh_cached: false,
         ..FinderOptions::new(root)
     };
     let token = cancel.child_token();

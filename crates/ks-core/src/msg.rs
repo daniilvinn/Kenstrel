@@ -83,9 +83,18 @@ pub enum Msg {
         gen: Gen,
         counts: Vec<(OsString, u32)>,
     },
+    /// Size and modification time of entries of the displayed results list.
+    EntryStats {
+        gen: Gen,
+        stats: Vec<(OsString, u64, Option<std::time::SystemTime>)>,
+    },
     /// The watched directory changed (already debounced by the watcher).
     DirChanged {
         gen: Gen,
+    },
+    /// A directory shown by a parked (background) tab changed (see `Effect::WatchParked`).
+    ParkedDirChanged {
+        path: std::path::PathBuf,
     },
     /// Result of `git status`; `None` when the directory is not in a repository.
     /// A snapshot of the find-file session `gen` (results window, counters).

@@ -1,0 +1,84 @@
+---
+source: crates/ks-ui/src/render.rs
+expression: rendered
+---
+ This PC
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▌ C:   Windows                                                                                                    NTFS   █████████░   31.4 GB free of 462.8 GB
+   Z:   Network Drive                                                                                                     ░░░░░░░░░░             not responding
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                                                          1/2
+   ‹l› open  ‹j› down  ‹k› up  ‹ctrl-o› back  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..160 fg=#e8e3dc bg=reset bold
+  1   0..160 fg=#403a35 bg=reset
+  2   0..1   fg=#e8e3dc bg=#2f2a26
+  2   1..2   fg=#d97757 bg=#2f2a26
+  2   2..3   fg=#e8e3dc bg=#2f2a26
+  2   3..7   fg=#7fa8c9 bg=#2f2a26 bold
+  2   7..114 fg=#e8e3dc bg=#2f2a26
+  2 114..121 fg=#716b64 bg=#2f2a26
+  2 121..122 fg=#e8e3dc bg=#2f2a26
+  2 122..132 fg=#e5b567 bg=#2f2a26
+  2 132..133 fg=#e8e3dc bg=#2f2a26
+  2 133..159 fg=#a9a29a bg=#2f2a26
+  2 159..160 fg=#e8e3dc bg=#2f2a26
+  3   3..8   fg=#7fa8c9 bg=reset bold
+  3   8..122 fg=#e8e3dc bg=reset
+  3 122..145 fg=#716b64 bg=reset
+  3 145..160 fg=#a9a29a bg=reset
+ 45   0..160 fg=#403a35 bg=reset
+ 46   1..156 fg=#d97757 bg=reset bold
+ 46 156..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..5   fg=#a9a29a bg=reset
+ 47   5..14  fg=#716b64 bg=reset
+ 47  14..15  fg=#a9a29a bg=reset
+ 47  15..24  fg=#716b64 bg=reset
+ 47  24..25  fg=#a9a29a bg=reset
+ 47  25..32  fg=#716b64 bg=reset
+ 47  32..38  fg=#a9a29a bg=reset
+ 47  38..47  fg=#716b64 bg=reset
+ 47  47..48  fg=#a9a29a bg=reset
+ 47  48..160 fg=#716b64 bg=reset

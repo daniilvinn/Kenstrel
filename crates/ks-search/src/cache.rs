@@ -9,7 +9,8 @@
 //! ignoring the verbatim prefix (`\\?\C:\` equals `C:\`). So watcher paths and finder roots
 //! match regardless of how they are spelled.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::ffi::OsStr;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -17,7 +18,19 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 
 use crate::finder::FinderItem;
-use crate::walk::{EntryKind, SKIPPED_NAMES};
+use crate::walk::{walk, EntryKind, WalkEntry, WalkOptions, WalkSink, SKIPPED_NAMES};
+use tokio_util::sync::CancellationToken;
+
+/// Exact names of entries whose relative path is not valid Unicode, keyed by the lossy
+/// `rel` string they are stored under.
+pub(crate) type RawNames = HashMap<Box<str>, Box<OsStr>>;
+
+/// One completed walk: the items plus the rare exact names of non-Unicode entries.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Walked {
+    pub items: Vec<FinderItem>,
+    pub raws: RawNames,
+}
 
 /// Identity of a cached walk. The root is compared normalized (see the module docs).
 #[derive(Debug, Clone)]
@@ -59,6 +72,10 @@ pub enum PathChange {
     Added(PathBuf, EntryKind),
     /// A file/dir (and everything below it) disappeared.
     Removed(PathBuf),
+    /// Something happened at this path and the caller does not know what (a finished file
+    /// operation, a tool that edited a file): the filesystem decides. A directory is scanned
+    /// like [`PathChange::Added`], a file is added, a missing path is removed.
+    Touched(PathBuf),
     /// A file/dir (and everything below it) moved.
     Renamed {
         /// Old path.
@@ -68,7 +85,7 @@ pub enum PathChange {
     },
 }
 
-type Entries = Arc<Vec<FinderItem>>;
+type Entries = Arc<Walked>;
 
 /// The cache. Share it as `Arc<WalkCache>`.
 #[derive(Default)]
@@ -107,13 +124,46 @@ impl WalkCache {
     /// Number of entries cached for `key`.
     pub fn len_of(&self, key: &CacheKey) -> Option<usize> {
         let g = self.inner.lock();
-        g.iter().find(|(k, _)| k == key).map(|(_, v)| v.len())
+        g.iter().find(|(k, _)| k == key).map(|(_, v)| v.items.len())
     }
 
-    pub(crate) fn put(&self, key: CacheKey, entries: Vec<FinderItem>) {
+    /// Stores a completed walk (replacing any earlier one for the key).
+    pub fn put(&self, key: CacheKey, items: Vec<FinderItem>) {
+        self.put_walked(
+            key,
+            Arc::new(Walked {
+                items,
+                raws: RawNames::new(),
+            }),
+        );
+    }
+
+    /// Stores `fresh` for `key` only if the cache still holds exactly `expected` (or nothing
+    /// for the key): a newer incremental update ([`apply_changes`](Self::apply_changes)) that
+    /// landed while `fresh` was being computed must not be overwritten by it.
+    pub(crate) fn put_walked_if_unchanged(
+        &self,
+        key: CacheKey,
+        expected: &Entries,
+        fresh: Entries,
+    ) {
+        let mut g = self.inner.lock();
+        match g.iter().find(|(k, _)| *k == key) {
+            Some((_, cur)) if !Arc::ptr_eq(cur, expected) => {}
+            _ => {
+                g.retain(|(k, _)| *k != key);
+                g.push((key, fresh));
+                while g.len() > Self::MAX_ROOTS {
+                    g.remove(0);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn put_walked(&self, key: CacheKey, walked: Entries) {
         let mut g = self.inner.lock();
         g.retain(|(k, _)| *k != key);
-        g.push((key, Arc::new(entries)));
+        g.push((key, walked));
         while g.len() > Self::MAX_ROOTS {
             g.remove(0);
         }
@@ -139,8 +189,8 @@ impl WalkCache {
     /// work runs on a private copy outside the cache lock (the filesystem is also only
     /// queried there), so concurrent finder starts are never blocked by it; the result is then
     /// swapped in. Limits: `Added` cannot evaluate gitignore rules (the hidden and built-in
-    /// skip rules are honoured), and an added directory is not scanned; the watcher should
-    /// report its contents or the caller should [`invalidate`] the root. Sessions that are
+    /// skip rules are honoured). An added directory is scanned (on the calling thread,
+    /// honouring the walk toggles of each cached root) so its contents appear too. Sessions that are
     /// already open keep their snapshot; reopen to see the change. Added paths are stored in
     /// their lossy UTF-8 form, and renamed entries lose their exact original name (see
     /// [`FinderItem::raw`]).
@@ -149,13 +199,36 @@ impl WalkCache {
     pub fn apply_changes(&self, changes: &[PathChange]) {
         let _serial = self.apply_lock.lock();
         // Filesystem queries happen here, not under the cache lock.
-        let kinds: Vec<EntryKind> = changes
-            .iter()
-            .map(|c| match c {
-                PathChange::Renamed { to, .. } if to.is_dir() => EntryKind::Dir,
-                _ => EntryKind::File,
-            })
-            .collect();
+        let mut resolved: Vec<PathChange> = Vec::with_capacity(changes.len());
+        let mut kinds: Vec<EntryKind> = Vec::with_capacity(changes.len());
+        for c in changes {
+            let (change, kind) = match c {
+                PathChange::Renamed { to, .. } if to.is_dir() => (c.clone(), EntryKind::Dir),
+                PathChange::Touched(p) => match std::fs::symlink_metadata(p) {
+                    Ok(m) if m.is_dir() => {
+                        (PathChange::Added(p.clone(), EntryKind::Dir), EntryKind::Dir)
+                    }
+                    Ok(m) => {
+                        let kind = if m.file_type().is_symlink() {
+                            EntryKind::Symlink
+                        } else {
+                            EntryKind::File
+                        };
+                        (PathChange::Added(p.clone(), kind), kind)
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        (PathChange::Removed(p.clone()), EntryKind::File)
+                    }
+                    // Locked, access denied, transient network error: the file still
+                    // exists as far as we know, so leave the cache alone.
+                    Err(_) => continue,
+                },
+                _ => (c.clone(), EntryKind::File),
+            };
+            resolved.push(change);
+            kinds.push(kind);
+        }
+        let changes = resolved;
         let snapshot: Vec<(CacheKey, Entries)> = self.inner.lock().clone();
         for (key, orig) in snapshot {
             let mut work = orig.clone();
@@ -184,6 +257,76 @@ struct ApplyState {
     /// Folded rel paths of the working copy; built lazily for `Added` bursts and discarded
     /// by any other mutation.
     known: Option<HashSet<String>>,
+}
+
+impl ApplyState {
+    fn known(&mut self, entries: &Walked) -> &mut HashSet<String> {
+        self.known
+            .get_or_insert_with(|| entries.items.iter().map(|e| fold(e.rel())).collect())
+    }
+}
+
+/// Most entries one newly appeared directory contributes; bounds how long `apply_changes`
+/// (which serializes behind `apply_lock`) can be held by a huge copy. The next reopen's
+/// background re-walk picks up the rest.
+const SCAN_NEW_DIR_CAP: usize = 200_000;
+
+struct ScanSink<'a> {
+    local: Vec<(PathBuf, EntryKind)>,
+    out: &'a Mutex<Vec<(PathBuf, EntryKind)>>,
+    count: &'a std::sync::atomic::AtomicUsize,
+}
+
+impl WalkSink for ScanSink<'_> {
+    fn entry(&mut self, entry: WalkEntry) -> bool {
+        self.local.push((entry.path().to_path_buf(), entry.kind));
+        self.count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            < SCAN_NEW_DIR_CAP
+    }
+}
+
+impl Drop for ScanSink<'_> {
+    fn drop(&mut self) {
+        self.out.lock().append(&mut self.local);
+    }
+}
+
+/// Scans a directory that appeared under the root and adds what it contains (honouring the
+/// walk toggles of `key`). Runs on the caller's thread, outside the cache lock.
+fn scan_new_dir(key: &CacheKey, dir: &Path, entries: &mut Entries, state: &mut ApplyState) {
+    let opts = WalkOptions {
+        root: dir.to_path_buf(),
+        show_hidden: key.show_hidden,
+        respect_gitignore: key.respect_gitignore,
+        include_dirs: key.include_dirs,
+        threads: 0,
+        overrides: None,
+        skip_cloud_dirs: false,
+    };
+    let found: Mutex<Vec<(PathBuf, EntryKind)>> = Mutex::new(Vec::new());
+    let count = std::sync::atomic::AtomicUsize::new(0);
+    walk(&opts, &CancellationToken::new(), || ScanSink {
+        local: Vec::new(),
+        out: &found,
+        count: &count,
+    });
+    let found = found.into_inner();
+    if found.is_empty() {
+        return;
+    }
+    let known = state.known(entries);
+    let mut fresh = Vec::new();
+    for (path, kind) in found {
+        let Some(rel) = rel_string(&key.root, &path) else {
+            continue;
+        };
+        if excluded_by_rules(key, &rel) || !known.insert(fold(&rel)) {
+            continue;
+        }
+        fresh.push(FinderItem::new(rel.as_str(), kind));
+    }
+    Arc::make_mut(entries).items.extend(fresh);
 }
 
 fn is_sep(c: char) -> bool {
@@ -223,6 +366,24 @@ fn fold(s: &str) -> String {
         }
     }
     out
+}
+
+/// Hash of the folded form of `s` (see [`fold`]); `buf` is scratch space reused across calls.
+pub(crate) fn fold_hash(buf: &mut String, s: &str) -> u64 {
+    use std::hash::BuildHasher;
+    buf.clear();
+    let s = strip_verbatim(s);
+    for c in s.chars() {
+        if is_sep(c) {
+            buf.push('\\');
+        } else if cfg!(windows) {
+            buf.extend(c.to_lowercase());
+        } else {
+            buf.push(c);
+        }
+    }
+    std::hash::BuildHasherDefault::<std::collections::hash_map::DefaultHasher>::default()
+        .hash_one(buf.as_str())
 }
 
 /// Normalized identity of a root directory (no trailing separator).
@@ -305,28 +466,40 @@ fn apply_one(
             let Some(rel) = rel_string(&key.root, path) else {
                 return;
             };
-            if (*kind == EntryKind::Dir && !key.include_dirs) || excluded_by_rules(key, &rel) {
+            if excluded_by_rules(key, &rel) {
                 return;
             }
-            let known = state
-                .known
-                .get_or_insert_with(|| entries.iter().map(|e| fold(&e.rel)).collect());
-            if !known.insert(fold(&rel)) {
-                return;
+            let is_dir = *kind == EntryKind::Dir;
+            if !is_dir || key.include_dirs {
+                let known = state.known(entries);
+                if known.insert(fold(&rel)) {
+                    Arc::make_mut(entries)
+                        .items
+                        .push(FinderItem::new(rel.as_str(), *kind));
+                }
             }
-            Arc::make_mut(entries).push(FinderItem::new(rel, *kind));
+            if is_dir {
+                scan_new_dir(key, path, entries, state);
+            }
         }
+        PathChange::Touched(_) => {}
         PathChange::Removed(path) => {
             let Some(rel) = rel_string(&key.root, path) else {
                 // The root itself vanished: empty the walk.
-                if root_key(path) == root_key(&key.root) && !entries.is_empty() {
-                    Arc::make_mut(entries).clear();
+                if root_key(path) == root_key(&key.root) && !entries.items.is_empty() {
+                    Arc::make_mut(entries).items.clear();
                     state.known = None;
                 }
                 return;
             };
-            if entries.iter().any(|e| relate(&e.rel, &rel).is_some()) {
-                Arc::make_mut(entries).retain(|e| relate(&e.rel, &rel).is_none());
+            if entries
+                .items
+                .iter()
+                .any(|e| relate(e.rel(), &rel).is_some())
+            {
+                Arc::make_mut(entries)
+                    .items
+                    .retain(|e| relate(e.rel(), &rel).is_none());
                 state.known = None;
             }
         }
@@ -345,17 +518,16 @@ fn apply_one(
                         );
                         return;
                     }
-                    if !entries.iter().any(|e| relate(&e.rel, &f).is_some()) {
+                    if !entries.items.iter().any(|e| relate(e.rel(), &f).is_some()) {
                         return;
                     }
-                    for e in Arc::make_mut(entries).iter_mut() {
-                        let new_rel = match relate(&e.rel, &f) {
+                    for e in Arc::make_mut(entries).items.iter_mut() {
+                        let new_rel = match relate(e.rel(), &f) {
                             Some(Rel::Same) => t.clone(),
                             Some(Rel::Below(rem)) => format!("{t}{rem}"),
                             None => continue,
                         };
-                        e.rel = new_rel.into_boxed_str();
-                        e.raw = None;
+                        *e = e.with_rel(&new_rel);
                     }
                     state.known = None;
                 }
@@ -408,8 +580,9 @@ mod tests {
         let mut v: Vec<_> = c
             .get(k)
             .unwrap()
+            .items
             .iter()
-            .map(|e| e.rel.to_string())
+            .map(|e| e.rel().to_string())
             .collect();
         v.sort();
         v
@@ -436,6 +609,93 @@ mod tests {
         assert_eq!(rels(&c, &k), vec!["new.txt", "z/b.txt", "z/e/c.txt"]);
         c.apply_changes(&[PathChange::Removed(PathBuf::from("/r/z"))]);
         assert_eq!(rels(&c, &k), vec!["new.txt"]);
+    }
+
+    fn disk_setup(include_dirs: bool) -> (tempfile::TempDir, WalkCache, CacheKey) {
+        let t = tempfile::tempdir().unwrap();
+        let key = CacheKey {
+            root: t.path().to_path_buf(),
+            show_hidden: false,
+            respect_gitignore: true,
+            include_dirs,
+        };
+        let c = WalkCache::new();
+        c.put(key.clone(), vec![item("a.txt")]);
+        (t, c, key)
+    }
+
+    fn write(root: &Path, rel: &str) {
+        let p = root.join(rel);
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, "x").unwrap();
+    }
+
+    #[test]
+    fn added_directory_is_scanned() {
+        let (t, c, k) = disk_setup(false);
+        write(t.path(), "newdir/a.rs");
+        write(t.path(), "newdir/deep/er/b.rs");
+        write(t.path(), "newdir/.hidden");
+        c.apply_changes(&[PathChange::Added(t.path().join("newdir"), EntryKind::Dir)]);
+        let sep = std::path::MAIN_SEPARATOR;
+        let mut want = vec![
+            "a.txt".to_string(),
+            format!("newdir{sep}a.rs"),
+            format!("newdir{sep}deep{sep}er{sep}b.rs"),
+        ];
+        want.sort();
+        assert_eq!(rels(&c, &k), want);
+        // Applying it again adds nothing.
+        c.apply_changes(&[PathChange::Added(t.path().join("newdir"), EntryKind::Dir)]);
+        assert_eq!(c.len_of(&k), Some(3));
+    }
+
+    #[test]
+    fn added_directory_is_listed_and_scanned_with_include_dirs() {
+        let (t, c, k) = disk_setup(true);
+        write(t.path(), "d/e/f.txt");
+        c.apply_changes(&[PathChange::Added(t.path().join("d"), EntryKind::Dir)]);
+        let sep = std::path::MAIN_SEPARATOR;
+        assert_eq!(
+            rels(&c, &k),
+            vec![
+                "a.txt".to_string(),
+                "d".to_string(),
+                format!("d{sep}e"),
+                format!("d{sep}e{sep}f.txt"),
+            ]
+        );
+    }
+
+    #[test]
+    fn touched_resolves_through_the_filesystem() {
+        let (t, c, k) = disk_setup(false);
+        write(t.path(), "made/x.txt");
+        write(t.path(), "single.txt");
+        c.apply_changes(&[
+            PathChange::Touched(t.path().join("made")),
+            PathChange::Touched(t.path().join("single.txt")),
+            PathChange::Touched(t.path().join("a.txt")),
+        ]);
+        // a.txt does not exist on disk: Touched removes it.
+        let sep = std::path::MAIN_SEPARATOR;
+        assert_eq!(
+            rels(&c, &k),
+            vec![format!("made{sep}x.txt"), "single.txt".to_string()]
+        );
+    }
+
+    #[test]
+    fn moved_in_directory_is_scanned() {
+        let (t, c, k) = disk_setup(false);
+        write(t.path(), "moved/in.txt");
+        let outside = tempfile::tempdir().unwrap();
+        c.apply_changes(&[PathChange::Renamed {
+            from: outside.path().join("moved"),
+            to: t.path().join("moved"),
+        }]);
+        let sep = std::path::MAIN_SEPARATOR;
+        assert!(rels(&c, &k).contains(&format!("moved{sep}in.txt")));
     }
 
     #[test]
@@ -550,5 +810,55 @@ mod tests {
         assert_eq!(got, vec![r"New.rs", r"lib\deep\x.rs", r"lib\main.rs"]);
         c.invalidate(Path::new(r"\\?\C:\work\proj"));
         assert!(!c.contains(&key));
+    }
+
+    #[test]
+    fn a_touched_path_that_cannot_be_inspected_is_not_removed() {
+        let t = tempfile::tempdir().unwrap();
+        let key = CacheKey {
+            root: t.path().to_path_buf(),
+            show_hidden: false,
+            respect_gitignore: true,
+            include_dirs: false,
+        };
+        let cache = WalkCache::new();
+        cache.put(
+            key.clone(),
+            vec![FinderItem::new("keep.txt", EntryKind::File)],
+        );
+        // A path with an interior NUL fails with InvalidInput, not NotFound.
+        let bad = t.path().join("keep.txt x");
+        cache.apply_changes(&[PathChange::Touched(bad)]);
+        assert_eq!(cache.len_of(&key), Some(1));
+        // A genuinely missing file is removed.
+        cache.apply_changes(&[PathChange::Touched(t.path().join("keep.txt"))]);
+        assert_eq!(cache.len_of(&key), Some(0));
+    }
+
+    #[test]
+    fn a_stale_refresh_does_not_overwrite_a_newer_incremental_update() {
+        let t = tempfile::tempdir().unwrap();
+        let key = CacheKey {
+            root: t.path().to_path_buf(),
+            show_hidden: false,
+            respect_gitignore: true,
+            include_dirs: false,
+        };
+        let cache = WalkCache::new();
+        cache.put(key.clone(), vec![FinderItem::new("a.txt", EntryKind::File)]);
+        let snapshot = cache.get(&key).unwrap();
+        // An incremental change lands while the re-walk is running ...
+        cache.apply_changes(&[PathChange::Added(t.path().join("b.txt"), EntryKind::File)]);
+        // ... so the (older) re-walk result must not replace it.
+        let fresh = Arc::new(Walked {
+            items: vec![FinderItem::new("a.txt", EntryKind::File)],
+            raws: RawNames::new(),
+        });
+        cache.put_walked_if_unchanged(key.clone(), &snapshot, fresh.clone());
+        assert_eq!(cache.len_of(&key), Some(2));
+        // With nothing in between the result is stored.
+        let current = cache.get(&key).unwrap();
+        cache.put_walked_if_unchanged(key.clone(), &current, fresh);
+        assert_eq!(cache.len_of(&key), Some(1));
     }
 }

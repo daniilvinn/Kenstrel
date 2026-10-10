@@ -367,6 +367,7 @@ pub(crate) fn show_results_list(
     view.finish_loading();
     if crate::tabs::has_room(state) {
         crate::tabs::open_in_new_tab(state, effects, root, view);
+        stat_results(state, effects);
         return;
     }
     // Tab limit reached: take over the current pane.
@@ -385,7 +386,27 @@ pub(crate) fn show_results_list(
     state.watch_gen.bump();
     effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
     effects.push(Effect::StopWatching);
+    stat_results(state, effects);
     state.dirty = true;
+}
+
+/// Asks for size and modification time of the entries of the displayed results list (they
+/// are read lazily, off the UI thread, so the columns fill in after the list appears).
+pub(crate) fn stat_results(state: &mut AppState, effects: &mut Vec<Effect>) {
+    let names: Vec<OsString> = state
+        .view
+        .entries()
+        .iter()
+        .map(|e| e.name.clone())
+        .collect();
+    if names.is_empty() {
+        return;
+    }
+    effects.push(Effect::StatEntries {
+        gen: state.children_gen.bump(),
+        dir: state.cwd.clone(),
+        names,
+    });
 }
 
 /// Leaves a virtual results list: lists the real directory again (a fresh view, so the list
@@ -697,6 +718,18 @@ pub(crate) fn on_git_timer(state: &mut AppState, effects: &mut Vec<Effect>, gen:
 pub(crate) fn on_git_status(state: &mut AppState, gen: Gen, snapshot: Option<Box<GitSnapshot>>) {
     if state.git_gen.is_current(gen) {
         state.git = snapshot.map(|boxed| *boxed);
+        state.dirty = true;
+    }
+}
+
+pub(crate) fn on_entry_stats(
+    state: &mut AppState,
+    gen: Gen,
+    stats: Vec<(OsString, u64, Option<std::time::SystemTime>)>,
+) {
+    if state.children_gen.is_current(gen) && !state.show_drives && state.view.label.is_some() {
+        let height = state.viewport_height();
+        state.view.apply_stats(stats, height);
         state.dirty = true;
     }
 }

@@ -61,6 +61,10 @@ pub struct FinderState {
     pub scroll: u32,
     /// Marked results in marking order.
     pub marks: Vec<FinderResult>,
+    /// While `ctrl-r` is looking for a scope with a root of its own: the roots passed so far
+    /// (a scope that resolves to one of them, such as the git root when already at it, is
+    /// skipped).
+    cycle_seen: Option<Vec<PathBuf>>,
 }
 
 impl FinderState {
@@ -111,6 +115,7 @@ pub(crate) fn open(state: &mut AppState, effects: &mut Vec<Effect>) {
         selected: 0,
         scroll: 0,
         marks: Vec::new(),
+        cycle_seen: None,
     };
     state.search.finder = Some(finder);
     state.overlays.push(Overlay::Finder);
@@ -175,12 +180,30 @@ pub(crate) fn on_text_key(state: &mut AppState, effects: &mut Vec<Effect>, key: 
     }
 }
 
-pub(crate) fn on_results(state: &mut AppState, gen: u64, snapshot: FinderSnapshot) {
+pub(crate) fn on_results(
+    state: &mut AppState,
+    effects: &mut Vec<Effect>,
+    gen: u64,
+    snapshot: FinderSnapshot,
+) {
     let Some(f) = state.search.finder.as_mut() else {
         return;
     };
     if f.gen != gen || snapshot.query != f.input.text() {
         return;
+    }
+    // `ctrl-r` landed on a scope whose root is one it already passed: go on to the next.
+    if let Some(mut seen) = f.cycle_seen.take() {
+        let repeated = seen
+            .iter()
+            .any(|root| crate::fileops::same_path(root, &snapshot.root));
+        // Four scopes exist; when all of them resolve to one root the cycle wraps back to the
+        // scope it started on, so ctrl-r never leaves a scope label that shows the same results.
+        if repeated && seen.len() < 4 {
+            seen.push(snapshot.root);
+            advance_scope(state, effects, seen);
+            return;
+        }
     }
     f.root = Some(snapshot.root);
     f.matched = snapshot.matched;
@@ -242,11 +265,23 @@ pub(crate) fn half_page(state: &mut AppState, effects: &mut Vec<Effect>, down: b
 }
 
 pub(crate) fn cycle_scope(state: &mut AppState, effects: &mut Vec<Effect>) {
+    let seen = state
+        .search
+        .finder
+        .as_ref()
+        .map(|f| f.root.iter().cloned().collect())
+        .unwrap_or_default();
+    advance_scope(state, effects, seen);
+}
+
+/// Moves to the next scope and restarts the session; `seen` are the roots passed already.
+fn advance_scope(state: &mut AppState, effects: &mut Vec<Effect>, seen: Vec<PathBuf>) {
     let rows = FinderState::rows(state.size);
     if let Some(f) = state.search.finder.as_mut() {
         f.scope = f.scope.next();
         f.root = None;
         f.marks.clear();
+        f.cycle_seen = Some(seen);
         state.search.finder_scope = f.scope;
     }
     reset_view(state);

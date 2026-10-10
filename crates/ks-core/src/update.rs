@@ -73,11 +73,21 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             state.utc_offset_secs = utc_offset_secs;
             state.dirty = true;
         }
-        Msg::ListingChunk { gen, entries } => nav::on_chunk(state, &mut effects, gen, entries),
-        Msg::ListingFinished { gen, error } => nav::on_finished(state, &mut effects, gen, error),
+        Msg::ListingChunk { gen, entries } => {
+            if let Some(entries) = tabs::parked_chunk(state, gen, entries) {
+                nav::on_chunk(state, &mut effects, gen, entries);
+            }
+        }
+        Msg::ListingFinished { gen, error } => {
+            if !tabs::parked_finished(state, &mut effects, gen, error.is_some()) {
+                nav::on_finished(state, &mut effects, gen, error);
+            }
+        }
         Msg::DrivesLoaded { gen, drives } => nav::on_drives(state, &mut effects, gen, drives),
         Msg::ChildCounts { gen, counts } => nav::on_child_counts(state, gen, counts),
+        Msg::EntryStats { gen, stats } => nav::on_entry_stats(state, gen, stats),
         Msg::DirChanged { gen } => nav::on_dir_changed(state, &mut effects, gen),
+        Msg::ParkedDirChanged { path } => tabs::on_parked_dir_changed(state, &mut effects, &path),
         Msg::GitStatus { gen, snapshot } => nav::on_git_status(state, gen, snapshot),
         Msg::ConfigReloaded {
             config,
@@ -107,7 +117,9 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::Preview(msg) => preview::on_preview(state, msg),
         Msg::ParentPreview(msg) => preview::on_parent(state, msg),
         Msg::ImageReady => state.dirty = true,
-        Msg::FinderResults { gen, snapshot } => search::on_finder_results(state, gen, *snapshot),
+        Msg::FinderResults { gen, snapshot } => {
+            search::on_finder_results(state, &mut effects, gen, *snapshot);
+        }
         Msg::Grep(event) => search::grep::on_event(state, event),
         Msg::Paste(text) => claude::on_paste(state, text, &mut effects),
         Msg::ClaudePreflight { generation, result } => {
