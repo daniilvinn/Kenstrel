@@ -7,6 +7,7 @@ members = [
     "crates/ks-preview",
     "crates/ks-ui",
     "crates/ks-app",
+    "crates/ks-claude",
 ]
 
 [workspace.package]
@@ -33,6 +34,7 @@ strip = true
 ks-core = { path = "crates/ks-core" }
 ks-fs = { path = "crates/ks-fs" }
 ks-ui = { path = "crates/ks-ui" }
+ks-claude = { path = "crates/ks-claude" }
 
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
@@ -44,6 +46,7 @@ insta = "1.49.0"
 notify = "8.2.0"
 notify-debouncer-full = "0.7.0"
 ratatui = "0.30.2"
+regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
 tempfile = "3.27.0"
 thiserror = "2.0.21"
