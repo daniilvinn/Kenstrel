@@ -395,14 +395,18 @@ async fn create_rename_and_undo_each_step() {
     .await;
 
     // Undo: rename, then create, then create.
+    h.jobs_idle().await;
     h.keys("u");
     h.shows("notes.md").await;
     h.gone("notes_v2.md").await;
+    h.jobs_idle().await;
     h.keys("u");
     h.gone("notes.md").await;
+    h.jobs_idle().await;
     h.keys("u");
     h.gone("proj").await;
     assert_eq!(listing(&root), ["keep.txt"]);
+    h.jobs_idle().await;
     h.keys("u");
     h.until("nothing to undo", |s| {
         s.status
@@ -432,6 +436,7 @@ async fn move_undo_and_trash_undo() {
     h.keys("p");
     h.jobs_idle().await;
     assert!(root.join("dest/m.txt").is_file() && !root.join("m.txt").exists());
+    h.jobs_idle().await;
     h.keys("u");
     h.until("the move to be undone", |_| root.join("m.txt").is_file())
         .await;
@@ -643,6 +648,7 @@ async fn bulk_rename_through_an_editor_preview_confirm_and_undo() {
     assert_eq!(read(work.join("x_b.txt")), "b.txt");
 
     // One undo restores the whole batch.
+    h.jobs_idle().await;
     h.keys("u");
     h.until("the batch undo", |_| work.join("a.txt").exists())
         .await;
@@ -650,8 +656,24 @@ async fn bulk_rename_through_an_editor_preview_confirm_and_undo() {
         listing(&work) == ["a.txt", "b.txt", "c.txt"]
     })
     .await;
-    // The temp edit file is gone: nothing new is left in the temp dir.
-    assert_eq!(bulk_temp_files(), before, "the edit file was not removed");
+    // The temp edit file is gone: nothing new is left in the temp dir. Other test processes
+    // (parallel tracks, other bulk tests) may create and remove their own files meanwhile, so
+    // wait briefly for the set to settle instead of comparing once.
+    let started = Instant::now();
+    loop {
+        let leftover: Vec<String> = bulk_temp_files()
+            .into_iter()
+            .filter(|n| !before.contains(n))
+            .collect();
+        if leftover.is_empty() {
+            break;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the edit file was not removed: {leftover:?}"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 }
 
 #[cfg(windows)]
@@ -913,6 +935,7 @@ async fn copy_keep_both_with_enter_then_undo_removes_the_copy() {
     h.shows("kb_unique_a (1).txt").await;
 
     // Undoing a copy removes what it created, and only that.
+    h.jobs_idle().await;
     h.keys("u");
     h.gone("kb_unique_a (1).txt").await;
     assert_eq!(listing(&dst), ["kb_unique_a.txt"]);

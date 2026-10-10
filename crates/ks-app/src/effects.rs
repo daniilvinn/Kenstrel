@@ -32,6 +32,72 @@ enum Slot {
     Watcher,
     Git,
     ChildCounts,
+    /// Lazy size/mtime reads of a results list; apart from `ChildCounts` so a directory
+    /// tab's child counts never cancel them.
+    Stats,
+}
+
+/// Most parked-tab directories that are watched at once (one per tab, the active tab has its
+/// own watch).
+const PARKED_WATCH_LIMIT: usize = ks_core::tabs::MAX_TABS - 1;
+
+/// Starts a directory watch that lives until `token` is cancelled; every debounced change
+/// sends `make()`. A watch that cannot be set up warns the user when `warn` is set.
+fn spawn_watch(
+    tx: Sender<Msg>,
+    token: CancellationToken,
+    path: PathBuf,
+    make: impl Fn() -> Msg + Send + 'static,
+    warn: bool,
+) {
+    tokio::spawn(async move {
+        let notify_tx = tx.clone();
+        let watch_path = path.clone();
+        // Setting up a watch touches the file system, so it stays off the loop.
+        let created = tokio::task::spawn_blocking(move || {
+            DirWatcher::new(&watch_path, move || {
+                let _ = notify_tx.blocking_send(make());
+            })
+        })
+        .await;
+        let watcher = match created {
+            Ok(Ok(watcher)) => watcher,
+            Ok(Err(error)) => {
+                tracing::warn!(path = %path.display(), %error, "cannot watch directory");
+                if warn && !token.is_cancelled() {
+                    let _ = tx
+                        .send(Msg::Notify {
+                            level: Level::Warning,
+                            text: "This directory cannot be watched; changes will not appear on their own"
+                                .to_owned(),
+                        })
+                        .await;
+                }
+                return;
+            }
+            Err(error) => {
+                tracing::error!(%error, "watcher setup task failed");
+                return;
+            }
+        };
+        token.cancelled().await;
+        // Dropping stops the OS watch; do it where blocking is allowed.
+        let _ = tokio::task::spawn_blocking(move || drop(watcher)).await;
+    });
+}
+
+/// Bookkeeping of the `git status` run in flight. A request for the directory that is being
+/// scanned does not start a second run (or kill the first, which on a huge repository under
+/// constant file churn would never finish): it only records the newest generation and that
+/// the files changed again, and the running task answers with the newest generation and
+/// scans once more.
+struct GitRun {
+    dir: PathBuf,
+    gen: Gen,
+    /// Files changed since the scan in flight started.
+    dirty: bool,
+    /// The task is still going (cleared by the task itself, under the lock).
+    running: bool,
 }
 
 pub struct EffectRunner {
@@ -54,6 +120,13 @@ pub struct EffectRunner {
     walk_cache: Arc<WalkCache>,
     finder: Option<FinderWorker>,
     grep: Option<GrepHandle>,
+    /// Watches of the directories of the parked tabs, by path (`Effect::WatchParked`).
+    parked: Vec<(PathBuf, CancellationToken)>,
+    /// The running background re-list of each parked directory: a newer one for the same
+    /// path, or the tab being activated, cancels it so re-lists never pile up under churn.
+    parked_lists: Vec<(PathBuf, CancellationToken)>,
+    /// The `git status` run in flight, if any (see [`GitRun`]).
+    git_run: Option<Arc<std::sync::Mutex<GitRun>>>,
     /// Performs the `Effect::Claude*` requests (PLAN section 10).
     claude: ClaudeHost,
 }
@@ -75,6 +148,9 @@ impl EffectRunner {
             walk_cache: Arc::new(WalkCache::new()),
             finder: None,
             grep: None,
+            parked: Vec::new(),
+            parked_lists: Vec::new(),
+            git_run: None,
         }
     }
 
@@ -156,6 +232,7 @@ impl EffectRunner {
                     }
                 }
                 Effect::ListDir { gen, path } => self.list_dir(gen, path),
+                Effect::ListParked { gen, path } => self.list_parked(gen, path),
                 Effect::ListDrives { gen } => self.list_drives(gen),
                 Effect::WatchDir { gen, path } => self.watch_dir(gen, path),
                 Effect::StopWatching => {
@@ -163,8 +240,10 @@ impl EffectRunner {
                         token.cancel();
                     }
                 }
+                Effect::WatchParked { paths } => self.watch_parked(paths),
                 Effect::GitStatus { gen, dir } => self.git_status(gen, dir),
                 Effect::CountChildren { gen, dir, names } => self.count_children(gen, dir, names),
+                Effect::StatEntries { gen, dir, names } => self.stat_entries(gen, dir, names),
                 // These change the loop's own theme and config; `event_loop::dispatch`
                 // performs them before effects reach the runner.
                 Effect::SetTheme { .. } | Effect::ReloadConfig => {
@@ -288,6 +367,8 @@ impl EffectRunner {
         self.shutdown.cancel();
         self.timers.clear();
         self.slots.clear();
+        self.parked.clear();
+        self.parked_lists.clear();
         // Dropping a previewer cancels its work and stops its threads.
         self.previewer = None;
         self.parent_previewer = None;
@@ -326,6 +407,32 @@ impl EffectRunner {
         });
     }
 
+    /// Lists the directory of a parked tab on its own task: it neither replaces nor is
+    /// replaced by the listing of the active tab.
+    fn list_parked(&mut self, gen: Gen, path: PathBuf) {
+        let token = self.shutdown.child_token();
+        self.parked_lists.retain(|(p, t)| {
+            let same = *p == path;
+            if same {
+                t.cancel();
+            }
+            !same && !t.is_cancelled()
+        });
+        self.parked_lists.push((path.clone(), token.clone()));
+        let tx = self.tx.clone();
+        tokio::task::spawn_blocking(move || {
+            let result = ks_fs::list_dir(&path, &token, |entries| {
+                tx.blocking_send(Msg::ListingChunk { gen, entries }).is_ok()
+            });
+            if !token.is_cancelled() {
+                let _ = tx.blocking_send(Msg::ListingFinished {
+                    gen,
+                    error: result.err(),
+                });
+            }
+        });
+    }
+
     fn list_drives(&mut self, gen: Gen) {
         let token = self.claim(Slot::Listing);
         let tx = self.tx.clone();
@@ -339,58 +446,108 @@ impl EffectRunner {
 
     fn watch_dir(&mut self, gen: Gen, path: PathBuf) {
         let token = self.claim(Slot::Watcher);
-        let tx = self.tx.clone();
-        tokio::spawn(async move {
-            let notify_tx = tx.clone();
-            let watch_path = path.clone();
-            // Setting up a watch touches the file system, so it stays off the loop.
-            let created = tokio::task::spawn_blocking(move || {
-                DirWatcher::new(&watch_path, move || {
-                    let _ = notify_tx.blocking_send(Msg::DirChanged { gen });
-                })
-            })
-            .await;
-            let watcher = match created {
-                Ok(Ok(watcher)) => watcher,
-                Ok(Err(error)) => {
-                    tracing::warn!(path = %path.display(), %error, "cannot watch directory");
-                    if !token.is_cancelled() {
-                        let _ = tx
-                            .send(Msg::Notify {
-                                level: Level::Warning,
-                                text: "This directory cannot be watched; changes will not appear on their own"
-                                    .to_owned(),
-                            })
-                            .await;
-                    }
-                    return;
-                }
-                Err(error) => {
-                    tracing::error!(%error, "watcher setup task failed");
-                    return;
-                }
-            };
-            token.cancelled().await;
-            // Dropping stops the OS watch; do it where blocking is allowed.
-            let _ = tokio::task::spawn_blocking(move || drop(watcher)).await;
+        spawn_watch(
+            self.tx.clone(),
+            token,
+            path,
+            move || Msg::DirChanged { gen },
+            true,
+        );
+    }
+
+    /// Makes the set of watched parked-tab directories exactly `paths`: new ones get a
+    /// watcher, ones that stay keep theirs, the rest stop.
+    fn watch_parked(&mut self, paths: Vec<PathBuf>) {
+        // At most one watch per tab, whatever the caller sends.
+        let paths: Vec<PathBuf> = paths.into_iter().take(PARKED_WATCH_LIMIT).collect();
+        self.parked.retain(|(path, token)| {
+            let keep = paths.contains(path);
+            if !keep {
+                token.cancel();
+            }
+            keep
         });
+        // A tab that is no longer parked (activated, closed or moved on) needs no re-list.
+        self.parked_lists.retain(|(path, token)| {
+            let keep = paths.contains(path);
+            if !keep {
+                token.cancel();
+            }
+            keep
+        });
+        for path in paths {
+            if self.parked.iter().any(|(p, _)| *p == path) {
+                continue;
+            }
+            let token = self.shutdown.child_token();
+            let changed = path.clone();
+            spawn_watch(
+                self.tx.clone(),
+                token.clone(),
+                path.clone(),
+                move || Msg::ParkedDirChanged {
+                    path: changed.clone(),
+                },
+                false,
+            );
+            self.parked.push((path, token));
+        }
     }
 
     fn git_status(&mut self, gen: Gen, dir: PathBuf) {
+        // Coalesce with the run in flight for the same directory.
+        if let Some(run) = &self.git_run {
+            let mut run = run
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let live = self
+                .slots
+                .get(&Slot::Git)
+                .is_some_and(|t| !t.is_cancelled());
+            if run.running && live && run.dir == dir {
+                run.gen = gen;
+                run.dirty = true;
+                return;
+            }
+        }
         let token = self.claim(Slot::Git);
+        let run = Arc::new(std::sync::Mutex::new(GitRun {
+            dir: dir.clone(),
+            gen,
+            dirty: false,
+            running: true,
+        }));
+        self.git_run = Some(run.clone());
         let tx = self.tx.clone();
         tokio::spawn(async move {
-            // Dropping the status future (on cancellation) kills the git processes.
-            let snapshot = tokio::select! {
-                () = token.cancelled() => return,
-                snapshot = ks_fs::git_status(&dir) => snapshot,
-            };
-            let _ = tx
-                .send(Msg::GitStatus {
-                    gen,
-                    snapshot: snapshot.map(Box::new),
-                })
-                .await;
+            loop {
+                // Dropping the status future (on cancellation) kills the git processes.
+                let snapshot = tokio::select! {
+                    () = token.cancelled() => return,
+                    snapshot = ks_fs::git_status(&dir) => snapshot,
+                };
+                let (gen, again) = {
+                    let mut state = run
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    let again = std::mem::take(&mut state.dirty);
+                    if !again {
+                        state.running = false;
+                    }
+                    (state.gen, again)
+                };
+                // The answer of a scan that something overtook is still shown (newest
+                // generation) while the next scan runs.
+                let _ = tx
+                    .send(Msg::GitStatus {
+                        gen,
+                        snapshot: snapshot.map(Box::new),
+                    })
+                    .await;
+                if !again {
+                    return;
+                }
+            }
         });
     }
 
@@ -502,6 +659,20 @@ impl EffectRunner {
                 });
             }
         }
+    }
+
+    fn stat_entries(&mut self, gen: Gen, dir: PathBuf, names: Vec<OsString>) {
+        let token = self.claim(Slot::Stats);
+        let tx = self.tx.clone();
+        tokio::task::spawn_blocking(move || {
+            ks_fs::stat_entries(&dir, names, &token, |batch| {
+                let stats = batch
+                    .into_iter()
+                    .map(|(name, stat)| (name, stat.size, stat.mtime))
+                    .collect();
+                tx.blocking_send(Msg::EntryStats { gen, stats }).is_ok()
+            });
+        });
     }
 
     fn count_children(&mut self, gen: Gen, dir: PathBuf, names: Vec<OsString>) {
@@ -666,6 +837,74 @@ mod fs_effect_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn a_parked_listing_does_not_cancel_the_active_one() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        std::fs::write(a.path().join("one"), "x").unwrap();
+        std::fs::write(b.path().join("two"), "x").unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let (ga, gb) = (gen(), gen());
+        runner.run([
+            Effect::ListDir {
+                gen: ga,
+                path: a.path().to_owned(),
+            },
+            Effect::ListParked {
+                gen: gb,
+                path: b.path().to_owned(),
+            },
+        ]);
+        let mut finished = Vec::new();
+        let mut names = Vec::new();
+        while finished.len() < 2 {
+            match next(&mut rx).await {
+                Msg::ListingChunk { entries, .. } => {
+                    names.extend(entries.iter().map(|e| e.display_name().into_owned()));
+                }
+                Msg::ListingFinished { gen, error } => {
+                    assert!(error.is_none());
+                    finished.push(gen);
+                }
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+        assert!(finished.contains(&ga) && finished.contains(&gb));
+        names.sort();
+        assert_eq!(names, ["one", "two"]);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn re_lists_of_one_parked_directory_do_not_pile_up() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("f"), "x").unwrap();
+        let (tx, mut rx) = mpsc::channel(64);
+        let mut runner = EffectRunner::new(tx);
+        let last = gen();
+        for _ in 0..5 {
+            runner.run([Effect::ListParked {
+                gen: gen(),
+                path: dir.path().to_owned(),
+            }]);
+        }
+        runner.run([Effect::ListParked {
+            gen: last,
+            path: dir.path().to_owned(),
+        }]);
+        assert_eq!(runner.parked_lists.len(), 1, "one slot per parked path");
+        loop {
+            if let Msg::ListingFinished { gen, .. } = next(&mut rx).await {
+                if gen == last {
+                    break;
+                }
+            }
+        }
+        // Activating the tab (it leaves the parked set) cancels its re-list.
+        runner.run([Effect::WatchParked { paths: Vec::new() }]);
+        assert!(runner.parked_lists.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn a_new_palette_re_highlights_cached_previews() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("a.rs");
@@ -766,6 +1005,63 @@ mod fs_effect_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn parked_directories_are_watched_as_a_set() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        runner.run([Effect::WatchParked {
+            paths: vec![a.path().to_owned(), b.path().to_owned()],
+        }]);
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        std::fs::write(b.path().join("new.txt"), "x").unwrap();
+        assert_eq!(
+            next(&mut rx).await,
+            Msg::ParkedDirChanged {
+                path: b.path().to_owned()
+            }
+        );
+        std::fs::write(a.path().join("new.txt"), "x").unwrap();
+        assert_eq!(
+            next(&mut rx).await,
+            Msg::ParkedDirChanged {
+                path: a.path().to_owned()
+            }
+        );
+
+        // Dropping `a` from the set stops its watch; `b` keeps working.
+        runner.run([Effect::WatchParked {
+            paths: vec![b.path().to_owned()],
+        }]);
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        while rx.try_recv().is_ok() {}
+        std::fs::write(a.path().join("later.txt"), "x").unwrap();
+        assert!(timeout(Duration::from_millis(700), rx.recv())
+            .await
+            .is_err());
+        std::fs::write(b.path().join("later.txt"), "x").unwrap();
+        assert_eq!(
+            next(&mut rx).await,
+            Msg::ParkedDirChanged {
+                path: b.path().to_owned()
+            }
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_missing_parked_directory_is_skipped_quietly() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        runner.run([Effect::WatchParked {
+            paths: vec![dir.path().join("missing")],
+        }]);
+        assert!(timeout(Duration::from_millis(500), rx.recv())
+            .await
+            .is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn watching_a_missing_directory_warns() {
         let dir = tempfile::tempdir().unwrap();
         let (tx, mut rx) = mpsc::channel(16);
@@ -803,6 +1099,47 @@ mod fs_effect_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn git_status_requests_for_the_same_directory_coalesce() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let (g1, g2, g3) = (gen(), gen(), gen());
+        let request = |g| Effect::GitStatus {
+            gen: g,
+            dir: dir.path().to_owned(),
+        };
+        runner.run([request(g1), request(g2), request(g3)]);
+        // Only the newest generation is ever answered, and with at most one extra scan.
+        let mut answers = vec![next(&mut rx).await];
+        while let Ok(Some(msg)) = timeout(Duration::from_millis(800), rx.recv()).await {
+            answers.push(msg);
+        }
+        assert!(
+            (1..=2).contains(&answers.len()),
+            "{} answers: {answers:?}",
+            answers.len()
+        );
+        for answer in &answers {
+            match answer {
+                Msg::GitStatus { gen, .. } => assert_eq!(*gen, g3, "{answers:?}"),
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+
+        // A different directory replaces the run instead of joining it.
+        let other = tempfile::tempdir().unwrap();
+        let g4 = gen();
+        runner.run([Effect::GitStatus {
+            gen: g4,
+            dir: other.path().to_owned(),
+        }]);
+        match next(&mut rx).await {
+            Msg::GitStatus { gen, .. } => assert_eq!(gen, g4),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn child_counts_are_reported() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("sub")).unwrap();
@@ -822,6 +1159,32 @@ mod fs_effect_tests {
                 counts: vec![("sub".into(), 1)]
             }
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn entry_stats_are_reported_for_relative_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("sub")).unwrap();
+        std::fs::write(dir.path().join("sub").join("f.txt"), "abc").unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        let g = gen();
+        let rel: OsString = std::path::Path::new("sub").join("f.txt").into_os_string();
+        runner.run([Effect::StatEntries {
+            gen: g,
+            dir: dir.path().to_owned(),
+            names: vec![rel.clone()],
+        }]);
+        match next(&mut rx).await {
+            Msg::EntryStats { gen, stats } => {
+                assert_eq!(gen, g);
+                assert_eq!(stats.len(), 1);
+                assert_eq!(stats[0].0, rel);
+                assert_eq!(stats[0].1, 3);
+                assert!(stats[0].2.is_some());
+            }
+            other => panic!("unexpected {other:?}"),
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]

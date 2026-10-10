@@ -446,6 +446,9 @@ fn bar_style(drive: &DriveInfo, theme: &Theme) -> Style {
 }
 
 fn space_text(drive: &DriveInfo, base: ks_core::config::SizeBase) -> String {
+    if drive.unavailable {
+        return "not responding".to_owned();
+    }
     match (drive.free, drive.total) {
         (Some(free), Some(total)) => format!(
             "{} free of {}",
@@ -508,6 +511,18 @@ mod tests {
             let d = drive(Some(100), Some(100 - used));
             assert_eq!(usage_bar(&d, 10, false).chars().count(), 10);
         }
+    }
+
+    #[test]
+    fn an_unresponsive_drive_says_so() {
+        let mut d = DriveInfo::new("Z:/");
+        d.kind = DriveKind::Network;
+        d.unavailable = true;
+        assert_eq!(
+            space_text(&d, ks_core::config::SizeBase::Binary),
+            "not responding"
+        );
+        assert_eq!(drive_title(&d), "Network Drive");
     }
 
     #[test]

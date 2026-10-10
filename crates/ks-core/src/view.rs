@@ -8,7 +8,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 
-use crate::config::SortConfig;
+use crate::config::{SortConfig, SortKey};
 use crate::cursor::Cursor;
 use crate::entry::{compare, sort_entries, Entry};
 use crate::generation::Gen;
@@ -199,6 +199,31 @@ impl DirView {
             if let Some(&count) = by_name.get(&entry.name) {
                 entry.children = Some(count);
             }
+        }
+    }
+
+    /// Fills in size and modification time of the entries named in `stats` (a virtual listing
+    /// whose entries start without metadata) and re-sorts when the sort key needs them.
+    pub fn apply_stats(
+        &mut self,
+        stats: Vec<(OsString, u64, Option<std::time::SystemTime>)>,
+        height: usize,
+    ) {
+        let by_name: HashMap<OsString, (u64, Option<std::time::SystemTime>)> = stats
+            .into_iter()
+            .map(|(name, size, mtime)| (name, (size, mtime)))
+            .collect();
+        for entry in self.entries.iter_mut() {
+            if let Some(&(size, mtime)) = by_name.get(&entry.name) {
+                entry.size = size;
+                entry.mtime = mtime;
+            }
+        }
+        // Size and mtime sorts depend on the values that just arrived.
+        if matches!(self.sort.key, SortKey::Size | SortKey::Mtime) {
+            self.reposition(height, |view| {
+                view.entries.sort_by(|a, b| compare(a, b, &view.sort));
+            });
         }
     }
 
@@ -486,6 +511,38 @@ mod tests {
 
     fn cursor_name(view: &DirView) -> String {
         view.current().unwrap().display_name().into_owned()
+    }
+
+    #[test]
+    fn arriving_stats_re_sort_by_size_and_keep_the_cursor_entry() {
+        let mut view = DirView::new(
+            SortConfig {
+                key: crate::config::SortKey::Size,
+                ..SortConfig::default()
+            },
+            false,
+        );
+        view.push_chunk(
+            vec![
+                Entry::file("a", 0),
+                Entry::file("b", 0),
+                Entry::file("c", 0),
+            ],
+            H,
+        );
+        view.finish_loading();
+        view.move_cursor(2, H);
+        assert_eq!(cursor_name(&view), "c");
+        view.apply_stats(
+            vec![
+                ("a".into(), 30, None),
+                ("b".into(), 10, None),
+                ("c".into(), 20, None),
+            ],
+            H,
+        );
+        assert_eq!(shown(&view), ["a", "c", "b"]);
+        assert_eq!(cursor_name(&view), "c");
     }
 
     #[test]

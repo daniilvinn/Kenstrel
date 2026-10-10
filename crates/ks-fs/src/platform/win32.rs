@@ -75,41 +75,64 @@ pub fn reparse_tag(path: &Path) -> Option<u32> {
 }
 
 /// Drives with label, file system and free/total space. Never shows the "no disk in
-/// drive" system dialog; drives that cannot be queried are listed without details.
+/// drive" system dialog; drives that cannot be queried are listed without details, and a
+/// drive that does not answer within [`crate::drives::QUERY_TIMEOUT`] (a dead network
+/// share) is listed as unavailable instead of blocking the list.
 pub fn list_drives() -> Vec<DriveInfo> {
-    // SAFETY: no pointers involved.
-    let mask = unsafe { GetLogicalDrives() };
-    let mut previous_mode = Default::default();
-    // SAFETY: `previous_mode` is a valid out-pointer for the call.
-    let mode_set =
-        unsafe { SetThreadErrorMode(SEM_FAILCRITICALERRORS, Some(&mut previous_mode)) }.is_ok();
-
-    let drives = (0..26u8)
-        .filter(|bit| mask & (1 << bit) != 0)
-        .map(|bit| query_drive(PathBuf::from(format!("{}:\\", char::from(b'A' + bit)))))
-        .collect();
-
-    if mode_set {
-        // SAFETY: restores the value returned by the call above.
-        let _ = unsafe { SetThreadErrorMode(previous_mode, None) };
-    }
-    drives
+    list_drives_within(crate::drives::QUERY_TIMEOUT)
 }
 
-fn query_drive(root: PathBuf) -> DriveInfo {
-    let wide_root = wide(&root);
-    let root_ptr = PCWSTR(wide_root.as_ptr());
-    let mut info = DriveInfo::new(root);
+fn list_drives_within(timeout: std::time::Duration) -> Vec<DriveInfo> {
+    // SAFETY: no pointers involved.
+    let mask = unsafe { GetLogicalDrives() };
+    let roots: Vec<PathBuf> = (0..26u8)
+        .filter(|bit| mask & (1 << bit) != 0)
+        .map(|bit| PathBuf::from(format!("{}:\\", char::from(b'A' + bit))))
+        .collect();
+    crate::drives::query_all(
+        roots,
+        timeout,
+        std::sync::Arc::new(|root: &Path| query_drive(root.to_path_buf())),
+        |root| {
+            let mut info = DriveInfo::new(root);
+            info.kind = drive_kind(&wide(root));
+            info
+        },
+    )
+}
 
-    // SAFETY: `root_ptr` points at a NUL-terminated buffer that outlives the call.
-    info.kind = match unsafe { GetDriveTypeW(root_ptr) } {
+fn drive_kind(wide_root: &[u16]) -> DriveKind {
+    // SAFETY: `wide_root` is NUL-terminated and outlives the call.
+    match unsafe { GetDriveTypeW(PCWSTR(wide_root.as_ptr())) } {
         DRIVE_REMOVABLE => DriveKind::Removable,
         DRIVE_FIXED => DriveKind::Fixed,
         DRIVE_REMOTE => DriveKind::Network,
         DRIVE_CDROM => DriveKind::Optical,
         DRIVE_RAMDISK => DriveKind::RamDisk,
         _ => DriveKind::Unknown,
-    };
+    }
+}
+
+/// Queries one drive. Runs on a thread of its own (the error mode is per thread).
+fn query_drive(root: PathBuf) -> DriveInfo {
+    let mut previous_mode = Default::default();
+    // SAFETY: `previous_mode` is a valid out-pointer for the call.
+    let mode_set =
+        unsafe { SetThreadErrorMode(SEM_FAILCRITICALERRORS, Some(&mut previous_mode)) }.is_ok();
+    let info = query_drive_inner(root);
+    if mode_set {
+        // SAFETY: restores the value returned by the call above.
+        let _ = unsafe { SetThreadErrorMode(previous_mode, None) };
+    }
+    info
+}
+
+fn query_drive_inner(root: PathBuf) -> DriveInfo {
+    let wide_root = wide(&root);
+    let root_ptr = PCWSTR(wide_root.as_ptr());
+    let mut info = DriveInfo::new(root);
+
+    info.kind = drive_kind(&wide_root);
 
     let mut label = [0u16; 261];
     let mut fs = [0u16; 261];

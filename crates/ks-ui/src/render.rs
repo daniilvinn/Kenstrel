@@ -534,6 +534,32 @@ mod tests {
     }
 
     #[test]
+    fn drives_view_with_an_unresponsive_share_snapshots() {
+        use ks_core::{DriveInfo, DriveKind};
+        for name in THEMES {
+            for (w, h) in SIZES {
+                let mut state = drives_state(w, h);
+                let mut ok = DriveInfo::new("C:/");
+                ok.label = "Windows".into();
+                ok.fs = "NTFS".into();
+                ok.kind = DriveKind::Fixed;
+                ok.total = Some(496_960_008_192);
+                ok.free = Some(33_758_236_672);
+                let mut dead = DriveInfo::new("Z:/");
+                dead.kind = DriveKind::Network;
+                dead.unavailable = true;
+                let rows = state.viewport_height();
+                state
+                    .drives
+                    .set(vec![ok, dead], std::path::Path::new("C:/x"), rows);
+                let rendered = draw(&state, &theme(name));
+                assert!(rendered.contains("not responding"));
+                insta::assert_snapshot!(format!("drives_dead_{name}_{w}x{h}"), rendered);
+            }
+        }
+    }
+
+    #[test]
     fn visual_mode_snapshot() {
         for name in THEMES {
             for (w, h) in SIZES {

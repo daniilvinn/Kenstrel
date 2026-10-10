@@ -478,3 +478,13 @@ Merged `fix/f1` (grep send/mark `alt-c`/`alt-m`, preview line selection `V` with
 - **Gates**: fmt, clippy `-D warnings` clean; `cargo test --workspace --no-fail-fast` fully green, including `fileops::move_undo_and_trash_undo` (fixed by f1's `jobs_idle` wait). No `.snap.new` files; `docs/keymap.md` test passes unchanged (f1 already regenerated it).
 - **README**: no default key changed; added the grep `alt-m`/`alt-c` sentence and a `V` row.
 - **Open issues**: as in `docs/progress/f1.md` (directory preview git glyphs/counts and changes-view-in-preview not done; `alt` chords and `V` unverified in a real Windows Terminal; first-frame time must be read from the log on a real run). Palette/help snapshots will conflict with f2/f3 and need regeneration after those merges.
+
+## Integration: fix/f2
+
+Merged `fix/f2` (finder cache freshness with background re-walk, `Touched` cache changes after jobs/hook events, multi-tab watching with stale mark and background re-list, results-list stats, shared `Arc<str>` finder items, grep bench, drives timeout, ctrl-r scope dedupe, git status coalescing) onto main.
+
+- **Conflicts** (all textual, kept both sides): `fileops/logic.rs` `finish_job` now calls both `preview::invalidate_paths` (f1) and `search::cache_after_job` (f2); `ks-fs/src/lib.rs` exports `file_owner` (f1) and `stat_entries`/`EntryStat` (f2); `search/tests.rs` keeps f1's Claude-send/mark tests and f2's lazy-stats test; `tests/fileops.rs` comment only. Cargo.lock merged cleanly.
+- **AppState guard** (`tabs.rs`): stays exhaustive; f2's new tab state lives in the tab slots, no new `AppState` field to classify.
+- **Event loop**: f1's deferred terminal query and f2's parked-tab watchers do not interact; no change needed.
+- **Gates**: fmt, clippy `-D warnings` clean; `cargo test --workspace --no-fail-fast` fully green, no `.snap.new`. f2 added no Action, so `docs/keymap.md` and README key tables are unchanged.
+- **Open issues**: as in `docs/progress/f2.md` (re-walk rebuilds the matcher when paths vanished; abandoned drive-query threads live until the OS call returns). f3 palette/help snapshots may still need regeneration.

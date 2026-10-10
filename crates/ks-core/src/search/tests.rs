@@ -303,6 +303,100 @@ fn finder_results_for_old_generations_or_queries_are_dropped() {
     assert_eq!(f.total, 100);
 }
 
+fn snapshot_at(query: &str, root: PathBuf) -> Box<FinderSnapshot> {
+    let mut snap = snapshot(query, Vec::new());
+    snap.root = root;
+    snap
+}
+
+#[test]
+fn ctrl_r_skips_scopes_that_resolve_to_the_same_root() {
+    let mut s = state_with(&[]);
+    let (gen, _) = open_finder(&mut s);
+    // The cwd scope resolved to /home/me/proj, which is also the git root.
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: snapshot_at("", PathBuf::from("/home/me/proj")),
+        },
+    );
+    let effects = key(&mut s, "ctrl-r");
+    let Some(Effect::FinderStart {
+        gen: git_gen,
+        scope: Scope::GitRoot,
+        ..
+    }) = effects.first().cloned()
+    else {
+        panic!("expected a git-root session, got {effects:?}");
+    };
+    // The git root is the same directory: the session moves on to home by itself.
+    let effects = update(
+        &mut s,
+        Msg::FinderResults {
+            gen: git_gen,
+            snapshot: snapshot_at("", PathBuf::from("/home/me/proj")),
+        },
+    );
+    let Some(Effect::FinderStart {
+        gen: home_gen,
+        scope: Scope::Home,
+        ..
+    }) = effects.first().cloned()
+    else {
+        panic!("expected a home session, got {effects:?}");
+    };
+    assert!(home_gen > git_gen);
+    assert_eq!(s.search.finder_scope, Scope::Home);
+    // Home is a different directory: the cycle stops there.
+    let effects = update(
+        &mut s,
+        Msg::FinderResults {
+            gen: home_gen,
+            snapshot: snapshot_at("", PathBuf::from("/home/me")),
+        },
+    );
+    assert!(effects.is_empty(), "{effects:?}");
+    let f = s.search.finder.as_ref().unwrap();
+    assert_eq!(f.scope, Scope::Home);
+    assert_eq!(f.root.as_deref(), Some(Path::new("/home/me")));
+}
+
+#[test]
+fn ctrl_r_stops_when_every_scope_resolves_to_one_root() {
+    let mut s = state_with(&[]);
+    let (mut gen, _) = open_finder(&mut s);
+    let root = PathBuf::from("/only");
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: snapshot_at("", root.clone()),
+        },
+    );
+    let start_scope = s.search.finder.as_ref().unwrap().scope;
+    let mut effects = key(&mut s, "ctrl-r");
+    let mut starts = 1;
+    while let Some(Effect::FinderStart { gen: g, .. }) = effects.first().cloned() {
+        gen = g;
+        effects = update(
+            &mut s,
+            Msg::FinderResults {
+                gen,
+                snapshot: snapshot_at("", root.clone()),
+            },
+        );
+        starts += 1;
+        assert!(starts < 10, "the cycle must end");
+    }
+    assert_eq!(
+        s.search.finder.as_ref().unwrap().root.as_deref(),
+        Some(root.as_path())
+    );
+    // Back on the scope it started from, not on a duplicate.
+    assert_eq!(s.search.finder.as_ref().unwrap().scope, start_scope);
+}
+
 #[test]
 fn scope_cycles_and_toggles_restart_the_session_under_a_new_generation() {
     let mut s = state_with(&[]);
@@ -574,6 +668,27 @@ fn cache_diff_reports_additions_and_removals() {
         ]
     );
     assert!(diff_listing(&cwd(), &new, &new).is_empty());
+}
+
+#[test]
+fn a_finished_job_feeds_the_walk_cache_with_its_destinations() {
+    let mut effects = Vec::new();
+    cache_after_job(&mut effects, &[], &[]);
+    assert!(effects.is_empty());
+    let dest = PathBuf::from("/elsewhere/copy");
+    let src = cwd().join("old");
+    cache_after_job(
+        &mut effects,
+        std::slice::from_ref(&dest),
+        std::slice::from_ref(&src),
+    );
+    assert_eq!(
+        effects,
+        vec![Effect::WalkCacheChanges(vec![
+            PathChange::Removed(src),
+            PathChange::Touched(dest),
+        ])]
+    );
 }
 
 #[test]
@@ -1033,6 +1148,61 @@ fn the_results_list_opens_in_a_new_tab() {
 }
 
 #[test]
+fn results_list_entries_get_size_and_time_lazily() {
+    let mut s = state_with(&["unrelated"]);
+    grep_with_two_files(&mut s);
+    let effects = key(&mut s, "ctrl-l");
+    let Some(Effect::StatEntries { gen, dir, names }) = effects
+        .iter()
+        .find(|e| matches!(e, Effect::StatEntries { .. }))
+        .cloned()
+    else {
+        panic!("expected a StatEntries effect, got {effects:?}");
+    };
+    assert_eq!(dir, cwd());
+    assert_eq!(names.len(), 2);
+    assert!(s
+        .view
+        .entries()
+        .iter()
+        .all(|e| e.size == 0 && e.mtime.is_none()));
+
+    // A stale answer (another generation) is dropped.
+    let stamp = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
+    update(
+        &mut s,
+        Msg::EntryStats {
+            gen: Gen::default(),
+            stats: vec![(names[0].clone(), 9, Some(stamp))],
+        },
+    );
+    assert!(s.view.entries().iter().all(|e| e.size == 0));
+
+    update(
+        &mut s,
+        Msg::EntryStats {
+            gen,
+            stats: vec![(names[0].clone(), 1234, Some(stamp))],
+        },
+    );
+    let filled = s
+        .view
+        .entries()
+        .iter()
+        .find(|e| e.name == names[0])
+        .unwrap();
+    assert_eq!(filled.size, 1234);
+    assert_eq!(filled.mtime, Some(stamp));
+    let other = s
+        .view
+        .entries()
+        .iter()
+        .find(|e| e.name == names[1])
+        .unwrap();
+    assert_eq!(other.size, 0);
+}
+
+#[test]
 fn the_results_list_replaces_the_pane_when_no_tab_is_free() {
     let mut s = state_with(&["unrelated"]);
     for _ in 1..crate::tabs::MAX_TABS {
@@ -1292,4 +1462,37 @@ fn a_new_search_drops_the_marks() {
     let effects = type_text(&mut s, "x");
     fire_debounce(&mut s, &effects);
     assert!(s.search.grep.as_ref().unwrap().marks.is_empty());
+}
+
+#[test]
+fn lazy_stats_resort_a_size_sorted_results_list() {
+    let mut s = state_with(&["unrelated"]);
+    grep_with_two_files(&mut s);
+    let effects = key(&mut s, "ctrl-l");
+    let Some(Effect::StatEntries { gen, names, .. }) = effects
+        .iter()
+        .find(|e| matches!(e, Effect::StatEntries { .. }))
+        .cloned()
+    else {
+        panic!("expected a StatEntries effect");
+    };
+    let h = s.viewport_height();
+    s.view.set_sort(
+        crate::config::SortConfig {
+            key: crate::config::SortKey::Size,
+            reverse: false,
+            ..Default::default()
+        },
+        h,
+    );
+    assert_eq!(s.view.entries()[0].name, names[0]);
+    update(
+        &mut s,
+        Msg::EntryStats {
+            gen,
+            stats: vec![(names[0].clone(), 10, None), (names[1].clone(), 500, None)],
+        },
+    );
+    let order: Vec<_> = s.view.entries().iter().map(|e| e.size).collect();
+    assert_eq!(order, vec![500, 10]);
 }

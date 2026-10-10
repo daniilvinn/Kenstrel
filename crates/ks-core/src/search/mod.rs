@@ -284,8 +284,13 @@ pub(crate) fn on_timer(state: &mut AppState, effects: &mut Vec<Effect>, gen: Gen
     grep::on_timer(state, effects, gen);
 }
 
-pub(crate) fn on_finder_results(state: &mut AppState, gen: u64, snapshot: FinderSnapshot) {
-    finder::on_results(state, gen, snapshot);
+pub(crate) fn on_finder_results(
+    state: &mut AppState,
+    effects: &mut Vec<Effect>,
+    gen: u64,
+    snapshot: FinderSnapshot,
+) {
+    finder::on_results(state, effects, gen, snapshot);
 }
 
 // ----- the in-directory filter -----
@@ -354,6 +359,17 @@ pub(crate) fn diff_listing(dir: &Path, old: &[Entry], new: &[Entry]) -> Vec<Path
         changes.push(PathChange::Added(dir.join(&entry.name), kind));
     }
     changes
+}
+
+/// Walk cache updates for a finished file operation: everything the job created is touched
+/// (a new directory is scanned for its contents) and everything it removed is dropped, so
+/// the finder is right about destinations that are not the displayed directory.
+pub(crate) fn cache_after_job(effects: &mut Vec<Effect>, created: &[PathBuf], removed: &[PathBuf]) {
+    let mut changes: Vec<PathChange> = removed.iter().cloned().map(PathChange::Removed).collect();
+    changes.extend(created.iter().cloned().map(PathChange::Touched));
+    if !changes.is_empty() {
+        effects.push(Effect::WalkCacheChanges(changes));
+    }
 }
 
 /// Marks the entries a find-file `enter` asked for, once their directory has loaded.

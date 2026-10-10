@@ -1,0 +1,60 @@
+---
+source: crates/ks-ui/src/render.rs
+expression: rendered
+---
+ This PC
+────────────────────────────────────────────────────────────────────────────────
+ ▌ C:   Windows                    NTFS   █████████░   31.4 GB free of 462.8 GB
+   Z:   Network Drive                     ░░░░░░░░░░             not responding
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ›                                                                          1/2
+   ‹l› open  ‹j› down  ‹k› up  ‹ctrl-o› back  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..80  fg=#2b2724 bg=reset bold
+  1   0..80  fg=#d4ccc2 bg=reset
+  2   0..1   fg=#2b2724 bg=#ece5dc
+  2   1..2   fg=#c4623f bg=#ece5dc
+  2   2..3   fg=#2b2724 bg=#ece5dc
+  2   3..7   fg=#2f6690 bg=#ece5dc bold
+  2   7..34  fg=#2b2724 bg=#ece5dc
+  2  34..41  fg=#958e86 bg=#ece5dc
+  2  41..42  fg=#2b2724 bg=#ece5dc
+  2  42..52  fg=#a86f12 bg=#ece5dc
+  2  52..53  fg=#2b2724 bg=#ece5dc
+  2  53..79  fg=#6b645d bg=#ece5dc
+  2  79..80  fg=#2b2724 bg=#ece5dc
+  3   3..8   fg=#2f6690 bg=reset bold
+  3   8..42  fg=#2b2724 bg=reset
+  3  42..65  fg=#958e86 bg=reset
+  3  65..80  fg=#6b645d bg=reset
+ 21   0..80  fg=#d4ccc2 bg=reset
+ 22   1..76  fg=#c4623f bg=reset bold
+ 22  76..80  fg=#6b645d bg=reset
+ 23   3..4   fg=#958e86 bg=reset
+ 23   4..5   fg=#6b645d bg=reset
+ 23   5..14  fg=#958e86 bg=reset
+ 23  14..15  fg=#6b645d bg=reset
+ 23  15..24  fg=#958e86 bg=reset
+ 23  24..25  fg=#6b645d bg=reset
+ 23  25..32  fg=#958e86 bg=reset
+ 23  32..38  fg=#6b645d bg=reset
+ 23  38..47  fg=#958e86 bg=reset
+ 23  47..48  fg=#6b645d bg=reset
+ 23  48..80  fg=#958e86 bg=reset

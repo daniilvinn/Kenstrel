@@ -26,6 +26,7 @@
 //! matcher; every other method is non-blocking. Dropping the session cancels the walk (it does
 //! not join).
 
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -36,43 +37,84 @@ use nucleo::{Config, Injector, Matcher, Nucleo, Utf32String};
 use parking_lot::Mutex;
 use tokio_util::sync::CancellationToken;
 
-use crate::cache::{CacheKey, WalkCache};
+use crate::cache::{fold_hash, CacheKey, RawNames, WalkCache, Walked};
 use crate::walk::{walk, EntryKind, WalkEntry, WalkOptions, WalkSink, WalkSummary};
 use crate::Notify;
 
 /// A path known to the finder, relative to the session root (OS separators).
+///
+/// Stored as one reference-counted string whose first byte tags the kind (and whether the
+/// name is a lossy conversion), so the walk cache and the matcher share a single allocation
+/// per path (PLAN P8 memory budget).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FinderItem {
-    /// Path relative to the root.
-    pub rel: Box<str>,
-    /// Entry kind.
-    pub kind: EntryKind,
-    /// Exact relative name, only present when `rel` is a lossy conversion because the real
-    /// name is not valid Unicode (unpaired UTF-16 surrogates). [`FinderResult::path`] uses it
-    /// so such files can still be opened.
-    pub raw: Option<Box<OsStr>>,
+    repr: Arc<str>,
 }
 
 impl FinderItem {
-    /// An item whose name is valid Unicode.
-    pub fn new(rel: impl Into<Box<str>>, kind: EntryKind) -> Self {
-        Self {
-            rel: rel.into(),
-            kind,
-            raw: None,
+    fn tag(kind: EntryKind, lossy: bool) -> char {
+        let c = match kind {
+            EntryKind::File => 'f',
+            EntryKind::Dir => 'd',
+            EntryKind::Symlink => 'l',
+        };
+        if lossy {
+            c.to_ascii_uppercase()
+        } else {
+            c
         }
     }
 
-    /// An item from a relative path, keeping the exact name when it is not valid Unicode.
+    fn build(rel: &str, kind: EntryKind, lossy: bool) -> Self {
+        let mut s = String::with_capacity(rel.len() + 1);
+        s.push(Self::tag(kind, lossy));
+        s.push_str(rel);
+        Self { repr: s.into() }
+    }
+
+    /// An item whose name is valid Unicode.
+    pub fn new(rel: impl AsRef<str>, kind: EntryKind) -> Self {
+        Self::build(rel.as_ref(), kind, false)
+    }
+
+    /// An item from a relative path. A name that is not valid Unicode is stored lossily
+    /// (see [`FinderItem::is_lossy`]); the session keeps the exact name on the side.
     pub fn from_rel_path(rel: &Path, kind: EntryKind) -> Self {
+        Self::split_rel_path(rel, kind).0
+    }
+
+    pub(crate) fn split_rel_path(rel: &Path, kind: EntryKind) -> (Self, Option<Box<OsStr>>) {
         match rel.to_str() {
-            Some(s) => Self::new(s, kind),
-            None => Self {
-                rel: rel.to_string_lossy().into_owned().into(),
-                kind,
-                raw: Some(rel.as_os_str().into()),
-            },
+            Some(s) => (Self::new(s, kind), None),
+            None => (
+                Self::build(&rel.to_string_lossy(), kind, true),
+                Some(rel.as_os_str().into()),
+            ),
         }
+    }
+
+    /// Path relative to the root.
+    pub fn rel(&self) -> &str {
+        &self.repr[1..]
+    }
+
+    /// Entry kind.
+    pub fn kind(&self) -> EntryKind {
+        match self.repr.as_bytes()[0].to_ascii_lowercase() {
+            b'd' => EntryKind::Dir,
+            b'l' => EntryKind::Symlink,
+            _ => EntryKind::File,
+        }
+    }
+
+    /// Whether `rel` is a lossy conversion of a name that is not valid Unicode.
+    pub fn is_lossy(&self) -> bool {
+        self.repr.as_bytes()[0].is_ascii_uppercase()
+    }
+
+    /// The same entry under a new path. The exact-name information is dropped.
+    pub fn with_rel(&self, rel: &str) -> Self {
+        Self::build(rel, self.kind(), false)
     }
 }
 
@@ -94,6 +136,9 @@ pub struct FinderOptions {
     /// Do not descend into cloud-placeholder directories (see
     /// [`WalkOptions::skip_cloud_dirs`]). Off by default. Not part of the cache key.
     pub skip_cloud_dirs: bool,
+    /// When the walk cache serves a session, re-walk the root in the background and merge
+    /// differences into the session (default on).
+    pub refresh_cached: bool,
 }
 
 impl FinderOptions {
@@ -107,6 +152,19 @@ impl FinderOptions {
             match_threads: None,
             walk_threads: 0,
             skip_cloud_dirs: false,
+            refresh_cached: true,
+        }
+    }
+
+    fn walk_options(&self) -> WalkOptions {
+        WalkOptions {
+            root: self.root.clone(),
+            show_hidden: self.show_hidden,
+            respect_gitignore: self.respect_gitignore,
+            include_dirs: self.include_dirs,
+            threads: self.walk_threads,
+            overrides: None,
+            skip_cloud_dirs: self.skip_cloud_dirs,
         }
     }
 
@@ -130,12 +188,14 @@ pub struct FinderStatus {
     pub matching: bool,
     /// The walk is still producing paths.
     pub walking: bool,
+    /// A background re-walk of a cached root is in flight (the results shown are the cache).
+    pub refreshing: bool,
 }
 
 impl FinderStatus {
     /// Whether the caller should keep ticking.
     pub fn busy(&self) -> bool {
-        self.matching || self.walking
+        self.matching || self.walking || self.refreshing
     }
 }
 
@@ -158,20 +218,42 @@ struct WalkShared {
     summary: Mutex<Option<WalkSummary>>,
 }
 
+/// What a background re-walk of a cached root found.
+struct RefreshOutcome {
+    /// Items that were not in the cached walk.
+    added: Vec<FinderItem>,
+    /// The complete fresh walk, only when something in the cache no longer exists (nucleo
+    /// cannot remove items, so the matcher is rebuilt from it).
+    full: Option<Arc<Walked>>,
+    /// Exact names of non-Unicode entries among `added`.
+    raws: RawNames,
+}
+
+#[derive(Default)]
+struct RefreshShared {
+    running: AtomicBool,
+    pending: Mutex<Option<RefreshOutcome>>,
+}
+
 /// A running (or cached) fuzzy-find session. See the module docs.
 pub struct FinderSession {
     generation: u64,
     opts: FinderOptions,
     nucleo: Nucleo<FinderItem>,
+    injector: Injector<FinderItem>,
     query: String,
     matcher: Matcher,
     cancel: CancellationToken,
     shared: Arc<WalkShared>,
+    refresh: Arc<RefreshShared>,
+    /// Exact names of non-Unicode entries (by lossy `rel`).
+    raws: Arc<Mutex<RawNames>>,
+    notify: Notify,
     from_cache: bool,
 }
 
 fn fill(item: &FinderItem, cols: &mut [Utf32String]) {
-    cols[0] = Utf32String::from(&*item.rel);
+    cols[0] = Utf32String::from(item.rel());
 }
 
 /// Per-walker-thread sink: injects into nucleo immediately and buffers for the cache.
@@ -179,12 +261,22 @@ struct InjectSink {
     root: PathBuf,
     injector: Injector<FinderItem>,
     local: Vec<FinderItem>,
-    collected: Arc<Mutex<Vec<Vec<FinderItem>>>>,
+    local_raws: Vec<(Box<str>, Box<OsStr>)>,
+    collected: Arc<Mutex<Collected>>,
+}
+
+#[derive(Default)]
+struct Collected {
+    chunks: Vec<Vec<FinderItem>>,
+    raws: RawNames,
 }
 
 impl WalkSink for InjectSink {
     fn entry(&mut self, entry: WalkEntry) -> bool {
-        let item = FinderItem::from_rel_path(entry.rel(&self.root), entry.kind);
+        let (item, raw) = FinderItem::split_rel_path(entry.rel(&self.root), entry.kind);
+        if let Some(raw) = raw {
+            self.local_raws.push((item.rel().into(), raw));
+        }
         self.injector.push(item.clone(), fill);
         self.local.push(item);
         true
@@ -193,17 +285,190 @@ impl WalkSink for InjectSink {
 
 impl Drop for InjectSink {
     fn drop(&mut self) {
-        let local = std::mem::take(&mut self.local);
-        if !local.is_empty() {
-            self.collected.lock().push(local);
+        let mut c = self.collected.lock();
+        if !self.local.is_empty() {
+            c.chunks.push(std::mem::take(&mut self.local));
         }
+        c.raws.extend(self.local_raws.drain(..));
+    }
+}
+
+/// What one walker thread of a background re-walk found.
+#[derive(Default)]
+struct RefreshPart {
+    items: Vec<FinderItem>,
+    added: Vec<FinderItem>,
+    raws: RawNames,
+    hits: usize,
+}
+
+/// Per-walker-thread sink of a background re-walk: reuses the cached allocation of every path
+/// that is still there, so the transient cost of a refresh is small.
+struct RefreshSink {
+    root: PathBuf,
+    known: Arc<HashMap<u64, u32>>,
+    cached: Arc<Walked>,
+    scratch: String,
+    local: RefreshPart,
+    out: Arc<Mutex<Vec<RefreshPart>>>,
+}
+
+impl WalkSink for RefreshSink {
+    fn entry(&mut self, entry: WalkEntry) -> bool {
+        let rel = entry.rel(&self.root);
+        let text = rel.to_string_lossy();
+        let hash = fold_hash(&mut self.scratch, &text);
+        if let Some(&idx) = self.known.get(&hash) {
+            let old = &self.cached.items[idx as usize];
+            if old.kind() == entry.kind {
+                self.local.items.push(old.clone());
+                self.local.hits += 1;
+                return true;
+            }
+        }
+        let (item, raw) = FinderItem::split_rel_path(rel, entry.kind);
+        if let Some(raw) = raw {
+            self.local.raws.insert(item.rel().into(), raw);
+        }
+        self.local.items.push(item.clone());
+        self.local.added.push(item);
+        true
+    }
+}
+
+impl Drop for RefreshSink {
+    fn drop(&mut self) {
+        self.out.lock().push(std::mem::take(&mut self.local));
+    }
+}
+
+/// Feeds `walked` into `injector` from a helper thread, clearing `shared.walking` at the end.
+fn spawn_feed(
+    walked: Arc<Walked>,
+    injector: Injector<FinderItem>,
+    cancel: CancellationToken,
+    shared: Arc<WalkShared>,
+    notify: Notify,
+) {
+    let (feed_walked, feed_injector) = (walked.clone(), injector.clone());
+    let (feed_cancel, feed_shared, feed_notify) = (cancel, shared.clone(), notify.clone());
+    let feed = move || {
+        for chunk in feed_walked.items.chunks(8192) {
+            if feed_cancel.is_cancelled() {
+                break;
+            }
+            for e in chunk {
+                feed_injector.push(e.clone(), fill);
+            }
+            feed_notify();
+        }
+        feed_shared.walking.store(false, Ordering::Release);
+        feed_notify();
+    };
+    if let Err(e) = std::thread::Builder::new()
+        .name("ks-finder-feed".into())
+        .spawn(feed)
+    {
+        // Without a helper thread inject inline: slower, but never loses results.
+        tracing::error!(error = %e, "failed to spawn finder feed thread; injecting inline");
+        for it in &walked.items {
+            injector.push(it.clone(), fill);
+        }
+        shared.walking.store(false, Ordering::Release);
+        notify();
+    }
+}
+
+/// Re-walks a cached root in the background and reports what changed since the cache was
+/// filled. The result is stored in the cache and handed to the session through `refresh`.
+fn spawn_refresh(
+    opts: &FinderOptions,
+    cached: Arc<Walked>,
+    cache: Arc<WalkCache>,
+    cancel: CancellationToken,
+    refresh: Arc<RefreshShared>,
+    notify: Notify,
+) {
+    let walk_opts = opts.walk_options();
+    let key = opts.cache_key();
+    refresh.running.store(true, Ordering::Release);
+    let thread_refresh = refresh.clone();
+    let body = move || {
+        let refresh = thread_refresh;
+        let finish = |outcome: Option<RefreshOutcome>| {
+            *refresh.pending.lock() = outcome;
+            refresh.running.store(false, Ordering::Release);
+            notify();
+        };
+        if !walk_opts.root.is_dir() {
+            // Do not mistake an unreadable or vanished root for an emptied one.
+            return finish(None);
+        }
+        let mut scratch = String::new();
+        let mut known: HashMap<u64, u32> = HashMap::with_capacity(cached.items.len());
+        for (i, item) in cached.items.iter().enumerate() {
+            known.insert(fold_hash(&mut scratch, item.rel()), i as u32);
+        }
+        let known = Arc::new(known);
+        let out: Arc<Mutex<Vec<RefreshPart>>> = Arc::default();
+        let summary = walk(&walk_opts, &cancel, || RefreshSink {
+            root: walk_opts.root.clone(),
+            known: known.clone(),
+            cached: cached.clone(),
+            scratch: String::new(),
+            local: RefreshPart::default(),
+            out: out.clone(),
+        });
+        if summary.cancelled {
+            return finish(None);
+        }
+        let mut items = Vec::new();
+        let mut added = Vec::new();
+        let mut raws = RawNames::new();
+        let mut hits = 0;
+        for part in out.lock().drain(..) {
+            items.extend(part.items);
+            added.extend(part.added);
+            raws.extend(part.raws);
+            hits += part.hits;
+        }
+        drop(known);
+        let removed = hits < cached.items.len();
+        if added.is_empty() && !removed {
+            return finish(None);
+        }
+        let mut all_raws = cached.raws.clone();
+        if removed && !all_raws.is_empty() {
+            // Keep the exact names of the non-Unicode entries that survived.
+            let alive: HashSet<&str> = items.iter().map(|i| i.rel()).collect();
+            all_raws.retain(|k, _| alive.contains(&**k));
+        }
+        all_raws.extend(raws.iter().map(|(k, v)| (k.clone(), v.clone())));
+        let fresh = Arc::new(Walked {
+            items,
+            raws: all_raws,
+        });
+        cache.put_walked_if_unchanged(key, &cached, fresh.clone());
+        finish(Some(RefreshOutcome {
+            added,
+            full: removed.then_some(fresh),
+            raws,
+        }));
+    };
+    if let Err(e) = std::thread::Builder::new()
+        .name("ks-finder-refresh".into())
+        .spawn(body)
+    {
+        tracing::error!(error = %e, "failed to spawn finder refresh thread");
+        refresh.running.store(false, Ordering::Release);
     }
 }
 
 impl FinderSession {
     /// Starts a session. If `cache` holds a completed walk for the same root and toggles the
-    /// items are injected immediately and no walk happens; otherwise a walk thread is spawned
-    /// and, when it completes uncancelled, stored in the cache.
+    /// items are injected immediately and, unless [`FinderOptions::refresh_cached`] is off, a
+    /// background re-walk reconciles the session (and the cache) with the disk; otherwise a
+    /// walk thread is spawned and, when it completes uncancelled, stored in the cache.
     ///
     /// `notify` is called (from any thread) whenever new results may be available; it should
     /// only schedule a [`tick`](Self::tick), never do work. `generation` is returned by
@@ -241,68 +506,58 @@ impl FinderSession {
             walking: AtomicBool::new(true),
             summary: Mutex::new(None),
         });
+        let refresh = Arc::new(RefreshShared::default());
+        let raws: Arc<Mutex<RawNames>> = Arc::default();
         let key = opts.cache_key();
 
         let cached = cache.as_ref().and_then(|c| c.get(&key));
         let from_cache = cached.is_some();
         if let Some(entries) = cached {
-            let feed_cancel = cancel.clone();
-            let feed_shared = shared.clone();
-            let feed_notify = notify.clone();
-            let feed_injector = injector.clone();
-            let feed_entries = entries.clone();
-            let feed = move || {
-                for chunk in feed_entries.chunks(8192) {
-                    if feed_cancel.is_cancelled() {
-                        break;
-                    }
-                    for e in chunk {
-                        feed_injector.push(e.clone(), fill);
-                    }
-                    feed_notify();
-                }
-                feed_shared.walking.store(false, Ordering::Release);
-                feed_notify();
-            };
-            if let Err(e) = std::thread::Builder::new()
-                .name("ks-finder-feed".into())
-                .spawn(feed)
-            {
-                // Without a helper thread inject inline: slower, but never loses results.
-                tracing::error!(error = %e, "failed to spawn finder feed thread; injecting inline");
-                for it in entries.iter() {
-                    injector.push(it.clone(), fill);
-                }
-                shared.walking.store(false, Ordering::Release);
-                notify();
+            raws.lock().extend(entries.raws.clone());
+            spawn_feed(
+                entries.clone(),
+                injector.clone(),
+                cancel.clone(),
+                shared.clone(),
+                notify.clone(),
+            );
+            if let (true, Some(cache)) = (opts.refresh_cached, cache) {
+                spawn_refresh(
+                    &opts,
+                    entries,
+                    cache,
+                    cancel.clone(),
+                    refresh.clone(),
+                    notify.clone(),
+                );
             }
         } else {
-            let walk_opts = WalkOptions {
-                root: opts.root.clone(),
-                show_hidden: opts.show_hidden,
-                respect_gitignore: opts.respect_gitignore,
-                include_dirs: opts.include_dirs,
-                threads: opts.walk_threads,
-                overrides: None,
-                skip_cloud_dirs: opts.skip_cloud_dirs,
-            };
+            let walk_opts = opts.walk_options();
             let thread_cancel = cancel.clone();
             let thread_shared = shared.clone();
+            let thread_injector = injector.clone();
+            let thread_raws = raws.clone();
+            let thread_notify = notify.clone();
             let spawned = std::thread::Builder::new()
                 .name("ks-finder-walk".into())
                 .spawn(move || {
-                    let collected: Arc<Mutex<Vec<Vec<FinderItem>>>> = Arc::default();
+                    let notify = thread_notify;
+                    let collected: Arc<Mutex<Collected>> = Arc::default();
                     let summary = walk(&walk_opts, &thread_cancel, || InjectSink {
                         root: walk_opts.root.clone(),
-                        injector: injector.clone(),
+                        injector: thread_injector.clone(),
                         local: Vec::with_capacity(1024),
+                        local_raws: Vec::new(),
                         collected: collected.clone(),
                     });
                     if !summary.cancelled {
+                        let Collected { chunks, raws } = std::mem::take(&mut *collected.lock());
+                        thread_raws
+                            .lock()
+                            .extend(raws.iter().map(|(k, v)| (k.clone(), v.clone())));
                         if let Some(cache) = cache {
-                            let all: Vec<FinderItem> =
-                                collected.lock().drain(..).flatten().collect();
-                            cache.put(key, all);
+                            let all: Vec<FinderItem> = chunks.into_iter().flatten().collect();
+                            cache.put_walked(key, Arc::new(Walked { items: all, raws }));
                         }
                     }
                     tracing::debug!(?summary, "finder walk finished");
@@ -320,10 +575,14 @@ impl FinderSession {
             generation,
             opts,
             nucleo,
+            injector,
             query: String::new(),
             matcher: Matcher::new(Config::DEFAULT.match_paths()),
             cancel,
             shared,
+            refresh,
+            raws,
+            notify,
             from_cache,
         }
     }
@@ -352,6 +611,7 @@ impl FinderSession {
             generation,
             opts,
             nucleo,
+            injector,
             query: String::new(),
             matcher: Matcher::new(Config::DEFAULT.match_paths()),
             cancel: CancellationToken::new(),
@@ -359,6 +619,9 @@ impl FinderSession {
                 walking: AtomicBool::new(false),
                 summary: Mutex::new(None),
             }),
+            refresh: Arc::default(),
+            raws: Arc::default(),
+            notify,
             from_cache: false,
         }
     }
@@ -402,12 +665,53 @@ impl FinderSession {
 
     /// Drives the matcher, waiting at most `timeout_ms` (10 is a good value) for it.
     pub fn tick(&mut self, timeout_ms: u64) -> FinderStatus {
+        let applied = self.apply_refresh();
         let st = self.nucleo.tick(timeout_ms);
         FinderStatus {
-            changed: st.changed,
+            changed: st.changed || applied,
             matching: st.running,
             walking: self.walking(),
+            refreshing: self.refreshing(),
         }
+    }
+
+    /// Applies the result of the background re-walk once the initial feed is complete.
+    fn apply_refresh(&mut self) -> bool {
+        if self.walking() {
+            return false;
+        }
+        let Some(outcome) = self.refresh.pending.lock().take() else {
+            return false;
+        };
+        self.raws.lock().extend(outcome.raws);
+        match outcome.full {
+            Some(full) => {
+                // Something disappeared: rebuild the matcher from the fresh walk. The old
+                // results stay on screen until the new items are matched.
+                self.nucleo.restart(false);
+                self.injector = self.nucleo.injector();
+                self.shared.walking.store(true, Ordering::Release);
+                spawn_feed(
+                    full,
+                    self.injector.clone(),
+                    self.cancel.clone(),
+                    self.shared.clone(),
+                    self.notify.clone(),
+                );
+            }
+            None => {
+                for item in outcome.added {
+                    self.injector.push(item, fill);
+                }
+            }
+        }
+        true
+    }
+
+    /// Whether a background re-walk of a cached root is still in flight (or its result is not
+    /// applied yet).
+    pub fn refreshing(&self) -> bool {
+        self.refresh.running.load(Ordering::Acquire) || self.refresh.pending.lock().is_some()
     }
 
     /// Whether the walker is still running.
@@ -450,13 +754,19 @@ impl FinderSession {
                 indices.sort_unstable();
                 indices.dedup();
             }
+            let rel = item.data.rel();
+            let exact = if item.data.is_lossy() {
+                self.raws.lock().get(rel).cloned()
+            } else {
+                None
+            };
             out.push(FinderResult {
-                rel: item.data.rel.to_string(),
-                path: match &item.data.raw {
-                    Some(raw) => self.opts.root.join(&**raw),
-                    None => self.opts.root.join(&*item.data.rel),
+                rel: rel.to_owned(),
+                path: match exact {
+                    Some(raw) => self.opts.root.join(&*raw),
+                    None => self.opts.root.join(rel),
                 },
-                kind: item.data.kind,
+                kind: item.data.kind(),
                 indices,
             });
         }
@@ -602,12 +912,81 @@ mod tests {
             crate::PathChange::Added(t.path().join("new.rs"), EntryKind::File),
             crate::PathChange::Removed(t.path().join("src")),
         ]);
-        let mut s3 = FinderSession::start(opts, 3, Some(cache), noop());
+        // The changes above are synthetic (nothing happened on disk): serve the cache only.
+        let mut cache_only = opts;
+        cache_only.refresh_cached = false;
+        let mut s3 = FinderSession::start(cache_only, 3, Some(cache), noop());
         settle(&mut s3);
         assert_eq!(s3.total_count(), 3);
         s3.set_query("new");
         settle(&mut s3);
         assert_eq!(s3.results(0, 5)[0].rel, "new.rs");
+    }
+
+    #[test]
+    fn reopen_serves_cache_then_merges_background_changes() {
+        let t = tree();
+        let cache = Arc::new(WalkCache::new());
+        let opts = FinderOptions::new(t.path());
+        let mut s1 = FinderSession::start(opts.clone(), 1, Some(cache.clone()), noop());
+        settle(&mut s1);
+        assert_eq!(s1.total_count(), 4);
+        drop(s1);
+
+        // Deep changes the displayed-directory diffs never see.
+        touch(t.path(), "docs/deep/er/new_file.md");
+        fs::remove_file(t.path().join("src/lib.rs")).unwrap();
+
+        let mut s2 = FinderSession::start(opts.clone(), 2, Some(cache.clone()), noop());
+        assert!(s2.from_cache());
+        settle(&mut s2);
+        assert!(!s2.refreshing());
+        s2.set_query("");
+        settle(&mut s2);
+        let rels: Vec<String> = s2
+            .results(0, 50)
+            .into_iter()
+            .map(|r| r.rel.replace('\\', "/"))
+            .collect();
+        assert!(
+            rels.contains(&"docs/deep/er/new_file.md".to_string()),
+            "{rels:?}"
+        );
+        assert!(!rels.contains(&"src/lib.rs".to_string()), "{rels:?}");
+        assert_eq!(rels.len(), 4);
+        // The cache itself was updated for the next opening.
+        assert_eq!(cache.len_of(&opts.cache_key()), Some(4));
+    }
+
+    #[test]
+    fn background_refresh_only_adds_when_nothing_vanished() {
+        let t = tree();
+        let cache = Arc::new(WalkCache::new());
+        let opts = FinderOptions::new(t.path());
+        let mut s1 = FinderSession::start(opts.clone(), 1, Some(cache.clone()), noop());
+        settle(&mut s1);
+        drop(s1);
+        touch(t.path(), "extra/one.txt");
+        let mut s2 = FinderSession::start(opts, 2, Some(cache), noop());
+        s2.set_query("one");
+        settle(&mut s2);
+        assert_eq!(s2.total_count(), 5);
+        assert_eq!(s2.matched_count(), 1);
+    }
+
+    #[test]
+    fn vanished_root_does_not_empty_a_cached_session() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("gone");
+        let opts = FinderOptions::new(&root);
+        let cache = Arc::new(WalkCache::new());
+        cache.put(
+            opts.cache_key(),
+            vec![FinderItem::new("a.txt", EntryKind::File)],
+        );
+        let mut s = FinderSession::start(opts, 1, Some(cache), noop());
+        settle(&mut s);
+        assert_eq!(s.total_count(), 1);
     }
 
     #[test]
@@ -682,6 +1061,53 @@ mod tests {
             again.root = PathBuf::from(plain.root.to_string_lossy().to_uppercase());
             assert!(cache.contains(&again.cache_key()));
         }
+    }
+
+    #[test]
+    fn cache_and_matcher_share_one_allocation_per_path() {
+        // A clone (what the cache hands to the matcher) is a pointer copy, not a string copy,
+        // and the item stays two words wide: this is what keeps 1M paths under budget.
+        let a = FinderItem::new("src/some/long/path/file.rs", EntryKind::File);
+        let b = a.clone();
+        assert!(Arc::ptr_eq(&a.repr, &b.repr));
+        assert_eq!(
+            std::mem::size_of::<FinderItem>(),
+            2 * std::mem::size_of::<usize>()
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_removal_refresh_keeps_the_exact_names_of_surviving_non_unicode_entries() {
+        use std::os::windows::ffi::OsStringExt;
+        let t = tempfile::tempdir().unwrap();
+        let wide: Vec<u16> = "bad"
+            .encode_utf16()
+            .chain([0xD800])
+            .chain("name.txt".encode_utf16())
+            .collect();
+        let name = std::ffi::OsString::from_wide(&wide);
+        if fs::write(t.path().join(&name), "x").is_err() {
+            eprintln!("SKIPPED: filesystem rejects lone surrogates");
+            return;
+        }
+        touch(t.path(), "gone.txt");
+        let cache = Arc::new(WalkCache::new());
+        let opts = FinderOptions::new(t.path());
+        let mut s1 = FinderSession::start(opts.clone(), 1, Some(cache.clone()), noop());
+        settle(&mut s1);
+        drop(s1);
+        fs::remove_file(t.path().join("gone.txt")).unwrap();
+        let mut s2 = FinderSession::start(opts.clone(), 2, Some(cache.clone()), noop());
+        settle(&mut s2);
+        drop(s2);
+        // The cache now holds the post-removal walk; a third session must still resolve the
+        // lossy entry to the real file.
+        let mut s3 = FinderSession::start(opts, 3, Some(cache), noop());
+        settle(&mut s3);
+        let r = s3.results(0, 5);
+        assert_eq!(r.len(), 1);
+        assert!(r[0].path.exists(), "{:?}", r[0].path);
     }
 
     #[cfg(windows)]

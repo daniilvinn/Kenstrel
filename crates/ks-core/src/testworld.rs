@@ -79,7 +79,7 @@ impl World {
 
     fn run(&self, effect: &Effect) -> Vec<Msg> {
         match effect {
-            Effect::ListDir { gen, path } => {
+            Effect::ListDir { gen, path } | Effect::ListParked { gen, path } => {
                 let gen = *gen;
                 let Some(entries) = self.dirs.get(path) else {
                     return vec![Msg::ListingFinished {

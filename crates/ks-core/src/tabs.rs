@@ -9,12 +9,11 @@
 //! git or child-count result that belongs to a parked tab can never equal a current ticket of
 //! the active tab and is dropped. A tab being parked also invalidates its own tickets, and a
 //! tab being activated re-lists its directory (keeping the cursor on its entry by name),
-//! re-arms the watcher and re-runs `git status`. Only the active tab is watched (deviation
-//! from PLAN 7, which watches every tab: a parked tab is refreshed when it is activated, so
-//! the user sees the same thing without a watcher per tab). Until the re-list arrives the tab
-//! shows its old entries; a directory that vanished meanwhile is reported as a failed refresh
-//! and the old entries stay. The effect protocol has a single watch slot, so watching every
-//! tab needs a multi-path `WatchDir` (integration note in docs/progress/p7.md).
+//! re-arms the watcher and re-runs `git status`. The directories of the parked tabs are
+//! watched too (`Effect::WatchParked`, at most one watch per tab): a change marks the tab
+//! stale (a dot after its number in the tab strip) and the re-list on activation shows it.
+//! Until the re-list arrives the tab shows its old entries; a directory that vanished
+//! meanwhile is reported as a failed refresh and the old entries stay.
 
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -22,7 +21,9 @@ use std::path::PathBuf;
 
 use crate::drives::DrivesView;
 use crate::effect::Effect;
-use crate::generation::GenCounter;
+use crate::entry::Entry;
+use crate::fileops::same_path;
+use crate::generation::{Gen, GenCounter};
 use crate::git::GitSnapshot;
 use crate::mode::Mode;
 use crate::msg::TimerKind;
@@ -50,6 +51,13 @@ pub(crate) struct TabSlot {
     git_gen: GenCounter,
     git_timer_gen: GenCounter,
     children_gen: GenCounter,
+    /// The directory changed while the tab was in the background (`Effect::WatchParked`).
+    /// Slot-only: it is not swapped with the active tab and is cleared on activation, which
+    /// re-lists the directory anyway.
+    stale: bool,
+    /// A background re-list of this parked tab in flight: ticket (from `list_gen`) and the
+    /// entries received so far. Slot-only, dropped on activation.
+    bg: Option<(Gen, Vec<Entry>)>,
 }
 
 impl TabSlot {
@@ -68,6 +76,8 @@ impl TabSlot {
             git_gen: GenCounter::in_space(space),
             git_timer_gen: GenCounter::in_space(space),
             children_gen: GenCounter::in_space(space),
+            stale: false,
+            bg: None,
         }
     }
 
@@ -118,6 +128,122 @@ impl Tabs {
     pub fn active_index(&self) -> usize {
         self.active
     }
+
+    /// Entry names of the parked tab `index` (empty for the active tab).
+    pub fn parked_names(&self, index: usize) -> Vec<String> {
+        self.slots
+            .get(index)
+            .and_then(Option::as_ref)
+            .map(|s| {
+                s.view
+                    .entries()
+                    .iter()
+                    .map(|e| e.name.to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Whether the directory of the parked tab `index` changed since it was left.
+    pub fn is_stale(&self, index: usize) -> bool {
+        self.slots
+            .get(index)
+            .and_then(Option::as_ref)
+            .is_some_and(|slot| slot.stale)
+    }
+}
+
+/// Tells the effect runner which directories the parked tabs show, so it can watch them.
+pub(crate) fn watch_parked(state: &AppState, effects: &mut Vec<Effect>) {
+    let mut paths: Vec<PathBuf> = Vec::new();
+    for slot in state.tabs.slots.iter().flatten() {
+        // A results list and the drives view have no directory to watch.
+        if slot.view.label.is_some() || slot.show_drives {
+            continue;
+        }
+        if !paths.iter().any(|p| same_path(p, &slot.cwd)) {
+            paths.push(slot.cwd.clone());
+        }
+    }
+    effects.push(Effect::WatchParked { paths });
+}
+
+/// `Msg::ParkedDirChanged`: marks the parked tabs that show `path` as out of date and
+/// re-lists them in the background. The chunks come back tagged with the tab's own ticket and
+/// are collected in the slot ([`parked_chunk`], [`parked_finished`]).
+pub(crate) fn on_parked_dir_changed(
+    state: &mut AppState,
+    effects: &mut Vec<Effect>,
+    path: &std::path::Path,
+) {
+    for slot in state.tabs.slots.iter_mut().flatten() {
+        if slot.view.label.is_none() && !slot.show_drives && same_path(&slot.cwd, path) {
+            slot.stale = true;
+            let gen = slot.list_gen.bump();
+            slot.bg = Some((gen, Vec::new()));
+            effects.push(Effect::ListParked {
+                gen,
+                path: slot.cwd.clone(),
+            });
+            state.dirty = true;
+        }
+    }
+}
+
+fn bg_slot(state: &mut AppState, gen: Gen) -> Option<&mut TabSlot> {
+    state
+        .tabs
+        .slots
+        .iter_mut()
+        .flatten()
+        .find(|slot| slot.list_gen.is_current(gen) && slot.bg.as_ref().is_some_and(|b| b.0 == gen))
+}
+
+/// A listing chunk: taken when it belongs to the background re-list of a parked tab,
+/// otherwise handed back for the active tab.
+pub(crate) fn parked_chunk(
+    state: &mut AppState,
+    gen: Gen,
+    entries: Vec<Entry>,
+) -> Option<Vec<Entry>> {
+    match bg_slot(state, gen) {
+        Some(slot) => {
+            if let Some((_, buffer)) = slot.bg.as_mut() {
+                buffer.extend(entries);
+            }
+            None
+        }
+        None => Some(entries),
+    }
+}
+
+/// End of a listing: applies the background re-list of a parked tab. Returns false when
+/// `gen` is not one (the active tab handles it).
+pub(crate) fn parked_finished(
+    state: &mut AppState,
+    effects: &mut Vec<Effect>,
+    gen: Gen,
+    failed: bool,
+) -> bool {
+    let height = state.viewport_height();
+    let Some(slot) = bg_slot(state, gen) else {
+        return false;
+    };
+    let Some((_, buffer)) = slot.bg.take() else {
+        return true;
+    };
+    if failed {
+        // Stays marked; the re-list on activation reports the problem.
+        return true;
+    }
+    let changes = crate::search::diff_listing(&slot.cwd, slot.view.entries(), &buffer);
+    if !changes.is_empty() {
+        effects.push(Effect::WalkCacheChanges(changes));
+    }
+    slot.view.replace_entries(buffer, height);
+    slot.stale = false;
+    state.dirty = true;
+    true
 }
 
 /// Compile-time guard: every [`AppState`] field is listed here, so adding one breaks the
@@ -202,10 +328,14 @@ fn prepare_to_leave(state: &mut AppState, effects: &mut Vec<Effect>) {
 /// The newly shown tab refreshes itself: re-list, watch and ask git.
 fn resume(state: &mut AppState, effects: &mut Vec<Effect>) {
     state.dirty = true;
+    watch_parked(state, effects);
     effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
     if state.view.label.is_some() {
         // A results list is not a directory listing: nothing to refresh, watch or ask git.
         effects.push(Effect::StopWatching);
+        // Stats that arrived while the tab was parked were dropped (other generation space):
+        // ask again so the size and mtime columns fill in.
+        nav::stat_results(state, effects);
         return;
     }
     if state.show_drives {
@@ -252,6 +382,7 @@ pub(crate) fn new_tab(state: &mut AppState, effects: &mut Vec<Effect>) {
         nav::request(state, effects, Location::Dir(cwd), NavKind::Visit, reveal);
     }
     effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
+    watch_parked(state, effects);
     state.dirty = true;
 }
 
@@ -275,6 +406,7 @@ pub(crate) fn open_in_new_tab(
     state.tabs.active = at + 1;
     effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
     effects.push(Effect::StopWatching);
+    watch_parked(state, effects);
     state.dirty = true;
 }
 
@@ -314,6 +446,9 @@ fn switch_to(state: &mut AppState, effects: &mut Vec<Effect>, target: usize) {
     prepare_to_leave(state, effects);
     slot.swap_with(state);
     let from = state.tabs.active;
+    // `slot` now holds the tab that was just left: it starts out up to date.
+    slot.stale = false;
+    slot.bg = None;
     state.tabs.slots[from] = Some(slot);
     state.tabs.active = target;
     resume(state, effects);
@@ -398,6 +533,166 @@ mod tests {
         assert_eq!(w.names(), ["Downloads", "projects", "notes.txt"]);
         assert_eq!(w.cursor(), "notes.txt", "the cursor is carried over");
         assert!(!w.state.view.loading);
+    }
+
+    fn last_parked_watch(w: &crate::testworld::World) -> Vec<PathBuf> {
+        w.log
+            .iter()
+            .rev()
+            .find_map(|e| match e {
+                Effect::WatchParked { paths } => Some(paths.clone()),
+                _ => None,
+            })
+            .expect("a WatchParked effect")
+    }
+
+    #[test]
+    fn parked_tabs_are_watched_and_marked_stale() {
+        let mut w = project_world();
+        w.key("t j l");
+        // Tab 1 is parked at /home/me; tab 2 (active) is at /home/me/projects.
+        assert_eq!(last_parked_watch(&w), vec![PathBuf::from("/home/me")]);
+        assert!(!w.state.tabs.is_stale(0));
+        w.hold = true;
+        w.send(Msg::ParkedDirChanged {
+            path: PathBuf::from("/home/me"),
+        });
+        // Marked until the background re-list arrives.
+        assert!(w.state.tabs.is_stale(0));
+        assert!(!w.state.tabs.is_stale(1));
+        // An unrelated directory changes nothing.
+        w.send(Msg::ParkedDirChanged {
+            path: PathBuf::from("/elsewhere"),
+        });
+        assert!(!w.state.tabs.is_stale(1));
+        // Switching shows the tab (re-listed) and parks tab 2 as up to date.
+        w.hold = false;
+        w.held.clear();
+        w.key("1");
+        assert!(!w.state.tabs.is_stale(0));
+        assert!(!w.state.tabs.is_stale(1));
+        assert_eq!(
+            last_parked_watch(&w),
+            vec![PathBuf::from("/home/me/projects")]
+        );
+    }
+
+    #[test]
+    fn a_parked_tab_is_re_listed_in_the_background() {
+        let mut w = project_world();
+        w.key("t j l");
+        assert!(!w.state.tabs.parked_names(0).contains(&"fresh".to_string()));
+        let mut entries = w.dirs[&PathBuf::from("/home/me")].clone();
+        entries.push(Entry::dir("fresh"));
+        w.dir("/home/me", entries);
+        let before = w.state.view.entries().len();
+        w.send(Msg::ParkedDirChanged {
+            path: PathBuf::from("/home/me"),
+        });
+        // The listing of the parked tab was routed to its slot, not to the active view.
+        assert!(w.state.tabs.parked_names(0).contains(&"fresh".to_string()));
+        assert!(!w.state.tabs.is_stale(0));
+        assert_eq!(w.state.view.entries().len(), before);
+    }
+
+    #[test]
+    fn a_parked_re_list_feeds_the_walk_cache_with_what_changed() {
+        let mut w = project_world();
+        w.key("t j l");
+        let mut entries = w.dirs[&PathBuf::from("/home/me")].clone();
+        entries.retain(|e| e.display_name() != "Downloads");
+        entries.push(Entry::dir("fresh"));
+        w.dir("/home/me", entries);
+        w.log.clear();
+        w.send(Msg::ParkedDirChanged {
+            path: PathBuf::from("/home/me"),
+        });
+        let changes: Vec<ks_search::PathChange> = w
+            .log
+            .iter()
+            .filter_map(|e| match e {
+                Effect::WalkCacheChanges(c) => Some(c.clone()),
+                _ => None,
+            })
+            .flatten()
+            .collect();
+        assert!(
+            changes.iter().any(|c| matches!(c,
+                ks_search::PathChange::Added(p, _) if p.ends_with("fresh"))),
+            "{changes:?}"
+        );
+        assert!(
+            changes.iter().any(|c| matches!(c,
+                ks_search::PathChange::Removed(p) if p.ends_with("Downloads"))),
+            "{changes:?}"
+        );
+    }
+
+    #[test]
+    fn a_tab_activated_while_its_re_list_is_in_flight_ignores_the_late_result() {
+        let mut w = project_world();
+        w.key("t j l");
+        w.hold = true;
+        w.send(Msg::ParkedDirChanged {
+            path: PathBuf::from("/home/me"),
+        });
+        // The parked re-list (chunk and end) is still on its way ...
+        assert!(!w.held.is_empty());
+        // ... when the tab is activated; it lists itself afresh.
+        w.key("1");
+        let before = w.names();
+        w.log.clear();
+        let held = std::mem::take(&mut w.held);
+        let (stale_listing, _other): (Vec<Msg>, Vec<Msg>) = held
+            .into_iter()
+            .partition(|m| matches!(m, Msg::ListingChunk { .. } | Msg::ListingFinished { .. }));
+        w.hold = false;
+        for msg in stale_listing {
+            w.send(msg);
+        }
+        assert_eq!(w.names(), before, "the late result changed the active view");
+        assert_eq!(
+            w.count(|e| matches!(e, Effect::WalkCacheChanges(_))),
+            0,
+            "a dropped result must not touch the cache"
+        );
+    }
+
+    #[test]
+    fn a_results_tab_asks_for_its_stats_again_when_it_comes_back() {
+        let mut w = project_world();
+        let mut effects = Vec::new();
+        crate::nav::show_results_list(
+            &mut w.state,
+            &mut effects,
+            PathBuf::from("/home/me"),
+            "grep".into(),
+            vec![Entry::file("a.txt", 0)],
+        );
+        assert_eq!(w.state.tabs.active_index(), 1);
+        w.key("1");
+        w.log.clear();
+        w.key("2");
+        assert_eq!(w.count(|e| matches!(e, Effect::StatEntries { .. })), 1);
+    }
+
+    #[test]
+    fn closing_a_tab_updates_the_watched_set() {
+        let mut w = project_world();
+        w.key("t");
+        assert_eq!(last_parked_watch(&w), vec![PathBuf::from("/home/me")]);
+        w.key("ctrl-w");
+        assert!(last_parked_watch(&w).is_empty());
+    }
+
+    #[test]
+    fn the_watched_set_is_bounded_by_the_tab_limit() {
+        let mut w = project_world();
+        for _ in 0..MAX_TABS + 2 {
+            w.key("t");
+        }
+        assert_eq!(w.state.tabs.count(), MAX_TABS);
+        assert!(last_parked_watch(&w).len() < MAX_TABS);
     }
 
     #[test]
