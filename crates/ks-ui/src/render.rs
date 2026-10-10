@@ -58,6 +58,7 @@ pub fn render(frame: &mut Frame, state: &AppState, theme: &Theme) {
     } else if in_hints {
         render_hints(frame, bottom_rule, state, theme, true);
     }
+    crate::search::render_overlays(frame, state, theme);
     crate::palette::render(frame, state, theme);
     crate::help::render(frame, state, theme);
     crate::navaids::render_overlays(frame, state, theme);
@@ -93,6 +94,14 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme)
             Span::styled(
                 truncate_end("This PC", budget),
                 Style::new().fg(theme.fg).add_modifier(Modifier::BOLD),
+            ),
+        ])
+    } else if let Some(label) = &state.view.label {
+        Line::from(vec![
+            Span::raw(" "),
+            Span::styled(
+                truncate_end(label, budget),
+                Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
             ),
         ])
     } else {
@@ -222,13 +231,31 @@ fn render_prompt(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme)
     if crate::fileops::render_input_prompt(frame, area, state, theme) {
         return;
     }
-    let left = Line::from(vec![
+    let mut left_spans = vec![
         Span::raw(" "),
         Span::styled(PROMPT_GLYPH, theme.bold_accent()),
         Span::raw(" "),
-    ]);
-    let left_width = width(PROMPT_GLYPH) + 2;
-    frame.render_widget(Paragraph::new(left), area);
+    ];
+    let mut left_width = width(PROMPT_GLYPH) + 2;
+    // The in-directory filter: `/query` with a cursor while typing, a chip once kept.
+    let filter_budget = usize::from(area.width) / 2;
+    if state.mode == Mode::Filter {
+        left_spans.push(Span::styled("/", theme.bold_accent()));
+        let spans = crate::search::input_spans(
+            &state.search.filter_input,
+            filter_budget,
+            true,
+            "filter",
+            theme,
+        );
+        left_width += 1 + spans.iter().map(|s| width(&s.content)).sum::<usize>();
+        left_spans.extend(spans);
+    } else if let Some(query) = state.view.filter_query() {
+        let chip = format!("/{}", truncate_end(query, filter_budget));
+        left_width += width(&chip);
+        left_spans.push(Span::styled(chip, theme.bold_accent()));
+    }
+    frame.render_widget(Paragraph::new(Line::from(left_spans)), area);
 
     // Right side, in order: pending keys, status message, list status, jobs.
     let mut segments: Vec<Span> = Vec::new();
@@ -327,6 +354,27 @@ fn hints_for(state: &AppState) -> &'static [(Action, &'static str)] {
             (Action::Accept, "jump"),
             (Action::CursorDown, "next"),
             (Action::CursorUp, "previous"),
+            (Action::Cancel, "close"),
+        ],
+        (KeyContext::Filter, _) => &[
+            (Action::Accept, "keep"),
+            (Action::Cancel, "clear"),
+            (Action::CursorDown, "down"),
+            (Action::CursorUp, "up"),
+        ],
+        (KeyContext::Finder, _) => &[
+            (Action::Accept, "go"),
+            (Action::FinderOpen, "open"),
+            (Action::FinderMark, "mark"),
+            (Action::FinderScope, "scope"),
+            (Action::Cancel, "close"),
+        ],
+        (KeyContext::Grep, _) => &[
+            (Action::Accept, "edit"),
+            (Action::GrepNextField, "field"),
+            (Action::GrepRegex, "regex"),
+            (Action::GrepWholeWord, "word"),
+            (Action::GrepToList, "list"),
             (Action::Cancel, "close"),
         ],
         _ => &[(Action::Cancel, "cancel")],

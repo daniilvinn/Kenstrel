@@ -57,6 +57,15 @@ the palette (`Reload config`).
 | `/` | Filter current directory | `filter.open` | Fuzzy-filter the current directory as you type. |
 | `ctrl-p`, `f` | Find file (recursive fuzzy) | `find.file` | Find a file by fuzzy path match, recursively. |
 | `ctrl-f`, `s` | Search file contents | `search.contents` | Search inside files (live grep). |
+| — | Find file: cycle scope (cwd, git root, home, drive) | `finder.scope` | Find file: cycle the search scope (current directory, git root, home, drive). |
+| — | Find file: toggle hidden files | `finder.hidden` | Find file: include or skip hidden files. |
+| — | Find file: toggle gitignored files | `finder.gitignore` | Find file: include or skip files ignored by git. |
+| — | Find file: open with default app | `finder.open` | Find file: open the marked results, or the highlighted one, with the default app. |
+| — | Find file: mark result | `finder.mark` | Find file: mark the highlighted result and move down. |
+| — | Search contents: toggle regex | `grep.regex` | Search contents: toggle regular-expression matching. |
+| — | Search contents: toggle whole word | `grep.word` | Search contents: toggle whole-word matching. |
+| — | Search contents: switch query/glob field | `grep.field` | Search contents: switch between the query and glob fields. |
+| — | Search contents: open results as a list | `grep.to_list` | Search contents: show the files with matches as a results list in a new tab. |
 
 ### Selection
 
@@ -161,6 +170,12 @@ the palette (`Reload config`).
 | `esc` | `cancel` |
 | `ctrl-c` | `cancel` |
 | `enter` | `accept` |
+| `down` | `cursor.down` |
+| `up` | `cursor.up` |
+| `ctrl-n` | `cursor.down` |
+| `ctrl-p` | `cursor.up` |
+| `pagedown` | `page.half_down` |
+| `pageup` | `page.half_up` |
 
 ### `finder`
 
@@ -169,6 +184,18 @@ the palette (`Reload config`).
 | `esc` | `cancel` |
 | `ctrl-c` | `cancel` |
 | `enter` | `accept` |
+| `down` | `cursor.down` |
+| `up` | `cursor.up` |
+| `ctrl-n` | `cursor.down` |
+| `ctrl-p` | `cursor.up` |
+| `pagedown` | `page.half_down` |
+| `pageup` | `page.half_up` |
+| `ctrl-r` | `finder.scope` |
+| `alt-.` | `finder.hidden` |
+| `alt-g` | `finder.gitignore` |
+| `ctrl-enter` | `finder.open` |
+| `ctrl-o` | `finder.open` |
+| `tab` | `finder.mark` |
 
 ### `grep`
 
@@ -177,6 +204,17 @@ the palette (`Reload config`).
 | `esc` | `cancel` |
 | `ctrl-c` | `cancel` |
 | `enter` | `accept` |
+| `down` | `cursor.down` |
+| `up` | `cursor.up` |
+| `ctrl-n` | `cursor.down` |
+| `ctrl-p` | `cursor.up` |
+| `pagedown` | `page.half_down` |
+| `pageup` | `page.half_up` |
+| `ctrl-r` | `grep.regex` |
+| `ctrl-w` | `grep.word` |
+| `tab` | `grep.field` |
+| `backtab` | `grep.field` |
+| `ctrl-l` | `grep.to_list` |
 
 ### `palette`
 

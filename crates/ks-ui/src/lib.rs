@@ -11,6 +11,7 @@ pub mod palette;
 pub mod popup;
 pub mod preview;
 pub mod render;
+pub mod search;
 pub mod syntax;
 pub mod text;
 pub mod theme;

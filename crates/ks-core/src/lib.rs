@@ -27,6 +27,7 @@ pub mod msg;
 mod nav;
 pub mod palette;
 pub mod preview;
+pub mod search;
 pub mod state;
 pub mod tabs;
 #[cfg(test)]
@@ -51,6 +52,10 @@ pub use keymap::Keymap;
 pub use mode::{KeyContext, Mode, Overlay};
 pub use msg::{Msg, TimerKind};
 pub use preview::{PaneWidths, PreviewKind, PreviewMsg, PreviewRequest, PreviewState};
+pub use search::{
+    preview_target, FinderSnapshot, FinderState, GrepField, GrepRow, GrepState, LineInput,
+    PreviewTarget, SearchState,
+};
 pub use state::{AppState, JobId, Level, Places, QuitKind, Size, StartParams, Status};
 pub use tabs::Tabs;
 pub use update::update;

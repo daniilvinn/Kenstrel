@@ -289,7 +289,80 @@ fn render_preview(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme
     if state.preview.target.as_deref() != Some(preview.path.as_path()) {
         return;
     }
-    render_content(frame, content, state, theme, preview);
+    render_content(frame, content, state, theme, preview, None);
+}
+
+/// The preview pane inside a search overlay (find file / content search): the same content
+/// renderer as the main pane, with a header naming the highlighted file instead of the list's
+/// cursor entry. `line` (1-based) is the hit of a content search; it gets the selection
+/// background when it is on screen.
+pub(crate) fn render_overlay_pane(
+    frame: &mut Frame,
+    area: Rect,
+    state: &AppState,
+    theme: &Theme,
+    target: &ks_core::PreviewTarget,
+) {
+    if area.height == 0 || area.width < 4 {
+        return;
+    }
+    let [header, rule, content] = split_pane(area);
+    let name = target
+        .path
+        .file_name()
+        .map_or_else(String::new, |n| sanitize(&n.to_string_lossy()));
+    let right = target.line.map(|l| format!("line {l}")).unwrap_or_default();
+    let total = usize::from(header.width).saturating_sub(2);
+    let right_width = if right.is_empty() {
+        0
+    } else {
+        width(&right) + 2
+    };
+    let name = truncate_middle(&name, total.saturating_sub(right_width), true);
+    let pad = total.saturating_sub(width(&name) + width(&right));
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::raw(" "),
+            Span::styled(name, Style::new().fg(theme.fg).add_modifier(Modifier::BOLD)),
+            Span::raw(" ".repeat(pad)),
+            Span::styled(right, theme.dim()),
+            Span::raw(" "),
+        ])),
+        header,
+    );
+    if rule.height > 0 {
+        let line = RULE_GLYPH.repeat(usize::from(rule.width));
+        frame.render_widget(
+            Paragraph::new(Span::styled(line, Style::new().fg(theme.border))),
+            rule,
+        );
+    }
+    if content.is_empty() {
+        return;
+    }
+    let content = Rect::new(
+        content.x + 1,
+        content.y,
+        content.width.saturating_sub(2),
+        content.height,
+    );
+    let current =
+        state.preview.current.as_deref().filter(|p| {
+            p.path == target.path && state.preview.target.as_deref() == Some(&target.path)
+        });
+    match current {
+        Some(preview) => {
+            let mark = target
+                .line
+                .and_then(|l| usize::try_from(l.saturating_sub(1)).ok());
+            render_content(frame, content, state, theme, preview, mark);
+        }
+        None if state.preview.loading => frame.render_widget(
+            Paragraph::new(Span::styled("loading…", theme.muted())),
+            content,
+        ),
+        None => {}
+    }
 }
 
 /// Header line, rule and content, each possibly empty on very short terminals.
@@ -433,6 +506,7 @@ fn render_content(
     state: &AppState,
     theme: &Theme,
     preview: &Preview,
+    mark: Option<usize>,
 ) {
     let rows = usize::from(area.height);
     let cells = usize::from(area.width);
@@ -444,8 +518,8 @@ fn render_content(
         }
         PreviewBody::Metadata => metadata_lines(preview.meta.as_ref(), state, theme),
         PreviewBody::Empty => vec![Line::from(Span::styled("empty file", theme.muted()))],
-        PreviewBody::Text(text) => text_lines(text, true, scroll, rows, cells, theme),
-        PreviewBody::Markdown(text) => text_lines(text, false, scroll, rows, cells, theme),
+        PreviewBody::Text(text) => text_lines(text, true, (scroll, mark), rows, cells, theme),
+        PreviewBody::Markdown(text) => text_lines(text, false, (scroll, None), rows, cells, theme),
         PreviewBody::Directory(dir) => dir_lines(dir, state, scroll, rows, cells, theme),
         PreviewBody::Archive(archive) => archive_lines(archive, state, scroll, rows, cells, theme),
         PreviewBody::Binary(binary) => binary_lines(binary, area.width, scroll, rows, theme),
@@ -528,7 +602,7 @@ pub(crate) fn push_clipped(
 fn text_lines(
     text: &TextPreview,
     numbered: bool,
-    scroll: usize,
+    (scroll, mark): (usize, Option<usize>),
     rows: usize,
     cells: usize,
     theme: &Theme,
@@ -554,7 +628,16 @@ fn text_lines(
                 ));
             }
             push_clipped(&mut spans, line, body, theme);
-            Line::from(spans)
+            let line = Line::from(spans);
+            if mark == Some(index) {
+                // The content-search hit: the whole row on the selection background.
+                let pad = (gutter + body).saturating_sub(line.width());
+                let mut line = line;
+                line.spans.push(Span::raw(" ".repeat(pad)));
+                line.style(Style::new().bg(theme.selection_bg))
+            } else {
+                line
+            }
         })
         .collect();
     if text.truncated && out.len() < rows && scroll + out.len() >= text.lines.len() {

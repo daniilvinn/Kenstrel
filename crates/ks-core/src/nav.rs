@@ -101,6 +101,7 @@ pub(crate) fn request(
     kind: NavKind,
     reveal: Option<OsString>,
 ) {
+    state.search.pending_marks = None;
     let reveal = match (&target, &kind) {
         (Location::Dir(path), NavKind::Visit) => {
             reveal.or_else(|| state.cursor_memory.get(path).cloned())
@@ -264,6 +265,106 @@ pub(crate) fn can_refresh(state: &AppState) -> bool {
         .is_none_or(|p| matches!(p.kind, NavKind::Refresh))
 }
 
+// ----- search integration (P3 + P4) -----
+
+/// Shows the directory of `path` with the cursor on `path`'s entry, and marks `marks` (names
+/// in that directory) once it has loaded. Used by find file.
+pub(crate) fn go_to_file(
+    state: &mut AppState,
+    effects: &mut Vec<Effect>,
+    path: &std::path::Path,
+    marks: Vec<OsString>,
+) {
+    let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
+        return;
+    };
+    let dir = dir.to_owned();
+    // The finder has its own hidden toggle: a hidden target must be listed, or the cursor
+    // could not land on it.
+    if !state.view.show_hidden && is_hidden_path(path) {
+        state.view.show_hidden = true;
+        set_status(
+            state,
+            Level::Info,
+            "Showing hidden files to reveal the match".into(),
+            effects,
+        );
+    }
+    visit(
+        state,
+        effects,
+        Location::Dir(dir.clone()),
+        Some(name.to_owned()),
+    );
+    if !marks.is_empty() {
+        state.search.pending_marks = Some((dir, marks));
+    }
+}
+
+/// Dot-prefixed, or carrying the Windows hidden attribute.
+fn is_hidden_path(path: &std::path::Path) -> bool {
+    if path
+        .file_name()
+        .is_some_and(|n| n.to_string_lossy().starts_with('.'))
+    {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const HIDDEN: u32 = 0x2;
+        std::fs::metadata(path).is_ok_and(|m| m.file_attributes() & HIDDEN != 0)
+    }
+    #[cfg(not(windows))]
+    false
+}
+
+/// Shows `entries` (names relative to `root`) as a virtual listing in a NEW TAB (the single
+/// place that builds a results list). The header shows `label` instead of the path; `esc`
+/// turns the tab into the real listing of `root`. When no more tabs can be opened the list
+/// replaces the current pane instead.
+pub(crate) fn show_results_list(
+    state: &mut AppState,
+    effects: &mut Vec<Effect>,
+    root: PathBuf,
+    label: String,
+    entries: Vec<Entry>,
+) {
+    let height = state.viewport_height();
+    let mut view = DirView::new(state.view.sort.clone(), true);
+    view.label = Some(label);
+    view.push_chunk(entries, height);
+    view.finish_loading();
+    if crate::tabs::has_room(state) {
+        crate::tabs::open_in_new_tab(state, effects, root, view);
+        return;
+    }
+    // Tab limit reached: take over the current pane.
+    abandon_history_nav(state);
+    state.nav = None;
+    let gen = state.list_gen.bump();
+    leave_current(state, &NavKind::Visit, &Location::Dir(root.clone()));
+    state.cwd = root;
+    state.show_drives = false;
+    view.gen = gen;
+    state.view = view;
+    state.git = None;
+    state.children_gen.bump();
+    state.git_gen.bump();
+    state.git_timer_gen.bump();
+    state.watch_gen.bump();
+    effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
+    effects.push(Effect::StopWatching);
+    state.dirty = true;
+}
+
+/// Leaves a virtual results list: lists the real directory again (a fresh view, so the list
+/// and its label are dropped).
+pub(crate) fn leave_results_list(state: &mut AppState, effects: &mut Vec<Effect>) {
+    let cwd = state.cwd.clone();
+    visit(state, effects, Location::Dir(cwd), None);
+}
+
 // ----- results -----
 
 fn here(state: &AppState) -> HistoryEntry {
@@ -301,7 +402,7 @@ fn leave_current(state: &mut AppState, kind: &NavKind, destination: &Location) {
             NavKind::Refresh | NavKind::Climb => {}
         }
     }
-    if state.mode == Mode::Visual {
+    if matches!(state.mode, Mode::Visual | Mode::Filter) {
         state.mode = Mode::Normal;
     }
 }
@@ -370,6 +471,11 @@ pub(crate) fn on_finished(
         match (&pending.kind, error) {
             (NavKind::Refresh, None) => {
                 let height = state.viewport_height();
+                let changes =
+                    crate::search::diff_listing(&state.cwd, state.view.entries(), &pending.buffer);
+                if !changes.is_empty() {
+                    effects.push(Effect::WalkCacheChanges(changes));
+                }
                 state.view.replace_entries(pending.buffer, height);
                 state.view.gen = gen;
                 state.dirty = true;
@@ -397,6 +503,7 @@ pub(crate) fn on_finished(
 /// The listing of the displayed directory is complete.
 fn finish_view(state: &mut AppState, effects: &mut Vec<Effect>) {
     state.view.finish_loading();
+    crate::search::apply_pending_marks(state);
     state.dirty = true;
     count_children(state, effects);
 }
@@ -526,7 +633,7 @@ pub(crate) fn on_drives(
 
 /// The watcher reported a change in the displayed directory.
 pub(crate) fn on_dir_changed(state: &mut AppState, effects: &mut Vec<Effect>, gen: Gen) {
-    if !state.watch_gen.is_current(gen) || state.show_drives {
+    if !state.watch_gen.is_current(gen) || state.show_drives || state.view.label.is_some() {
         return;
     }
     // A real navigation in flight will list the directory afresh anyway.

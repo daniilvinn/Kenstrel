@@ -19,6 +19,7 @@ workspace = true
 [dependencies]
 ks-core.workspace = true
 ks-fs.workspace = true
+ks-search.workspace = true
 ks-ui.workspace = true
 anyhow.workspace = true
 clap.workspace = true

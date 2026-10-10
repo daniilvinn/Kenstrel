@@ -291,7 +291,7 @@ where
                 runner.set_preview_palette(theme.syntax_palette());
                 Some(msg)
             }
-            _ = spinner.tick(), if state.has_running_jobs() => Some(Msg::Tick),
+            _ = spinner.tick(), if state.has_running_jobs() || state.search.is_busy() => Some(Msg::Tick),
             _ = clock.tick() => Some(Msg::Clock {
                 now: SystemTime::now(),
                 utc_offset_secs: ks_fs::utc_offset_secs(),
@@ -482,11 +482,11 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn key_releases_do_not_double_fire() {
         let mut state = state();
-        // `s` (press + release) then `q`. The release must be ignored, so exactly one
+        // `c` (press + release) then `q`. The release must be ignored, so exactly one
         // "not available" notice is produced and the loop still quits on `q`.
         let events = vec![
-            key('s', KeyEventKind::Press),
-            key('s', KeyEventKind::Release),
+            key('c', KeyEventKind::Press),
+            key('c', KeyEventKind::Release),
             key('q', KeyEventKind::Press),
             key('q', KeyEventKind::Release),
         ];
@@ -494,7 +494,7 @@ mod tests {
         assert_eq!(result.unwrap(), QuitKind::Exit);
         assert_eq!(
             state.status.as_ref().unwrap().text,
-            "Search file contents is not available yet"
+            "Open Claude is not available yet"
         );
     }
 

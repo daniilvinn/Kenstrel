@@ -15,6 +15,7 @@ use crate::mode::{Mode, Overlay};
 use crate::msg::{Msg, TimerKind};
 use crate::nav;
 use crate::preview;
+use crate::search;
 use crate::state::{AppState, Level, QuitKind, Status};
 use crate::tabs;
 use crate::{help, palette};
@@ -36,11 +37,12 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
                 nav::fit_viewport(state);
                 state.palette.refit(palette::visible_rows(size));
                 state.help.clamp_scroll(help::visible_rows(size));
+                search::on_resize(state, &mut effects);
             }
             state.dirty = true;
         }
         Msg::Tick => {
-            if state.has_running_jobs() {
+            if state.has_running_jobs() || state.search.is_busy() {
                 state.spinner_frame = state.spinner_frame.wrapping_add(1);
                 state.dirty = true;
             }
@@ -103,6 +105,8 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::Preview(msg) => preview::on_preview(state, msg),
         Msg::ParentPreview(msg) => preview::on_parent(state, msg),
         Msg::ImageReady => state.dirty = true,
+        Msg::FinderResults { gen, snapshot } => search::on_finder_results(state, gen, *snapshot),
+        Msg::Grep(event) => search::grep::on_event(state, event),
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
@@ -151,6 +155,11 @@ fn on_key(state: &mut AppState, key: crate::key::KeyChord, effects: &mut Vec<Eff
             {
                 return;
             }
+            if search::on_unbound_key(state, effects, key) {
+                clear_pending(state, effects);
+                state.dirty = true;
+                return;
+            }
             let pending = clear_pending(state, effects);
             if aids::on_unbound_key(state, key) || pending {
                 state.dirty = true;
@@ -181,6 +190,7 @@ fn on_timer(
     match kind {
         TimerKind::GitRefresh => nav::on_git_timer(state, effects, gen),
         TimerKind::StateSave => aids::on_save_timer(state, gen, effects),
+        TimerKind::GrepDebounce => search::on_timer(state, effects, gen),
         TimerKind::WhichKey => {
             if state.which_key_gen.is_current(gen) && !state.pending.is_empty() {
                 state.which_key_visible = true;
@@ -224,6 +234,9 @@ pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: 
     if handled {
         return;
     }
+    if search::run_action(state, invocation, effects) {
+        return;
+    }
     if fileops::handle_action(state, &invocation, effects) {
         return;
     }
@@ -235,7 +248,7 @@ pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: 
         Action::ConfigReload => effects.push(Effect::ReloadConfig),
         Action::Quit => fileops::request_quit(state, QuitKind::Exit),
         Action::QuitCd => fileops::request_quit(state, QuitKind::ChangeDir),
-        Action::Cancel => cancel(state),
+        Action::Cancel => cancel(state, effects),
         Action::CursorDown if aids::owns_overlay(state) => aids::move_selection(state, 1),
         Action::CursorUp if aids::owns_overlay(state) => aids::move_selection(state, -1),
         Action::Accept if aids::owns_overlay(state) => aids::accept(state, effects),
@@ -314,7 +327,10 @@ fn on_config_reloaded(
 
 /// `esc`: close the top overlay, else leave the current mode (visual mode keeps its marks),
 /// else clear the marks, else dismiss the status line.
-fn cancel(state: &mut AppState) {
+fn cancel(state: &mut AppState, effects: &mut Vec<Effect>) {
+    if search::cancel(state, effects) {
+        return;
+    }
     if state.overlays.pop().is_some() {
         return;
     }
@@ -474,10 +490,10 @@ mod tests {
     #[test]
     fn unimplemented_actions_report_instead_of_failing_silently() {
         let mut s = state();
-        let effects = key(&mut s, "s");
+        let effects = key(&mut s, "c");
         let status = s.status.as_ref().unwrap();
         assert_eq!(status.level, Level::Info);
-        assert_eq!(status.text, "Search file contents is not available yet");
+        assert_eq!(status.text, "Open Claude is not available yet");
         assert!(matches!(
             effects.as_slice(),
             [Effect::StartTimer {

@@ -1661,6 +1661,7 @@ dependencies = [
  "ks-core",
  "ks-fs",
  "ks-preview",
+ "ks-search",
  "ks-ui",
  "ratatui",
  "tempfile",
@@ -1697,6 +1698,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "ks-preview",
+ "ks-search",
  "nucleo-matcher",
  "serde",
  "thiserror 2.0.21",
@@ -1765,6 +1767,7 @@ dependencies = [
  "insta",
  "ks-core",
  "ks-preview",
+ "ks-search",
  "ratatui",
  "ratatui-image",
  "serde",

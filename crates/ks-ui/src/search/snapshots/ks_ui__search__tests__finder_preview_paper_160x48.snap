@@ -1,0 +1,321 @@
+---
+source: crates/ks-ui/src/search/tests.rs
+assertion_line: 608
+expression: "draw(&s, &theme(name))"
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ╭ Find file · cwd · ~/projects/omniforce/src/renderer ─────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ › rend                                                                                                                                       6 / 58,910  │M
+  │──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│!
+  │  ●src/renderer/vulkan_device.rs                                                    │ render_graph.rs                                                     │
+  │ ▌ src/renderer/render_graph.rs                                                     │─────────────────────────────────────────────────────────────────────│
+  │   src/renderer/passes/pass_a.rs                                                    │   1     let value_0 = compute(0);                                   │+
+  │   docs/renderer.md                                                                 │   2     let value_1 = compute(1);                                   │
+  │   …ender-notes/backend/an/extremely/deeply/nested/path/vulkan_renderer_overview.md │   3     let value_2 = compute(2);                                   │?
+  │   tools/extend.rs                                                                  │   4     let value_3 = compute(3);                                   │
+  │                                                                                    │   5     let value_4 = compute(4);                                   │
+  │                                                                                    │   6     let value_5 = compute(5);                                   │
+ ▌│                                                                                    │   7     let value_6 = compute(6);                                   │M
+  │                                                                                    │   8     let value_7 = compute(7);                                   │
+  │                                                                                    │   9     let value_8 = compute(8);                                   │
+  │                                                                                    │  10     let value_9 = compute(9);                                   │
+  │                                                                                    │  11     let value_10 = compute(10);                                 │
+  │                                                                                    │  12     let value_11 = compute(11);                                 │
+  │                                                                                    │  13     let value_12 = compute(12);                                 │
+  │                                                                                    │  14     let value_13 = compute(13);                                 │
+  │                                                                                    │  15     let value_14 = compute(14);                                 │
+  │                                                                                    │  16     let value_15 = compute(15);                                 │
+  │                                                                                    │  17     let value_16 = compute(16);                                 │
+  │                                                                                    │  18     let value_17 = compute(17);                                 │
+  │                                                                                    │  19     let value_18 = compute(18);                                 │
+  │                                                                                    │  20     let value_19 = compute(19);                                 │
+  │                                                                                    │  21     let value_20 = compute(20);                                 │
+  │                                                                                    │  22     let value_21 = compute(21);                                 │
+  │                                                                                    │  23     let value_22 = compute(22);                                 │
+  │                                                                                    │  24     let value_23 = compute(23);                                 │
+  │                                                                                    │  25     let value_24 = compute(24);                                 │
+  │                                                                                    │  26     let value_25 = compute(25);                                 │
+  │                                                                                    │  27     let value_26 = compute(26);                                 │
+  │                                                                                    │  28     let value_27 = compute(27);                                 │
+  │                                                                                    │  29     let value_28 = compute(28);                                 │
+  │                                                                                    │  30     let value_29 = compute(29);                                 │
+  │                                                                                    │  31     let value_30 = compute(30);                                 │
+  │                                                                                    │  32     let value_31 = compute(31);                                 │
+  │                                                                                    │  33     let value_32 = compute(32);                                 │
+  │                                                                                    │  34     let value_33 = compute(33);                                 │
+  │                                                                                    │  35     let value_34 = compute(34);                                 │
+  │                                                                                    │  36     let value_35 = compute(35);                                 │
+  │                                                                                    │  37     let value_36 = compute(36);                                 │
+  │ ‹ctrl-r› scope cwd  ‹alt-.› hidden off  ‹alt-g› ignored off  1 marked                                                                                    │
+──╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯──
+ ›                                                                                                                                           12/13 · 1 selected
+   ‹enter› go  ‹ctrl-enter› open  ‹tab› mark  ‹ctrl-r› scope  ‹esc› close
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#6b645d bg=reset
+  0  26..143 fg=#2b2724 bg=reset bold
+  0 143..148 fg=#6b645d bg=reset bold
+  0 148..151 fg=#6b645d bg=reset
+  0 151..154 fg=#3d7a3a bg=reset
+  0 154..157 fg=#a86f12 bg=reset
+  0 157..160 fg=#8a6a3f bg=reset
+  1   0..160 fg=#d4ccc2 bg=reset
+  2   2..4   fg=#c4623f bg=reset
+  2   4..14  fg=#2b2724 bg=reset bold
+  2  14..20  fg=#c4623f bg=reset
+  2  20..56  fg=#6b645d bg=reset
+  2  56..160 fg=#c4623f bg=reset
+  3   2..4   fg=#c4623f bg=reset
+  3   4..6   fg=#c4623f bg=reset bold
+  3   6..145 fg=#2b2724 bg=reset
+  3 145..157 fg=#6b645d bg=reset
+  3 157..158 fg=#c4623f bg=reset
+  3 158..160 fg=#a86f12 bg=reset
+  4   2..3   fg=#c4623f bg=reset
+  4   3..157 fg=#d4ccc2 bg=reset
+  4 157..158 fg=#c4623f bg=reset
+  4 158..160 fg=#a39c94 bg=reset
+  5   2..6   fg=#c4623f bg=reset
+  5   6..10  fg=#6b645d bg=reset
+  5  10..14  fg=#c4623f bg=reset bold
+  5  14..19  fg=#6b645d bg=reset
+  5  19..87  fg=#2b2724 bg=reset
+  5  87..89  fg=#d4ccc2 bg=reset
+  5  89..157 fg=#2b2724 bg=reset bold
+  5 157..160 fg=#c4623f bg=reset
+  6   2..3   fg=#c4623f bg=reset
+  6   3..4   fg=#2b2724 bg=#ece5dc
+  6   4..6   fg=#c4623f bg=#ece5dc
+  6   6..10  fg=#6b645d bg=#ece5dc
+  6  10..14  fg=#c4623f bg=#ece5dc bold
+  6  14..19  fg=#6b645d bg=#ece5dc
+  6  19..87  fg=#2b2724 bg=#ece5dc
+  6  87..157 fg=#d4ccc2 bg=reset
+  6 157..160 fg=#c4623f bg=reset
+  7   2..6   fg=#c4623f bg=reset
+  7   6..10  fg=#6b645d bg=reset
+  7  10..14  fg=#c4623f bg=reset bold
+  7  14..26  fg=#6b645d bg=reset
+  7  26..87  fg=#2b2724 bg=reset
+  7  87..91  fg=#d4ccc2 bg=reset
+  7  91..97  fg=#958e86 bg=reset
+  7  97..157 fg=#2b2724 bg=reset
+  7 157..158 fg=#c4623f bg=reset
+  7 158..160 fg=#3d7a3a bg=reset
+  8   2..6   fg=#c4623f bg=reset
+  8   6..11  fg=#6b645d bg=reset
+  8  11..15  fg=#c4623f bg=reset bold
+  8  15..87  fg=#2b2724 bg=reset
+  8  87..91  fg=#d4ccc2 bg=reset
+  8  91..97  fg=#958e86 bg=reset
+  8  97..157 fg=#2b2724 bg=reset
+  8 157..160 fg=#c4623f bg=reset
+  9   2..6   fg=#c4623f bg=reset
+  9   6..7   fg=#958e86 bg=reset
+  9   7..59  fg=#6b645d bg=reset
+  9  59..72  fg=#2b2724 bg=reset
+  9  72..76  fg=#c4623f bg=reset bold
+  9  76..87  fg=#2b2724 bg=reset
+  9  87..91  fg=#d4ccc2 bg=reset
+  9  91..97  fg=#958e86 bg=reset
+  9  97..157 fg=#2b2724 bg=reset
+  9 157..158 fg=#c4623f bg=reset
+  9 158..160 fg=#8a6a3f bg=reset
+ 10   2..6   fg=#c4623f bg=reset
+ 10   6..12  fg=#6b645d bg=reset
+ 10  12..87  fg=#2b2724 bg=reset
+ 10  87..91  fg=#d4ccc2 bg=reset
+ 10  91..97  fg=#958e86 bg=reset
+ 10  97..157 fg=#2b2724 bg=reset
+ 10 157..160 fg=#c4623f bg=reset
+ 11   2..87  fg=#c4623f bg=reset
+ 11  87..91  fg=#d4ccc2 bg=reset
+ 11  91..97  fg=#958e86 bg=reset
+ 11  97..157 fg=#2b2724 bg=reset
+ 11 157..160 fg=#c4623f bg=reset
+ 12   2..87  fg=#c4623f bg=reset
+ 12  87..91  fg=#d4ccc2 bg=reset
+ 12  91..97  fg=#958e86 bg=reset
+ 12  97..157 fg=#2b2724 bg=reset
+ 12 157..160 fg=#c4623f bg=reset
+ 13   0..1   fg=#2b2724 bg=#ece5dc
+ 13   1..2   fg=#c4623f bg=#ece5dc
+ 13   2..87  fg=#c4623f bg=reset
+ 13  87..91  fg=#d4ccc2 bg=reset
+ 13  91..97  fg=#958e86 bg=reset
+ 13  97..157 fg=#2b2724 bg=reset
+ 13 157..158 fg=#c4623f bg=reset
+ 13 158..159 fg=#a86f12 bg=#ece5dc
+ 13 159..160 fg=#2b2724 bg=#ece5dc
+ 14   2..87  fg=#c4623f bg=reset
+ 14  87..91  fg=#d4ccc2 bg=reset
+ 14  91..97  fg=#958e86 bg=reset
+ 14  97..157 fg=#2b2724 bg=reset
+ 14 157..160 fg=#c4623f bg=reset
+ 15   2..87  fg=#c4623f bg=reset
+ 15  87..91  fg=#d4ccc2 bg=reset
+ 15  91..97  fg=#958e86 bg=reset
+ 15  97..157 fg=#2b2724 bg=reset
+ 15 157..160 fg=#c4623f bg=reset
+ 16   2..87  fg=#c4623f bg=reset
+ 16  87..90  fg=#d4ccc2 bg=reset
+ 16  90..97  fg=#958e86 bg=reset
+ 16  97..157 fg=#2b2724 bg=reset
+ 16 157..160 fg=#c4623f bg=reset
+ 17   2..87  fg=#c4623f bg=reset
+ 17  87..90  fg=#d4ccc2 bg=reset
+ 17  90..97  fg=#958e86 bg=reset
+ 17  97..157 fg=#2b2724 bg=reset
+ 17 157..160 fg=#c4623f bg=reset
+ 18   2..87  fg=#c4623f bg=reset
+ 18  87..90  fg=#d4ccc2 bg=reset
+ 18  90..97  fg=#958e86 bg=reset
+ 18  97..157 fg=#2b2724 bg=reset
+ 18 157..160 fg=#c4623f bg=reset
+ 19   2..87  fg=#c4623f bg=reset
+ 19  87..90  fg=#d4ccc2 bg=reset
+ 19  90..97  fg=#958e86 bg=reset
+ 19  97..157 fg=#2b2724 bg=reset
+ 19 157..160 fg=#c4623f bg=reset
+ 20   2..87  fg=#c4623f bg=reset
+ 20  87..90  fg=#d4ccc2 bg=reset
+ 20  90..97  fg=#958e86 bg=reset
+ 20  97..157 fg=#2b2724 bg=reset
+ 20 157..160 fg=#c4623f bg=reset
+ 21   2..87  fg=#c4623f bg=reset
+ 21  87..90  fg=#d4ccc2 bg=reset
+ 21  90..97  fg=#958e86 bg=reset
+ 21  97..157 fg=#2b2724 bg=reset
+ 21 157..160 fg=#c4623f bg=reset
+ 22   2..87  fg=#c4623f bg=reset
+ 22  87..90  fg=#d4ccc2 bg=reset
+ 22  90..97  fg=#958e86 bg=reset
+ 22  97..157 fg=#2b2724 bg=reset
+ 22 157..160 fg=#c4623f bg=reset
+ 23   2..87  fg=#c4623f bg=reset
+ 23  87..90  fg=#d4ccc2 bg=reset
+ 23  90..97  fg=#958e86 bg=reset
+ 23  97..157 fg=#2b2724 bg=reset
+ 23 157..160 fg=#c4623f bg=reset
+ 24   2..87  fg=#c4623f bg=reset
+ 24  87..90  fg=#d4ccc2 bg=reset
+ 24  90..97  fg=#958e86 bg=reset
+ 24  97..157 fg=#2b2724 bg=reset
+ 24 157..160 fg=#c4623f bg=reset
+ 25   2..87  fg=#c4623f bg=reset
+ 25  87..90  fg=#d4ccc2 bg=reset
+ 25  90..97  fg=#958e86 bg=reset
+ 25  97..157 fg=#2b2724 bg=reset
+ 25 157..160 fg=#c4623f bg=reset
+ 26   2..87  fg=#c4623f bg=reset
+ 26  87..90  fg=#d4ccc2 bg=reset
+ 26  90..97  fg=#958e86 bg=reset
+ 26  97..157 fg=#2b2724 bg=reset
+ 26 157..160 fg=#c4623f bg=reset
+ 27   2..87  fg=#c4623f bg=reset
+ 27  87..90  fg=#d4ccc2 bg=reset
+ 27  90..97  fg=#958e86 bg=reset
+ 27  97..157 fg=#2b2724 bg=reset
+ 27 157..160 fg=#c4623f bg=reset
+ 28   2..87  fg=#c4623f bg=reset
+ 28  87..90  fg=#d4ccc2 bg=reset
+ 28  90..97  fg=#958e86 bg=reset
+ 28  97..157 fg=#2b2724 bg=reset
+ 28 157..160 fg=#c4623f bg=reset
+ 29   2..87  fg=#c4623f bg=reset
+ 29  87..90  fg=#d4ccc2 bg=reset
+ 29  90..97  fg=#958e86 bg=reset
+ 29  97..157 fg=#2b2724 bg=reset
+ 29 157..160 fg=#c4623f bg=reset
+ 30   2..87  fg=#c4623f bg=reset
+ 30  87..90  fg=#d4ccc2 bg=reset
+ 30  90..97  fg=#958e86 bg=reset
+ 30  97..157 fg=#2b2724 bg=reset
+ 30 157..160 fg=#c4623f bg=reset
+ 31   2..87  fg=#c4623f bg=reset
+ 31  87..90  fg=#d4ccc2 bg=reset
+ 31  90..97  fg=#958e86 bg=reset
+ 31  97..157 fg=#2b2724 bg=reset
+ 31 157..160 fg=#c4623f bg=reset
+ 32   2..87  fg=#c4623f bg=reset
+ 32  87..90  fg=#d4ccc2 bg=reset
+ 32  90..97  fg=#958e86 bg=reset
+ 32  97..157 fg=#2b2724 bg=reset
+ 32 157..160 fg=#c4623f bg=reset
+ 33   2..87  fg=#c4623f bg=reset
+ 33  87..90  fg=#d4ccc2 bg=reset
+ 33  90..97  fg=#958e86 bg=reset
+ 33  97..157 fg=#2b2724 bg=reset
+ 33 157..160 fg=#c4623f bg=reset
+ 34   2..87  fg=#c4623f bg=reset
+ 34  87..90  fg=#d4ccc2 bg=reset
+ 34  90..97  fg=#958e86 bg=reset
+ 34  97..157 fg=#2b2724 bg=reset
+ 34 157..160 fg=#c4623f bg=reset
+ 35   2..87  fg=#c4623f bg=reset
+ 35  87..90  fg=#d4ccc2 bg=reset
+ 35  90..97  fg=#958e86 bg=reset
+ 35  97..157 fg=#2b2724 bg=reset
+ 35 157..160 fg=#c4623f bg=reset
+ 36   2..87  fg=#c4623f bg=reset
+ 36  87..90  fg=#d4ccc2 bg=reset
+ 36  90..97  fg=#958e86 bg=reset
+ 36  97..157 fg=#2b2724 bg=reset
+ 36 157..160 fg=#c4623f bg=reset
+ 37   2..87  fg=#c4623f bg=reset
+ 37  87..90  fg=#d4ccc2 bg=reset
+ 37  90..97  fg=#958e86 bg=reset
+ 37  97..157 fg=#2b2724 bg=reset
+ 37 157..160 fg=#c4623f bg=reset
+ 38   2..87  fg=#c4623f bg=reset
+ 38  87..90  fg=#d4ccc2 bg=reset
+ 38  90..97  fg=#958e86 bg=reset
+ 38  97..157 fg=#2b2724 bg=reset
+ 38 157..160 fg=#c4623f bg=reset
+ 39   2..87  fg=#c4623f bg=reset
+ 39  87..90  fg=#d4ccc2 bg=reset
+ 39  90..97  fg=#958e86 bg=reset
+ 39  97..157 fg=#2b2724 bg=reset
+ 39 157..160 fg=#c4623f bg=reset
+ 40   2..87  fg=#c4623f bg=reset
+ 40  87..90  fg=#d4ccc2 bg=reset
+ 40  90..97  fg=#958e86 bg=reset
+ 40  97..157 fg=#2b2724 bg=reset
+ 40 157..160 fg=#c4623f bg=reset
+ 41   2..87  fg=#c4623f bg=reset
+ 41  87..90  fg=#d4ccc2 bg=reset
+ 41  90..97  fg=#958e86 bg=reset
+ 41  97..157 fg=#2b2724 bg=reset
+ 41 157..160 fg=#c4623f bg=reset
+ 42   2..87  fg=#c4623f bg=reset
+ 42  87..90  fg=#d4ccc2 bg=reset
+ 42  90..97  fg=#958e86 bg=reset
+ 42  97..157 fg=#2b2724 bg=reset
+ 42 157..160 fg=#c4623f bg=reset
+ 43   2..87  fg=#c4623f bg=reset
+ 43  87..90  fg=#d4ccc2 bg=reset
+ 43  90..97  fg=#958e86 bg=reset
+ 43  97..157 fg=#2b2724 bg=reset
+ 43 157..160 fg=#c4623f bg=reset
+ 44   2..4   fg=#c4623f bg=reset
+ 44   4..19  fg=#958e86 bg=reset
+ 44  19..24  fg=#c4623f bg=reset
+ 44  24..65  fg=#958e86 bg=reset
+ 44  65..157 fg=#c4623f bg=reset bold
+ 44 157..160 fg=#c4623f bg=reset
+ 45   0..2   fg=#d4ccc2 bg=reset
+ 45   2..158 fg=#c4623f bg=reset
+ 45 158..160 fg=#d4ccc2 bg=reset
+ 46   1..141 fg=#c4623f bg=reset bold
+ 46 141..160 fg=#6b645d bg=reset
+ 47   3..4   fg=#958e86 bg=reset
+ 47   4..9   fg=#6b645d bg=reset
+ 47   9..16  fg=#958e86 bg=reset
+ 47  16..26  fg=#6b645d bg=reset
+ 47  26..35  fg=#958e86 bg=reset
+ 47  35..38  fg=#6b645d bg=reset
+ 47  38..47  fg=#958e86 bg=reset
+ 47  47..53  fg=#6b645d bg=reset
+ 47  53..63  fg=#958e86 bg=reset
+ 47  63..66  fg=#6b645d bg=reset
+ 47  66..160 fg=#958e86 bg=reset

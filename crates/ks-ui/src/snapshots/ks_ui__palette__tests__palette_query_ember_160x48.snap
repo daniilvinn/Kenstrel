@@ -1,5 +1,6 @@
 ---
 source: crates/ks-ui/src/palette.rs
+assertion_line: 247
 expression: rendered
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
@@ -14,24 +15,24 @@ expression: rendered
    ◆ new_pass.rs                                                                                                                               0 B     1m ago ?
    ◆ photo_from_phone.jpg                                                                                                                   4.0 MB 2025-02-22
    ◆ pipeline_cache.rs             ╭─ Commands ─────────────────────────────────────────────────────────────────────────────╮               3.3 KB   just now
-  ●◆ swapchain.rs                  │ › srt                                                                             2/11 │               9.8 KB    12m ago
+  ●◆ swapchain.rs                  │ › srt                                                                             2/16 │               9.8 KB    12m ago
  ▌ ◆ vulkan_device.rs              │────────────────────────────────────────────────────────────────────────────────────────│              14.2 KB     3h ago M
    ◆ 日本語のメモ.txt              │  Sort by name                                                                      S n │                220 B     2h ago
                                    │▌ Sort by size                                                                      S s │
                                    │  Sort by modified time                                                             S m │
                                    │  Sort by extension                                                                 S e │
+                                   │  Search contents: toggle regex                                                         │
+                                   │  Search contents: toggle whole word                                                    │
                                    │  Send marked files to Claude                                                         C │
+                                   │  Find file: cycle scope (cwd, git root, home, drive)                                   │
+                                   │  Search contents: switch query/glob field                                              │
+                                   │  Search contents: open results as a list                                               │
                                    │  Search file contents                                                        ctrl-f, s │
                                    │  Quit and cd shell to current directory                                              Q │
                                    │  Visual (range select) mode                                                          v │
                                    │  Undo last file operation                                                            u │
                                    │  Jump to top                                                                 g g, home │
                                    │  Jump to bottom                                                                 G, end │
-                                   │                                                                                        │
-                                   │                                                                                        │
-                                   │                                                                                        │
-                                   │                                                                                        │
-                                   │                                                                                        │
                                    │                                                                                        │
                                    │                                                                                        │
                                    │                                                                                        │
@@ -162,65 +163,101 @@ expression: rendered
  17 124..160 fg=#8f5c47 bg=reset
  18  35..38  fg=#8f5c47 bg=reset
  18  38..39  fg=#d97757 bg=reset bold
- 18  39..45  fg=#e8e3dc bg=reset
- 18  45..46  fg=#d97757 bg=reset bold
- 18  46..56  fg=#e8e3dc bg=reset
- 18  56..57  fg=#d97757 bg=reset bold
- 18  57..122 fg=#e8e3dc bg=reset
- 18 122..124 fg=#716b64 bg=reset
+ 18  39..41  fg=#e8e3dc bg=reset
+ 18  41..42  fg=#d97757 bg=reset bold
+ 18  42..55  fg=#e8e3dc bg=reset
+ 18  55..56  fg=#d97757 bg=reset bold
+ 18  56..124 fg=#e8e3dc bg=reset
  18 124..160 fg=#8f5c47 bg=reset
  19  35..38  fg=#8f5c47 bg=reset
  19  38..39  fg=#d97757 bg=reset bold
  19  39..41  fg=#e8e3dc bg=reset
  19  41..42  fg=#d97757 bg=reset bold
- 19  42..53  fg=#e8e3dc bg=reset
- 19  53..54  fg=#d97757 bg=reset bold
- 19  54..114 fg=#e8e3dc bg=reset
- 19 114..124 fg=#716b64 bg=reset
+ 19  42..55  fg=#e8e3dc bg=reset
+ 19  55..56  fg=#d97757 bg=reset bold
+ 19  56..124 fg=#e8e3dc bg=reset
  19 124..160 fg=#8f5c47 bg=reset
  20  35..38  fg=#8f5c47 bg=reset
- 20  38..50  fg=#e8e3dc bg=reset
- 20  50..51  fg=#d97757 bg=reset bold
- 20  51..61  fg=#e8e3dc bg=reset
- 20  61..62  fg=#d97757 bg=reset bold
- 20  62..65  fg=#e8e3dc bg=reset
- 20  65..67  fg=#d97757 bg=reset bold
- 20  67..122 fg=#e8e3dc bg=reset
+ 20  38..39  fg=#d97757 bg=reset bold
+ 20  39..45  fg=#e8e3dc bg=reset
+ 20  45..46  fg=#d97757 bg=reset bold
+ 20  46..56  fg=#e8e3dc bg=reset
+ 20  56..57  fg=#d97757 bg=reset bold
+ 20  57..122 fg=#e8e3dc bg=reset
  20 122..124 fg=#716b64 bg=reset
  20 124..160 fg=#8f5c47 bg=reset
  21  35..38  fg=#8f5c47 bg=reset
- 21  38..40  fg=#e8e3dc bg=reset
- 21  40..41  fg=#d97757 bg=reset bold
- 21  41..46  fg=#e8e3dc bg=reset
- 21  46..47  fg=#d97757 bg=reset bold
- 21  47..57  fg=#e8e3dc bg=reset
- 21  57..58  fg=#d97757 bg=reset bold
- 21  58..122 fg=#e8e3dc bg=reset
- 21 122..124 fg=#716b64 bg=reset
+ 21  38..55  fg=#e8e3dc bg=reset
+ 21  55..56  fg=#d97757 bg=reset bold
+ 21  56..71  fg=#e8e3dc bg=reset
+ 21  71..72  fg=#d97757 bg=reset bold
+ 21  72..74  fg=#e8e3dc bg=reset
+ 21  74..75  fg=#d97757 bg=reset bold
+ 21  75..124 fg=#e8e3dc bg=reset
  21 124..160 fg=#8f5c47 bg=reset
  22  35..38  fg=#8f5c47 bg=reset
- 22  38..45  fg=#e8e3dc bg=reset
- 22  45..46  fg=#d97757 bg=reset bold
- 22  46..56  fg=#e8e3dc bg=reset
- 22  56..57  fg=#d97757 bg=reset bold
- 22  57..58  fg=#e8e3dc bg=reset
- 22  58..59  fg=#d97757 bg=reset bold
- 22  59..122 fg=#e8e3dc bg=reset
- 22 122..124 fg=#716b64 bg=reset
+ 22  38..39  fg=#d97757 bg=reset bold
+ 22  39..41  fg=#e8e3dc bg=reset
+ 22  41..42  fg=#d97757 bg=reset bold
+ 22  42..48  fg=#e8e3dc bg=reset
+ 22  48..49  fg=#d97757 bg=reset bold
+ 22  49..124 fg=#e8e3dc bg=reset
  22 124..160 fg=#8f5c47 bg=reset
  23  35..38  fg=#8f5c47 bg=reset
- 23  38..114 fg=#e8e3dc bg=reset
- 23 114..124 fg=#716b64 bg=reset
+ 23  38..39  fg=#d97757 bg=reset bold
+ 23  39..41  fg=#e8e3dc bg=reset
+ 23  41..42  fg=#d97757 bg=reset bold
+ 23  42..48  fg=#e8e3dc bg=reset
+ 23  48..49  fg=#d97757 bg=reset bold
+ 23  49..124 fg=#e8e3dc bg=reset
  23 124..160 fg=#8f5c47 bg=reset
  24  35..38  fg=#8f5c47 bg=reset
- 24  38..117 fg=#e8e3dc bg=reset
- 24 117..124 fg=#716b64 bg=reset
+ 24  38..39  fg=#d97757 bg=reset bold
+ 24  39..41  fg=#e8e3dc bg=reset
+ 24  41..42  fg=#d97757 bg=reset bold
+ 24  42..53  fg=#e8e3dc bg=reset
+ 24  53..54  fg=#d97757 bg=reset bold
+ 24  54..114 fg=#e8e3dc bg=reset
+ 24 114..124 fg=#716b64 bg=reset
  24 124..160 fg=#8f5c47 bg=reset
- 25  35..160 fg=#8f5c47 bg=reset
- 26  35..160 fg=#8f5c47 bg=reset
- 27  35..160 fg=#8f5c47 bg=reset
- 28  35..160 fg=#8f5c47 bg=reset
- 29  35..160 fg=#8f5c47 bg=reset
+ 25  35..38  fg=#8f5c47 bg=reset
+ 25  38..50  fg=#e8e3dc bg=reset
+ 25  50..51  fg=#d97757 bg=reset bold
+ 25  51..61  fg=#e8e3dc bg=reset
+ 25  61..62  fg=#d97757 bg=reset bold
+ 25  62..65  fg=#e8e3dc bg=reset
+ 25  65..67  fg=#d97757 bg=reset bold
+ 25  67..122 fg=#e8e3dc bg=reset
+ 25 122..124 fg=#716b64 bg=reset
+ 25 124..160 fg=#8f5c47 bg=reset
+ 26  35..38  fg=#8f5c47 bg=reset
+ 26  38..40  fg=#e8e3dc bg=reset
+ 26  40..41  fg=#d97757 bg=reset bold
+ 26  41..46  fg=#e8e3dc bg=reset
+ 26  46..47  fg=#d97757 bg=reset bold
+ 26  47..57  fg=#e8e3dc bg=reset
+ 26  57..58  fg=#d97757 bg=reset bold
+ 26  58..122 fg=#e8e3dc bg=reset
+ 26 122..124 fg=#716b64 bg=reset
+ 26 124..160 fg=#8f5c47 bg=reset
+ 27  35..38  fg=#8f5c47 bg=reset
+ 27  38..45  fg=#e8e3dc bg=reset
+ 27  45..46  fg=#d97757 bg=reset bold
+ 27  46..56  fg=#e8e3dc bg=reset
+ 27  56..57  fg=#d97757 bg=reset bold
+ 27  57..58  fg=#e8e3dc bg=reset
+ 27  58..59  fg=#d97757 bg=reset bold
+ 27  59..122 fg=#e8e3dc bg=reset
+ 27 122..124 fg=#716b64 bg=reset
+ 27 124..160 fg=#8f5c47 bg=reset
+ 28  35..38  fg=#8f5c47 bg=reset
+ 28  38..114 fg=#e8e3dc bg=reset
+ 28 114..124 fg=#716b64 bg=reset
+ 28 124..160 fg=#8f5c47 bg=reset
+ 29  35..38  fg=#8f5c47 bg=reset
+ 29  38..117 fg=#e8e3dc bg=reset
+ 29 117..124 fg=#716b64 bg=reset
+ 29 124..160 fg=#8f5c47 bg=reset
  30  35..160 fg=#8f5c47 bg=reset
  31  35..160 fg=#8f5c47 bg=reset
  32  35..160 fg=#8f5c47 bg=reset

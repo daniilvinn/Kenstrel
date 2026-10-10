@@ -89,6 +89,7 @@ pub fn render_list(frame: &mut Frame, area: Rect, state: &AppState, theme: &Them
                     name_width,
                     cursor: index == view.cursor.index,
                     marked: view.is_marked(entry),
+                    highlight: view.highlight(index),
                 },
             ))
         })
@@ -103,6 +104,8 @@ struct RowContext<'a> {
     name_width: usize,
     cursor: bool,
     marked: bool,
+    /// Matched character positions of the in-directory filter.
+    highlight: &'a [u32],
 }
 
 fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
@@ -113,6 +116,7 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
         name_width,
         cursor,
         marked,
+        highlight,
     } = ctx;
     let row_bg = if cursor {
         Style::new().bg(theme.selection_bg)
@@ -142,9 +146,22 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
     if entry.is_dir {
         name.push('/');
     }
-    let name = truncate_middle(&name, name_width, !entry.is_dir);
-    let padding = name_width.saturating_sub(width(&name));
-    spans.push(span(name, name_style));
+    let shown = truncate_middle(&name, name_width, !entry.is_dir);
+    let padding = name_width.saturating_sub(width(&shown));
+    let mapped;
+    let highlight = if highlight.is_empty() || shown == name {
+        highlight
+    } else {
+        mapped = remap_highlight(&name, &shown, highlight);
+        &mapped
+    };
+    if highlight.is_empty() {
+        spans.push(span(shown, name_style));
+    } else {
+        for part in crate::search::highlighted(&shown, highlight, name_style, theme.bold_accent()) {
+            spans.push(Span::styled(part.content, part.style.patch(row_bg)));
+        }
+    }
     spans.push(span(" ".repeat(padding), Style::new()));
 
     if columns.size {
@@ -175,10 +192,40 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
     Line::from(spans)
 }
 
+/// Maps match positions in `name` onto the shortened `shown` (`head…tail`); positions inside
+/// the cut-out part are dropped.
+fn remap_highlight(name: &str, shown: &str, highlight: &[u32]) -> Vec<u32> {
+    let name_len = name.chars().count();
+    let shown_len = shown.chars().count();
+    let prefix = name
+        .chars()
+        .zip(shown.chars())
+        .take_while(|(a, b)| a == b)
+        .count();
+    // `shown` is `prefix chars`, the ellipsis, then a tail copied from the end of `name`.
+    let tail = shown_len.saturating_sub(prefix + 1);
+    highlight
+        .iter()
+        .filter_map(|&i| {
+            let i = i as usize;
+            if i < prefix {
+                Some(i as u32)
+            } else if tail > 0 && i >= name_len - tail {
+                u32::try_from(prefix + 1 + (i - (name_len - tail))).ok()
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 /// Directories show their number of children (once known), files their size.
 fn size_text(entry: &Entry, state: &AppState) -> String {
     if entry.is_dir {
         entry.children.map_or_else(String::new, |n| n.to_string())
+    } else if state.view.label.is_some() && entry.size == 0 {
+        // Search results carry no metadata yet.
+        String::new()
     } else {
         human_size(entry.size, state.config.files.size_base)
     }
@@ -232,6 +279,8 @@ fn render_placeholder(frame: &mut Frame, area: Rect, state: &AppState, theme: &T
     let view = &state.view;
     let text = if view.loading || state.is_navigating() {
         "loading…".to_owned()
+    } else if let Some(query) = view.filter_query() {
+        format!("no entries match /{query} (esc clears the filter)")
     } else if view.hidden_count() > 0 {
         let n = view.hidden_count();
         let noun = if n == 1 { "entry" } else { "entries" };
@@ -400,6 +449,22 @@ fn space_text(drive: &DriveInfo, base: ks_core::config::SizeBase) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn highlight_survives_truncation() {
+        let name = "quarterly_report_final_v2.xlsx";
+        let shown = truncate_middle(name, 20, true);
+        assert_ne!(shown, name);
+        // `rep` in the name is cut out or kept; whatever is kept must still point at the
+        // same characters in `shown`.
+        let hl: Vec<u32> = vec![0, 1, 10, 11, 12, 27, 28, 29];
+        let mapped = remap_highlight(name, &shown, &hl);
+        let chars: Vec<char> = shown.chars().collect();
+        let name_chars: Vec<char> = name.chars().collect();
+        assert!(mapped.contains(&0) && mapped.contains(&1));
+        let last = *mapped.last().unwrap() as usize;
+        assert_eq!(chars[last], name_chars[29]);
+    }
 
     fn drive(total: Option<u64>, free: Option<u64>) -> DriveInfo {
         DriveInfo {

@@ -8,15 +8,19 @@
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::fileops::{EditorSettings, FileOpsRunner};
 use crate::persist::{StateStore, StateWriter};
 use ks_core::{Effect, Gen, Level, Msg, PreviewKind, PreviewMsg, PreviewRequest, TimerKind};
 use ks_fs::DirWatcher;
 use ks_preview::{Limits, Palette, PreviewEvent, PreviewOptions, Previewer, RequestKind};
+use ks_search::{FinderOptions, FinderSession, GrepHandle, GrepQuery, WalkCache};
 use tokio::sync::mpsc::Sender;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
+
+use crate::search::FinderWorker;
 
 /// Background work of which only the latest request matters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -44,6 +48,10 @@ pub struct EffectRunner {
     parent_previewer: Option<Previewer>,
     /// Syntax colours handed to the engine, derived from the active theme.
     palette: Palette,
+    /// The walk cache of find file, shared by every finder session of this run.
+    walk_cache: Arc<WalkCache>,
+    finder: Option<FinderWorker>,
+    grep: Option<GrepHandle>,
 }
 
 impl EffectRunner {
@@ -59,6 +67,9 @@ impl EffectRunner {
             previewer: None,
             parent_previewer: None,
             palette: Palette::default(),
+            walk_cache: Arc::new(WalkCache::new()),
+            finder: None,
+            grep: None,
         }
     }
 
@@ -166,6 +177,63 @@ impl EffectRunner {
                         previewer.cancel();
                     }
                 }
+                Effect::FinderStart {
+                    gen,
+                    scope,
+                    cwd,
+                    show_hidden,
+                    respect_gitignore,
+                    query,
+                    offset,
+                    limit,
+                } => self.finder_start(
+                    gen,
+                    scope,
+                    cwd,
+                    (show_hidden, respect_gitignore),
+                    (query, offset, limit),
+                ),
+                Effect::FinderQuery {
+                    gen,
+                    query,
+                    offset,
+                    limit,
+                } => {
+                    if let Some(worker) = self.finder.as_ref().filter(|w| w.gen() == gen) {
+                        worker.set_query(query, offset, limit);
+                    }
+                }
+                Effect::FinderWindow { gen, offset, limit } => {
+                    if let Some(worker) = self.finder.as_ref().filter(|w| w.gen() == gen) {
+                        worker.set_window(offset, limit);
+                    }
+                }
+                // Dropping the worker stops its thread and cancels the walk.
+                Effect::FinderStop => self.finder = None,
+                Effect::GrepStart {
+                    gen,
+                    root,
+                    pattern,
+                    regex,
+                    whole_word,
+                    glob,
+                    show_hidden,
+                    respect_gitignore,
+                } => {
+                    let mut query = GrepQuery::new(root, pattern);
+                    query.regex = regex;
+                    query.whole_word = whole_word;
+                    query.glob = glob;
+                    query.show_hidden = show_hidden;
+                    query.respect_gitignore = respect_gitignore;
+                    self.grep_start(gen, query);
+                }
+                // Dropping the handle cancels the search.
+                Effect::GrepCancel => self.grep = None,
+                Effect::WalkCacheChanges(changes) => {
+                    let cache = self.walk_cache.clone();
+                    tokio::task::spawn_blocking(move || cache.apply_changes(&changes));
+                }
                 // File operations, shell runs and launching (P6).
                 other => self.fileops.handle(other),
             }
@@ -181,6 +249,8 @@ impl EffectRunner {
         // Dropping a previewer cancels its work and stops its threads.
         self.previewer = None;
         self.parent_previewer = None;
+        self.finder = None;
+        self.grep = None;
     }
 
     /// A fresh token for `slot`; whatever ran there before is cancelled.
@@ -336,6 +406,58 @@ impl EffectRunner {
             limits,
             show_hidden: request.show_hidden,
             ..PreviewOptions::default()
+        }
+    }
+
+    fn finder_start(
+        &mut self,
+        gen: u64,
+        scope: ks_search::Scope,
+        cwd: PathBuf,
+        (show_hidden, respect_gitignore): (bool, bool),
+        (query, offset, limit): (String, u32, u32),
+    ) {
+        // Replacing the worker drops (stops) the previous one.
+        self.finder = None;
+        let cache = self.walk_cache.clone();
+        let make = move |notify: ks_search::Notify| {
+            // Resolving the scope touches the file system, so it happens on the worker.
+            let root = ks_search::resolve_scope(scope, &cwd);
+            let mut options = FinderOptions::new(root.clone());
+            options.show_hidden = show_hidden;
+            options.respect_gitignore = respect_gitignore;
+            (
+                FinderSession::start(options, gen, Some(cache), notify),
+                root,
+            )
+        };
+        self.finder = Some(FinderWorker::spawn(
+            gen,
+            make,
+            query,
+            offset,
+            limit,
+            self.tx.clone(),
+        ));
+    }
+
+    fn grep_start(&mut self, gen: u64, query: GrepQuery) {
+        self.grep = None;
+        let tx = self.tx.clone();
+        // Runs on the engine's threads (plain std threads), where blocking is fine and
+        // gives the engine backpressure when the UI is behind.
+        let sink: ks_search::EventSink<ks_search::GrepEvent> = Arc::new(move |event| {
+            let _ = tx.blocking_send(Msg::Grep(event));
+        });
+        match ks_search::spawn_search(query, gen, self.shutdown.child_token(), sink) {
+            Ok(handle) => self.grep = Some(handle),
+            Err(error) => {
+                tracing::error!(%error, "cannot start the content search");
+                let _ = self.tx.try_send(Msg::Notify {
+                    level: Level::Error,
+                    text: format!("Cannot start the search: {error}"),
+                });
+            }
         }
     }
 

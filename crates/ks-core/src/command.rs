@@ -133,6 +133,51 @@ const COMMANDS: &[(Action, Category, &str)] = &[
         C::Search,
         "Search inside files (live grep).",
     ),
+    (
+        Action::FinderScope,
+        C::Search,
+        "Find file: cycle the search scope (current directory, git root, home, drive).",
+    ),
+    (
+        Action::FinderHidden,
+        C::Search,
+        "Find file: include or skip hidden files.",
+    ),
+    (
+        Action::FinderGitignore,
+        C::Search,
+        "Find file: include or skip files ignored by git.",
+    ),
+    (
+        Action::FinderOpen,
+        C::Search,
+        "Find file: open the marked results, or the highlighted one, with the default app.",
+    ),
+    (
+        Action::FinderMark,
+        C::Search,
+        "Find file: mark the highlighted result and move down.",
+    ),
+    (
+        Action::GrepRegex,
+        C::Search,
+        "Search contents: toggle regular-expression matching.",
+    ),
+    (
+        Action::GrepWholeWord,
+        C::Search,
+        "Search contents: toggle whole-word matching.",
+    ),
+    (
+        Action::GrepNextField,
+        C::Search,
+        "Search contents: switch between the query and glob fields.",
+    ),
+    (
+        Action::GrepToList,
+        C::Search,
+        "Search contents: show the files with matches as a results list in a new tab.",
+    ),
     (Action::PaletteOpen, C::App, "Open the command palette."),
     (
         Action::HelpOpen,

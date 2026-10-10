@@ -12,19 +12,19 @@ expression: "draw(&s, &theme(name))"
   │   /                   Filter current directory                           │
   │   ctrl-p, f           Find file (recursive fuzzy)                        │+
   │   ctrl-f, s           Search file contents                               │
-  │                                                                          │?
+  │   —                   Find file: cycle scope (cwd, git …                 │?
+  │   —                   Find file: toggle hidden files                     │
+  │   —                   Find file: toggle gitignored files                 │
+  │   —                   Find file: open with default app                   │
+ ▌│   —                   Find file: mark result                             │M
+  │   —                   Search contents: toggle regex                      │
+  │   —                   Search contents: toggle whole word                 │
+  │   —                   Search contents: switch query/glo…                 │
+  │   —                   Search contents: open results as …                 │
+  │                                                                          │
   │ Selection                                                                │
   │   space               Toggle mark                                        │
-  │   v                   Visual (range select) mode                         │
- ▌│   ctrl-a              Mark all                                           │M
-  │                                                                          │
-  │ File operations                                                          │
-  │   y                   Copy                                               │
-  │   x                   Cut                                                │
-  │   p                   Paste                                              │
-  │   Y                   Copy path to clipboard                             │
-  │   r                   Rename                                             │
-──╰───────────────────────────────────────────────────────────── 17-33 / 82 ─╯──
+──╰───────────────────────────────────────────────────────────── 17-33 / 91 ─╯──
  ›                                                           12/13 · 1 selected
    ‹/› filter  ‹j› scroll  ‹ctrl-d› page  ‹esc› close
 --- styles (row cols fg bg mods) ---
@@ -69,46 +69,50 @@ expression: "draw(&s, &theme(name))"
   8   6..26  fg=#2b2724 bg=reset bold
   8  26..77  fg=#6b645d bg=reset
   8  77..80  fg=#c4623f bg=reset
-  9   2..78  fg=#c4623f bg=reset
+  9   2..6   fg=#c4623f bg=reset
+  9   6..26  fg=#958e86 bg=reset
+  9  26..77  fg=#6b645d bg=reset
+  9  77..78  fg=#c4623f bg=reset
   9  78..80  fg=#8a6a3f bg=reset
- 10   2..4   fg=#c4623f bg=reset
- 10   4..77  fg=#c4623f bg=reset bold
+ 10   2..6   fg=#c4623f bg=reset
+ 10   6..26  fg=#958e86 bg=reset
+ 10  26..77  fg=#6b645d bg=reset
  10  77..80  fg=#c4623f bg=reset
  11   2..6   fg=#c4623f bg=reset
- 11   6..26  fg=#2b2724 bg=reset bold
+ 11   6..26  fg=#958e86 bg=reset
  11  26..77  fg=#6b645d bg=reset
  11  77..80  fg=#c4623f bg=reset
  12   2..6   fg=#c4623f bg=reset
- 12   6..26  fg=#2b2724 bg=reset bold
+ 12   6..26  fg=#958e86 bg=reset
  12  26..77  fg=#6b645d bg=reset
  12  77..80  fg=#c4623f bg=reset
  13   0..1   fg=#2b2724 bg=#ece5dc
  13   1..2   fg=#c4623f bg=#ece5dc
  13   2..6   fg=#c4623f bg=reset
- 13   6..26  fg=#2b2724 bg=reset bold
+ 13   6..26  fg=#958e86 bg=reset
  13  26..77  fg=#6b645d bg=reset
  13  77..78  fg=#c4623f bg=reset
  13  78..79  fg=#a86f12 bg=#ece5dc
  13  79..80  fg=#2b2724 bg=#ece5dc
- 14   2..80  fg=#c4623f bg=reset
- 15   2..4   fg=#c4623f bg=reset
- 15   4..77  fg=#c4623f bg=reset bold
+ 14   2..6   fg=#c4623f bg=reset
+ 14   6..26  fg=#958e86 bg=reset
+ 14  26..77  fg=#6b645d bg=reset
+ 14  77..80  fg=#c4623f bg=reset
+ 15   2..6   fg=#c4623f bg=reset
+ 15   6..26  fg=#958e86 bg=reset
+ 15  26..77  fg=#6b645d bg=reset
  15  77..80  fg=#c4623f bg=reset
  16   2..6   fg=#c4623f bg=reset
- 16   6..26  fg=#2b2724 bg=reset bold
+ 16   6..26  fg=#958e86 bg=reset
  16  26..77  fg=#6b645d bg=reset
  16  77..80  fg=#c4623f bg=reset
  17   2..6   fg=#c4623f bg=reset
- 17   6..26  fg=#2b2724 bg=reset bold
+ 17   6..26  fg=#958e86 bg=reset
  17  26..77  fg=#6b645d bg=reset
  17  77..80  fg=#c4623f bg=reset
- 18   2..6   fg=#c4623f bg=reset
- 18   6..26  fg=#2b2724 bg=reset bold
- 18  26..77  fg=#6b645d bg=reset
- 18  77..80  fg=#c4623f bg=reset
- 19   2..6   fg=#c4623f bg=reset
- 19   6..26  fg=#2b2724 bg=reset bold
- 19  26..77  fg=#6b645d bg=reset
+ 18   2..80  fg=#c4623f bg=reset
+ 19   2..4   fg=#c4623f bg=reset
+ 19   4..77  fg=#c4623f bg=reset bold
  19  77..80  fg=#c4623f bg=reset
  20   2..6   fg=#c4623f bg=reset
  20   6..26  fg=#2b2724 bg=reset bold

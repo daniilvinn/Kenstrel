@@ -13,6 +13,7 @@ pub mod logging;
 pub mod paths;
 pub mod persist;
 pub mod reload;
+pub mod search;
 pub mod settings;
 pub mod shell_init;
 pub mod startup;

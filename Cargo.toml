@@ -33,6 +33,7 @@ strip = true
 [workspace.dependencies]
 ks-core = { path = "crates/ks-core" }
 ks-fs = { path = "crates/ks-fs" }
+ks-search = { path = "crates/ks-search" }
 ks-ui = { path = "crates/ks-ui" }
 ks-claude = { path = "crates/ks-claude" }
 

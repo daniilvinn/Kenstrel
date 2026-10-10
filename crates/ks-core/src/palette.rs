@@ -628,7 +628,11 @@ pub(crate) mod tests {
     fn enter_runs_the_command_and_closes() {
         let mut s = state();
         key(&mut s, ":");
-        type_text(&mut s, "hidden");
+        type_text(&mut s, "toggle hidden files");
+        // The find-file toggle of the same name matches equally well and comes first.
+        if top_label(&s) != "Toggle hidden files" {
+            key(&mut s, "down");
+        }
         assert_eq!(top_label(&s), "Toggle hidden files");
         let before = s.view.show_hidden;
         key(&mut s, "enter");
@@ -640,10 +644,10 @@ pub(crate) mod tests {
     fn unimplemented_commands_report_not_available() {
         let mut s = state();
         key(&mut s, ":");
-        type_text(&mut s, "contents");
+        type_text(&mut s, "open claude");
         key(&mut s, "enter");
         let status = s.status.as_ref().unwrap();
-        assert_eq!(status.text, "Search file contents is not available yet");
+        assert_eq!(status.text, "Open Claude is not available yet");
     }
 
     #[test]

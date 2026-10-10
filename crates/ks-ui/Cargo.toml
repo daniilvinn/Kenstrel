@@ -21,6 +21,7 @@ ks-preview = { version = "0.1.0", path = "../ks-preview" }
 image = { version = "0.25.10", default-features = false }
 
 [dev-dependencies]
+ks-search.workspace = true
 insta.workspace = true
 tempfile.workspace = true
 tokio-util.workspace = true

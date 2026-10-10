@@ -21,6 +21,7 @@ use crate::action::Action;
 use crate::config::Config;
 use crate::effect::Effect;
 use crate::generation::{Gen, GenCounter};
+use crate::mode::Overlay;
 use crate::state::AppState;
 
 /// Terminals narrower than this hide the preview unless `w` forces it (PLAN §4.2).
@@ -259,11 +260,19 @@ impl AppState {
     /// Columns available to the preview content: the pane minus one cell of padding on
     /// each side. This is the width the renderer draws into.
     pub fn content_width(&self) -> u16 {
+        if overlay_mode(self) {
+            return crate::search::geometry::preview_width(self.size).saturating_sub(2);
+        }
         self.pane_widths().preview.saturating_sub(2)
     }
 
     /// Rows of preview content below the header.
     pub fn preview_rows(&self) -> usize {
+        if overlay_mode(self) {
+            let grep = matches!(self.overlays.last(), Some(Overlay::Grep));
+            let rows = crate::search::geometry::preview_rows(self.size, grep);
+            return usize::from(rows.saturating_sub(HEADER_ROWS));
+        }
         usize::from(crate::layout::body_height(self.size).saturating_sub(HEADER_ROWS))
     }
 }
@@ -300,7 +309,35 @@ pub fn content_len(preview: &Preview, pane_width: u16) -> usize {
     }
 }
 
+/// A find-file / content-search overlay is open on a terminal wide enough for its own preview
+/// pane (PLAN 4.3): the pane then follows the overlay's highlighted result, not the cursor.
+fn overlay_mode(state: &AppState) -> bool {
+    matches!(state.overlays.last(), Some(Overlay::Finder | Overlay::Grep))
+        && crate::search::geometry::shows_preview(state.size)
+}
+
+/// The highlighted result of the open search overlay, when the overlay shows a preview.
+pub fn overlay_target(state: &AppState) -> Option<crate::search::PreviewTarget> {
+    if overlay_mode(state) {
+        crate::search::preview_target(state)
+    } else {
+        None
+    }
+}
+
 fn wanted_key(state: &AppState) -> Option<TargetKey> {
+    if overlay_mode(state) {
+        // The overlay preview is independent of the `w` toggle and of the list's cursor.
+        let target = crate::search::preview_target(state)?;
+        return Some(TargetKey {
+            path: target.path,
+            mtime: None,
+            size: 0,
+            metadata: false,
+            show_hidden: state.view.show_hidden,
+            epoch: state.preview.theme_epoch,
+        });
+    }
     if !state.preview_visible() || state.show_drives {
         return None;
     }
@@ -333,8 +370,35 @@ fn request_for(state: &AppState, key: &TargetKey) -> PreviewRequest {
 pub(crate) fn sync(state: &mut AppState, effects: &mut Vec<Effect>) {
     sync_main(state, effects);
     sync_parent(state, effects);
+    follow_overlay_line(state);
     // A resize changes the visible rows and the hex row width: keep the scroll in range.
     clamp_scroll(state);
+}
+
+/// A content-search hit shows its line: scrolls the overlay's preview so the line sits a third
+/// of the way down, once the file's result is in.
+fn follow_overlay_line(state: &mut AppState) {
+    let Some(target) = overlay_target(state) else {
+        return;
+    };
+    let Some(line) = target.line else {
+        return;
+    };
+    let ready = state
+        .preview
+        .current
+        .as_deref()
+        .is_some_and(|p| p.path == target.path);
+    if !ready {
+        return;
+    }
+    let rows = state.preview_rows();
+    let first = usize::try_from(line.saturating_sub(1)).unwrap_or(usize::MAX);
+    let wanted = first.saturating_sub(rows / 3).min(max_scroll(state));
+    if state.preview.scroll != wanted {
+        state.preview.scroll = wanted;
+        state.dirty = true;
+    }
 }
 
 /// Largest valid scroll offset for the current result at the current size.
@@ -362,6 +426,20 @@ fn clamp_scroll(state: &mut AppState) {
 /// Whether the stored key already stands for what the pane should show. Compares borrowed
 /// parts so the common case (nothing changed) allocates nothing.
 fn key_is_current(state: &AppState) -> bool {
+    if overlay_mode(state) {
+        let target = crate::search::preview_target(state);
+        return match (&state.preview.key, target) {
+            (None, None) => true,
+            (Some(key), Some(target)) => {
+                key.path == target.path
+                    && key.mtime.is_none()
+                    && !key.metadata
+                    && key.show_hidden == state.view.show_hidden
+                    && key.epoch == state.preview.theme_epoch
+            }
+            _ => false,
+        };
+    }
     let Some(key) = &state.preview.key else {
         return wanted_visible_entry(state).is_none();
     };

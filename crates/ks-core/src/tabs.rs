@@ -27,6 +27,7 @@ use crate::git::GitSnapshot;
 use crate::mode::Mode;
 use crate::msg::TimerKind;
 use crate::nav::{self, History, Location, NavKind, PendingNav};
+use crate::search;
 use crate::state::{AppState, Level};
 use crate::update::set_status;
 use crate::view::DirView;
@@ -161,6 +162,10 @@ fn classify_state_fields(state: &AppState) {
         utc_offset_secs: _,
         tabs: _,
         aids: _,
+        // Overlay state (find file, content search) and the filter text box. The filter itself
+        // (query, matches, highlights) lives in `view` and is therefore per tab; the overlays
+        // are closed when a tab is left (`prepare_to_leave`).
+        search: _,
         // Yank register, job table, prompt and dialogs: one set for the whole app. Marks live in
         // `view` and so are per tab.
         fileops: _,
@@ -174,7 +179,7 @@ fn classify_state_fields(state: &AppState) {
 
 /// Makes the state of the active tab safe to leave: nothing of it may react to results that
 /// arrive while another tab is shown.
-fn prepare_to_leave(state: &mut AppState) {
+fn prepare_to_leave(state: &mut AppState, effects: &mut Vec<Effect>) {
     nav::abandon_history_nav(state);
     state.nav = None;
     // Late chunks of an unfinished listing must not extend the view; it is re-listed on
@@ -187,12 +192,19 @@ fn prepare_to_leave(state: &mut AppState) {
     state.children_gen.bump();
     state.view.exit_visual();
     state.mode = Mode::Normal;
+    // A find-file / content-search overlay belongs to the tab it was opened in.
+    search::leave_tab(state, effects);
 }
 
 /// The newly shown tab refreshes itself: re-list, watch and ask git.
 fn resume(state: &mut AppState, effects: &mut Vec<Effect>) {
     state.dirty = true;
     effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
+    if state.view.label.is_some() {
+        // A results list is not a directory listing: nothing to refresh, watch or ask git.
+        effects.push(Effect::StopWatching);
+        return;
+    }
     if state.show_drives {
         nav::request(state, effects, Location::Drives, NavKind::Refresh, None);
         effects.push(Effect::StopWatching);
@@ -221,7 +233,7 @@ pub(crate) fn new_tab(state: &mut AppState, effects: &mut Vec<Effect>) {
     let view = DirView::new(state.view.sort.clone(), state.view.show_hidden);
     let space = state.tabs.next_space;
     state.tabs.next_space += 1;
-    prepare_to_leave(state);
+    prepare_to_leave(state, effects);
     let mut slot = TabSlot::fresh(space, state.cwd.clone(), view);
     slot.swap_with(state);
     let at = state.tabs.active;
@@ -238,6 +250,34 @@ pub(crate) fn new_tab(state: &mut AppState, effects: &mut Vec<Effect>) {
     }
     effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
     state.dirty = true;
+}
+
+/// Opens `view` (a virtual listing such as the search results list) in a new tab next to the
+/// current one, with `cwd` as its directory. Nothing is listed, watched or asked of git: the
+/// tab shows exactly `view`. Callers check [`has_room`] first.
+pub(crate) fn open_in_new_tab(
+    state: &mut AppState,
+    effects: &mut Vec<Effect>,
+    cwd: PathBuf,
+    view: DirView,
+) {
+    let space = state.tabs.next_space;
+    state.tabs.next_space += 1;
+    prepare_to_leave(state, effects);
+    let mut slot = TabSlot::fresh(space, cwd, view);
+    slot.swap_with(state);
+    let at = state.tabs.active;
+    state.tabs.slots[at] = Some(slot);
+    state.tabs.slots.insert(at + 1, None);
+    state.tabs.active = at + 1;
+    effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
+    effects.push(Effect::StopWatching);
+    state.dirty = true;
+}
+
+/// Whether another tab can be opened.
+pub(crate) fn has_room(state: &AppState) -> bool {
+    state.tabs.count() < MAX_TABS
 }
 
 /// `1`..`9`: switch to tab `number` (counted from 1).
@@ -268,7 +308,7 @@ fn switch_to(state: &mut AppState, effects: &mut Vec<Effect>, target: usize) {
     let Some(mut slot) = state.tabs.slots[target].take() else {
         return;
     };
-    prepare_to_leave(state);
+    prepare_to_leave(state, effects);
     slot.swap_with(state);
     let from = state.tabs.active;
     state.tabs.slots[from] = Some(slot);
@@ -288,7 +328,7 @@ pub(crate) fn close(state: &mut AppState, effects: &mut Vec<Effect>) {
         return;
     }
     let at = state.tabs.active;
-    prepare_to_leave(state);
+    prepare_to_leave(state, effects);
     state.tabs.slots.remove(at);
     // The tab to the right takes its place; closing the last one shows its left neighbour.
     let next = at.min(state.tabs.slots.len() - 1);
