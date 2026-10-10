@@ -125,6 +125,47 @@ fn esc_in_filter_mode_clears_and_leaves_the_mode() {
 }
 
 #[test]
+fn a_filter_opened_from_visual_mode_leaves_no_hidden_range() {
+    let mut s = state_with(&["a", "b", "c", "d", "e"]);
+    key(&mut s, "v");
+    key(&mut s, "/");
+    assert!(!s.view.in_visual_mode(), "the prompt replaces visual mode");
+    type_text(&mut s, "a");
+    key(&mut s, "enter");
+    let before = s.view.marks_count();
+    key(&mut s, "j");
+    key(&mut s, "j");
+    assert_eq!(
+        s.view.marks_count(),
+        before,
+        "normal-mode motion marks nothing"
+    );
+}
+
+#[test]
+fn esc_in_visual_mode_over_a_kept_filter_ends_the_range_then_clears_the_filter() {
+    let mut s = state_with(&["a1", "a2", "a3", "a4", "b"]);
+    key(&mut s, "/");
+    type_text(&mut s, "a");
+    key(&mut s, "enter");
+    key(&mut s, "v");
+    assert_eq!(s.mode, Mode::Visual);
+    key(&mut s, "esc");
+    assert_eq!(s.mode, Mode::Normal);
+    assert!(!s.view.in_visual_mode());
+    assert_eq!(
+        s.view.filter_query(),
+        Some("a"),
+        "first esc only ends visual"
+    );
+    let before = s.view.marks_count();
+    key(&mut s, "j");
+    assert_eq!(s.view.marks_count(), before);
+    key(&mut s, "esc");
+    assert_eq!(s.view.filter_query(), None, "second esc clears the filter");
+}
+
+#[test]
 fn arrows_and_ctrl_n_p_move_inside_filter_mode() {
     let mut s = state_with(&["a1", "a2", "a3"]);
     key(&mut s, "/");

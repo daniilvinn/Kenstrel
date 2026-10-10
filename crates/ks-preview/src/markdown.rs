@@ -16,6 +16,24 @@ fn rgb_style(c: crate::model::Rgb) -> SpanStyle {
 /// Render inline markdown of `text` into `line`, using `base` as the starting style.
 fn inline(text: &str, base: SpanStyle, pal: &Palette, san: &mut Sanitizer, line: &mut StyledLine) {
     let chars: Vec<char> = text.chars().collect();
+    // next_close[k] / next_paren[k]: index of the first `]` / `)` at or after k (len if none),
+    // so link lookups are O(1) instead of rescanning the rest of the line for every `[`.
+    let mut next_close = vec![chars.len(); chars.len() + 2];
+    let mut next_paren = vec![chars.len(); chars.len() + 2];
+    for k in (0..chars.len()).rev() {
+        next_close[k] = if chars[k] == ']' {
+            k
+        } else {
+            next_close[k + 1]
+        };
+        next_paren[k] = if chars[k] == ')' {
+            k
+        } else {
+            next_paren[k + 1]
+        };
+    }
+    // Backtick run length -> a start offset from which no closing run of that length exists.
+    let mut no_tick_close: std::collections::HashMap<usize, usize> = Default::default();
     let mut buf = String::new();
     let (mut bold, mut italic) = (false, false);
     let cur = |bold: bool, italic: bool| {
@@ -47,7 +65,9 @@ fn inline(text: &str, base: SpanStyle, pal: &Palette, san: &mut Sanitizer, line:
                 let start = i + ticks;
                 let mut j = start;
                 let mut end = None;
-                while j + ticks <= chars.len() {
+                // A failed search from an earlier start covers every later start too.
+                let known_none = no_tick_close.get(&ticks).is_some_and(|&from| from <= start);
+                while !known_none && j + ticks <= chars.len() {
                     if chars[j..j + ticks].iter().all(|&c| c == '`')
                         && chars.get(j + ticks) != Some(&'`')
                     {
@@ -55,6 +75,9 @@ fn inline(text: &str, base: SpanStyle, pal: &Palette, san: &mut Sanitizer, line:
                         break;
                     }
                     j += 1;
+                }
+                if end.is_none() && !known_none {
+                    no_tick_close.insert(ticks, start);
                 }
                 match end {
                     Some(e) => {
@@ -83,16 +106,12 @@ fn inline(text: &str, base: SpanStyle, pal: &Palette, san: &mut Sanitizer, line:
             }
             '[' => {
                 // [text](url)
-                let close = chars[i + 1..]
-                    .iter()
-                    .position(|&c| c == ']')
-                    .map(|p| i + 1 + p);
+                let close = Some(next_close[i + 1]).filter(|&p| p < chars.len());
                 let link = close.and_then(|cl| {
                     if chars.get(cl + 1) == Some(&'(') {
-                        chars[cl + 2..]
-                            .iter()
-                            .position(|&c| c == ')')
-                            .map(|p| (cl, cl + 2 + p))
+                        Some(next_paren[cl + 2])
+                            .filter(|&p| p < chars.len())
+                            .map(|p| (cl, p))
                     } else {
                         None
                     }
@@ -347,6 +366,39 @@ pub(crate) fn render(
 mod tests {
     use super::*;
     use crate::model::Color;
+
+    #[test]
+    fn pathological_single_lines_render_in_linear_time() {
+        let n = 250_000;
+        let cases = [
+            "[".repeat(n),
+            "[](".repeat(n / 3),
+            format!("{}]", "[".repeat(n)),
+            "[x](".repeat(n / 4),
+            "` ``".repeat(n / 4),
+            "`a``b```c````".repeat(n / 13),
+        ];
+        for text in &cases {
+            let start = std::time::Instant::now();
+            let p = render_str(text);
+            let took = start.elapsed();
+            assert!(!p.lines.is_empty());
+            assert!(
+                took < std::time::Duration::from_secs(5),
+                "{} chars took {took:?}",
+                text.chars().count()
+            );
+        }
+    }
+
+    #[test]
+    fn links_and_code_still_render_after_the_linear_rewrite() {
+        let p = render_str("see [docs](http://x.y/z) and `code` and [broken](nope");
+        let text = p.lines[0].text();
+        assert!(text.contains("docs (http://x.y/z)"), "{text}");
+        assert!(text.contains("code"), "{text}");
+        assert!(text.contains("[broken](nope"), "{text}");
+    }
 
     fn render_str(s: &str) -> TextPreview {
         render(

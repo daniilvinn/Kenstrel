@@ -289,6 +289,12 @@ fn render_preview(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme
     if state.preview.target.as_deref() != Some(preview.path.as_path()) {
         return;
     }
+    // The overlay draws the (shared) preview itself; a second draw of the same image at
+    // another size would make the shared protocol re-encode on every frame.
+    if matches!(preview.body, PreviewBody::Image(_)) && crate::search::preview_rect(state).is_some()
+    {
+        return;
+    }
     render_content(frame, content, state, theme, preview, None);
 }
 

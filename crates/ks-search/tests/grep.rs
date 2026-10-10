@@ -212,6 +212,46 @@ fn glob_filter_with_negation() {
 }
 
 #[test]
+fn brace_alternation_globs_are_one_glob() {
+    let t = tempfile::tempdir().unwrap();
+    write(t.path(), "a.rs", "needle\n");
+    write(t.path(), "b.toml", "needle\n");
+    write(t.path(), "c.md", "needle\n");
+    let mut braces = q(t.path(), "needle");
+    braces.glob = "*.{rs,toml}".into();
+    let o = run(braces);
+    assert!(o.error.is_none(), "{:?}", o.error);
+    assert_eq!(rels(&o), vec!["a.rs", "b.toml"]);
+    let mut mixed = q(t.path(), "needle");
+    mixed.glob = "*.{rs,md}, *.toml".into();
+    assert_eq!(rels(&run(mixed)), vec!["a.rs", "b.toml", "c.md"]);
+}
+
+#[test]
+fn byte_level_regex_in_a_long_multibyte_line_does_not_kill_workers() {
+    let t = tempfile::tempdir().unwrap();
+    let long = format!("{}é{}\n", "a".repeat(500), "b".repeat(500));
+    for i in 0..8 {
+        write(t.path(), &format!("f{i}.txt"), long.clone());
+    }
+    let mut query = q(t.path(), r"(?-u:\xA9)");
+    query.regex = true;
+    let o = run(query);
+    assert!(o.error.is_none(), "{:?}", o.error);
+    assert_eq!(o.stats.files_searched, 8);
+}
+
+#[test]
+fn multi_line_regex_errors_are_a_single_short_line() {
+    let t = tempfile::tempdir().unwrap();
+    let mut query = q(t.path(), "(");
+    query.regex = true;
+    let msg = run(query).error.expect("an error");
+    assert!(!msg.contains('\n'), "{msg:?}");
+    assert!(msg.ends_with("unclosed group"), "{msg:?}");
+}
+
+#[test]
 fn match_cap() {
     let t = tempfile::tempdir().unwrap();
     for i in 0..20 {

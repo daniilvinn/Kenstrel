@@ -248,6 +248,11 @@ pub(crate) fn cancel(state: &mut AppState, effects: &mut Vec<Effect>) -> bool {
         Some(_) => return false,
         None => {}
     }
+    if state.mode == Mode::Visual {
+        // Esc ends the visual range first, even over a kept filter.
+        crate::nav::leave_visual_mode(state);
+        return true;
+    }
     if state.mode == Mode::Filter || state.view.filter_query().is_some() {
         clear_filter(state);
         return true;
@@ -299,6 +304,8 @@ fn open_filter(state: &mut AppState) {
     if state.show_drives {
         return;
     }
+    // The filter prompt replaces visual mode, like the file-operation prompts do.
+    crate::nav::leave_visual_mode(state);
     state.mode = Mode::Filter;
     state.search.filter_input = LineInput::new(state.view.filter_query().unwrap_or_default());
 }
@@ -320,10 +327,12 @@ fn filter_text_key(state: &mut AppState, key: KeyChord) -> bool {
 
 /// `enter` in filter mode: keep the filter and return to normal navigation.
 fn accept_filter(state: &mut AppState) {
+    state.view.exit_visual();
     state.mode = Mode::Normal;
 }
 
 fn clear_filter(state: &mut AppState) {
+    state.view.exit_visual();
     state.mode = Mode::Normal;
     state.search.filter_input.clear();
     let height = state.viewport_height();

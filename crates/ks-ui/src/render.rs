@@ -107,7 +107,7 @@ fn render_header(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme)
         Line::from(vec![
             Span::raw(" "),
             Span::styled(
-                truncate_end(label, budget),
+                truncate_end(&crate::text::sanitize(label), budget),
                 Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
             ),
         ])

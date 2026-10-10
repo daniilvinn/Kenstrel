@@ -37,7 +37,10 @@ pub use cache::{CacheKey, PathChange, WalkCache};
 pub use debounce::Debouncer;
 pub use filter::{filter_list, FilterMatch, ListFilter};
 pub use finder::{FinderOptions, FinderResult, FinderSession, FinderStatus};
-pub use grep::{spawn_search, FileMatches, GrepEvent, GrepHandle, GrepQuery, GrepStats, LineMatch};
+pub use grep::{
+    is_unsafe_char, spawn_search, FileMatches, GrepEvent, GrepHandle, GrepQuery, GrepStats,
+    LineMatch,
+};
 pub use scope::{drive_root, find_git_root, home_dir, resolve_scope, Scope};
 pub use tokio_util::sync::CancellationToken;
 pub use walk::{walk, EntryKind, WalkEntry, WalkOptions, WalkSink, WalkSummary};

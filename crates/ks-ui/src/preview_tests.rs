@@ -6,6 +6,7 @@ use ks_core::{update, AppState, Entry, KeyChord, Msg};
 use ks_preview::{Preview, PreviewBody, PreviewEvent, Role, SpanStyle, StyledLine};
 use ratatui::backend::TestBackend;
 use ratatui::style::{Modifier, Style};
+use ratatui::text::Line;
 use ratatui::Terminal;
 
 use crate::images::TEST_LOCK;
@@ -143,6 +144,68 @@ fn image_preview_uses_halfblocks_without_a_graphics_terminal() {
             );
         }
     }
+}
+
+#[test]
+fn an_image_is_drawn_once_per_frame_under_a_finder_overlay() {
+    let _guard = TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    crate::images::reset_for_tests();
+    let mut s = preview_state(160, 48);
+    move_to(&mut s, "logo.png");
+    show(&mut s, image_body(), None);
+    s.preview.image_id = 1;
+    let path = s.preview.target.clone().unwrap();
+    let before = crate::images::render_calls_for_tests();
+    draw(&s, &theme("ember"));
+    assert_eq!(
+        crate::images::render_calls_for_tests() - before,
+        1,
+        "main pane only"
+    );
+
+    let effects = ks_core::update(&mut s, Msg::Key("ctrl-p".parse().unwrap()));
+    let gen = effects
+        .iter()
+        .find_map(|e| match e {
+            ks_core::Effect::FinderStart { gen, .. } => Some(*gen),
+            _ => None,
+        })
+        .unwrap();
+    let snapshot = ks_core::FinderSnapshot {
+        query: String::new(),
+        root: s.cwd.clone(),
+        matched: 1,
+        total: 1,
+        walking: false,
+        from_cache: false,
+        offset: 0,
+        results: vec![ks_search::FinderResult {
+            rel: "logo.png".into(),
+            path,
+            kind: ks_search::EntryKind::File,
+            indices: vec![],
+        }],
+    };
+    ks_core::update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: Box::new(snapshot),
+        },
+    );
+    // The engine answers for the overlay's highlighted file, which the shared state follows.
+    s.preview.current = Some(Arc::new(Preview {
+        path: s.preview.target.clone().unwrap(),
+        meta: None,
+        body: image_body(),
+    }));
+    let before = crate::images::render_calls_for_tests();
+    draw(&s, &theme("ember"));
+    assert_eq!(
+        crate::images::render_calls_for_tests() - before,
+        1,
+        "the overlay pane alone draws the image"
+    );
 }
 
 #[test]
@@ -388,6 +451,25 @@ fn hex_rows_are_8_wide_in_a_narrow_pane() {
     assert!(narrow.iter().all(|l| l.width() <= 46), "fits 48 columns");
 }
 
+#[test]
+fn hex_rows_never_overflow_the_content_width() {
+    let theme = theme("ember");
+    let PreviewBody::Binary(binary) = hex_body() else {
+        unreachable!()
+    };
+    for w in [60u16, 74, 75, 76, 77, 100] {
+        let lines = binary_lines(&binary, w, 0, 100, &theme);
+        assert!(
+            lines.iter().all(|l| l.width() <= usize::from(w)),
+            "width {w}: {:?}",
+            lines.iter().map(Line::width).max()
+        );
+    }
+    let at = |w| binary_lines(&binary, w, 0, 100, &theme).len();
+    assert_eq!(at(75), at(60), "75 columns still use 8 bytes per row");
+    assert!(at(76) < at(75), "76 columns fit 16 bytes per row");
+}
+
 /// Keeps the per-keypress budget honest (PLAN section 11: under 16 ms): `update` plus a full
 /// render of a 1000 entry directory with a text preview. Debug builds are several times
 /// slower than release, so the assertion is generous there; the measured numbers are in
@@ -509,4 +591,22 @@ fn line_selection_needs_a_text_preview_and_esc_leaves_it() {
     assert!(draw(&s, &theme).contains("send to Claude"));
     key(&mut s, "esc");
     assert!(s.preview.select.is_none());
+}
+
+#[test]
+fn bidi_overrides_in_names_never_reach_the_buffer() {
+    for (w, h) in SIZES {
+        let mut state = preview_state(w, h);
+        let rows = state.viewport_height();
+        state
+            .view
+            .push_chunk(vec![Entry::file("invoice\u{202E}fdp.exe", 10)], rows);
+        let text = text_of(&state);
+        assert!(!text.contains('\u{202E}'), "list row at {w}x{h}");
+        assert!(text.contains("invoice?fdp.exe"), "list row at {w}x{h}");
+        state.view.label = Some("results \u{202E}evil".to_owned());
+        let text = text_of(&state);
+        assert!(!text.contains('\u{202E}'), "header label at {w}x{h}");
+        assert!(text.contains("results ?evil"), "header label at {w}x{h}");
+    }
 }

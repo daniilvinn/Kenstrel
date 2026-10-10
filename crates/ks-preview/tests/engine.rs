@@ -53,6 +53,29 @@ fn rust_file_is_highlighted_with_line_count() {
 }
 
 #[test]
+fn a_text_limit_below_the_hex_size_still_reports_truncation() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("cut.txt");
+    // 3000 bytes, cut at 1000 inside a multi-byte character (999 'a' then 'é').
+    let content = format!("{}é{}", "a".repeat(999), "b".repeat(1999));
+    assert_eq!(content.len(), 3000);
+    fs::write(&p, &content).unwrap();
+    let mut opts = PreviewOptions::default();
+    opts.limits.max_text_bytes = 1000;
+    let PreviewBody::Text(t) = build(&p, &opts).body else {
+        panic!("expected text")
+    };
+    assert!(t.truncated, "the file is longer than the text limit");
+    assert_eq!(t.bytes_read, 1000);
+    assert_eq!(t.total_lines, None);
+    assert_ne!(
+        t.encoding,
+        Encoding::Lossy,
+        "a cut inside a character is not lossy"
+    );
+}
+
+#[test]
 fn text_is_truncated_by_lines_and_bytes() {
     let dir = tempfile::tempdir().unwrap();
     let p = dir.path().join("big.txt");
