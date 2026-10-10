@@ -100,10 +100,25 @@ impl<'de> Deserialize<'de> for SizeBase {
     }
 }
 
+/// Which terminal graphics protocol draws image previews.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageProtocol {
+    /// Ask the terminal (device attributes query); halfblocks when it does not answer.
+    #[default]
+    Auto,
+    Halfblocks,
+    Sixel,
+    Kitty,
+    Iterm2,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PreviewConfig {
     pub enabled: bool,
+    /// Image protocol; `auto` asks the terminal at start-up.
+    pub image_protocol: ImageProtocol,
     /// Largest number of bytes read for a text preview.
     pub max_bytes: u64,
     /// Largest number of lines shown for a text preview.
@@ -114,6 +129,7 @@ impl Default for PreviewConfig {
     fn default() -> Self {
         Self {
             enabled: true,
+            image_protocol: ImageProtocol::Auto,
             max_bytes: 256 * 1024,
             max_lines: 2000,
         }
@@ -315,6 +331,35 @@ terminal = \"sometimes\""
         assert_eq!(config.files.size_base.divisor(), 1000);
         assert_eq!(config.layout.list_percent, 30);
         assert_eq!(config.keymap["normal"]["q"], "none");
+    }
+
+    #[test]
+    fn image_protocol_parses_and_rejects_unknown() {
+        assert_eq!(
+            Config::default().preview.image_protocol,
+            ImageProtocol::Auto
+        );
+        for (name, want) in [
+            ("auto", ImageProtocol::Auto),
+            ("halfblocks", ImageProtocol::Halfblocks),
+            ("sixel", ImageProtocol::Sixel),
+            ("kitty", ImageProtocol::Kitty),
+            ("iterm2", ImageProtocol::Iterm2),
+        ] {
+            let config = Config::from_toml(&format!(
+                "[preview]
+image_protocol = \"{name}\""
+            ))
+            .unwrap();
+            assert_eq!(config.preview.image_protocol, want);
+        }
+        let err = Config::from_toml(
+            "[preview]
+image_protocol = \"blit\"",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("blit"), "{err}");
     }
 
     #[test]

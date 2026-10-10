@@ -24,6 +24,7 @@
 
 [preview]
 # enabled = true
+# image_protocol = "auto"  # "auto" | "halfblocks" | "sixel" | "kitty" | "iterm2"
 # max_bytes = 262144    # read at most this much of a text file
 # max_lines = 2000
 

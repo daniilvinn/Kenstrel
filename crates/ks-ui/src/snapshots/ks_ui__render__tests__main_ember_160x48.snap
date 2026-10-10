@@ -1,5 +1,6 @@
 ---
 source: crates/ks-ui/src/render.rs
+assertion_line: 433
 expression: rendered
 ---
  ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1

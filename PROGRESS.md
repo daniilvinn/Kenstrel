@@ -408,3 +408,18 @@ Merged `phase/p6` (file operations) onto main (P5 + P7). Resolution decisions:
 - **Snapshots**: only help and palette snapshots changed (one more command: counts 74 to 75, 81 to 82, filtered `sort` 34 to 35, and the "Clear finished jobs" help row); accepted.
 - `Cargo.lock`: took ours; cargo needed no change.
 - Not verifiable here: terminal suspend/resume with nvim/hx in Windows Terminal (manual check still open, see `docs/progress/p6.md`).
+
+## Integration: phase/p2
+
+Merged `phase/p2` (preview pane, parent column, images) onto main (P5 + P7 + P6). Resolution decisions:
+
+- **Conflicts**: all additive (modules, `Msg`/`Effect` variants, `AppState.preview`, update arms, `ks-core` -> `ks-preview` dependency). In `EffectRunner::run` the preview arms sit before P6's catch-all `other => fileops.handle(other)`. In `ks-app/src/lib.rs` `init_images` runs before `PausableEvents::new` and `run_with_state`.
+- **Preview state is global** (classified "shared" in the `tabs.rs` guard). It follows the active tab's cursor: `preview::sync` runs at the end of every `update`, so a tab switch (different cwd/cursor path) issues a new request by itself. `w`/`P`/`i` and scroll are global toggles.
+- **Theme switch**: `event_loop` calls `runner.set_preview_palette(theme.syntax_palette())` whenever a side-channel result (theme load) is applied, and `Msg::ThemeApplied` bumps `PreviewState::theme_epoch`, part of the request key, so the current file is re-requested and re-highlighted (syntax colours are baked into the result). New test `a_theme_switch_requests_the_current_file_again`.
+- **Registry / keymap**: the P2 actions (`preview.toggle`, `preview.parent_column`, `preview.metadata`, `preview.scroll_down/up`) already had `COMMANDS` rows; the registry and `docs/keymap.md` drift tests pass unchanged.
+- **Hints**: P2's `‹w› preview ‹P› columns ‹i› info` tail on the Normal hint line was dropped: at 80 columns it truncated P5's line with `…` and changed every P5/P6/P7 snapshot. The keys stay discoverable through help, the palette and which-key.
+- **Layout**: `render_body` replaces `render_list` inside P7's tab-strip/header layout, so the split coexists with the tab strip and overlays (overlays draw after the body). `images::begin_frame` stays before the body.
+- **Test fixtures**: P6's `fileops::logic` test `state()` sets `preview.user_visible = Some(false)` because those tests assert exact effect lists (a visible pane adds `RequestPreview`).
+- **Snapshots**: only the hint-line row differed from the P2 side (after the hint decision); all other P5/P6/P7 snapshots are unchanged. Accepted.
+- `Cargo.lock`: took ours; cargo needed no change.
+- Not verifiable here: Sixel/halfblocks detection and clear-on-leave in Windows Terminal (see `docs/progress/p2.md`). P10's Claude split must still shrink `body` before `render_body`.

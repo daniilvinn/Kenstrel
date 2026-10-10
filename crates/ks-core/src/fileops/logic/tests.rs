@@ -37,6 +37,8 @@ fn state() -> AppState {
         rows,
     );
     state.view.finish_loading();
+    // These tests assert exact effect lists: keep the preview pane (and its requests) out.
+    state.preview.user_visible = Some(false);
     state.dirty = false;
     state
 }

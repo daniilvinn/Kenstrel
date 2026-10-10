@@ -1046,7 +1046,7 @@ mod tests {
         let mut w = project_world();
         // Two navigations back to back; deliver the results of the first one late.
         let first = update(&mut w.state, Msg::Key("j".parse().unwrap()));
-        assert!(first.is_empty());
+        assert!(!first.iter().any(|e| matches!(e, Effect::ListDir { .. })));
         let e1 = update(&mut w.state, Msg::Key("l".parse().unwrap()));
         let Effect::ListDir { gen: g1, .. } = e1[0] else {
             panic!("expected a listing, got {e1:?}")

@@ -8,6 +8,18 @@
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Gen(u64);
 
+impl Gen {
+    /// The ticket as a plain number, for engines that carry generations as `u64`.
+    pub const fn raw(self) -> u64 {
+        self.0
+    }
+
+    /// Rebuilds a ticket from [`raw`](Self::raw).
+    pub const fn from_raw(raw: u64) -> Self {
+        Self(raw)
+    }
+}
+
 /// Issues [`Gen`] tickets and answers "is this ticket still the latest one?".
 #[derive(Clone, Debug, Default)]
 pub struct GenCounter {

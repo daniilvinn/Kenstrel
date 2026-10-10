@@ -11,6 +11,7 @@ use crate::aids::StateFile;
 use crate::fileops::{ConflictAnswer, ForegroundSpec, JobRequest, PathFormatKind};
 use crate::generation::Gen;
 use crate::msg::TimerKind;
+use crate::preview::PreviewRequest;
 use crate::state::JobId;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,4 +114,13 @@ pub enum Effect {
     /// full redraw, then deliver `Msg::ForegroundDone { id }`. Handled by the event loop
     /// (it owns the terminal), not by the effect runner.
     RunForeground { id: u64, spec: ForegroundSpec },
+    /// Preview `request.path`, reporting `Msg::Preview` tagged with `gen`. Cancels the
+    /// request still running for the main pane.
+    RequestPreview { gen: Gen, request: PreviewRequest },
+    /// The main pane no longer needs a preview: cancel the running request.
+    CancelPreview,
+    /// List the parent directory for the parent column, reporting `Msg::ParentPreview`.
+    RequestParent { gen: Gen, request: PreviewRequest },
+    /// The parent column is gone: cancel its request.
+    CancelParent,
 }

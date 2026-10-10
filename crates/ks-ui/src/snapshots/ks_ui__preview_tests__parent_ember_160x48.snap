@@ -1,0 +1,409 @@
+---
+source: crates/ks-ui/src/preview_tests.rs
+assertion_line: 186
+expression: "draw(&s, &theme)"
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ◆ assets/                 │   ◆ current/                                       │ vulkan_device.rs                                     Rust · 14.2 KB · 3h ago
+  ◆ core/                   │   ◆ passes/                                      M │──────────────────────────────────────────────────────────────────────────────
+ ▌◆ renderer/               │   ◆ shaders/                                     ! │  1 use ash::vk;
+  ◆ scene/                  │   ◆ a_rather_long_file_name_that_must_be…_row.rs   │  2 use crate::core::{Result, Handle};
+  ◆ main.rs                 │   ◆ build.ps1                                      │  3
+                            │   ◆ bundle.zip                                     │  4 pub struct VulkanDevice {
+                            │   ◆ descriptors.rs                               + │  5     instance: ash::Instance,
+                            │   ◆ firmware.bin                                   │  6     physical: vk::PhysicalDevice,
+                            │   ◆ logo.png                                       │  7     // queue families, filled in by pick()
+                            │   ◆ mod.rs                                         │  8     slot_0: u32, // 0
+                            │   ◆ new_pass.rs                                  ? │  9     slot_1: u32, // 1
+                            │   ◆ photo_from_phone.jpg                           │ 10     slot_2: u32, // 2
+                            │   ◆ pipeline_cache.rs                              │ 11     slot_3: u32, // 3
+                            │   ◆ README.md                                      │ 12     slot_4: u32, // 4
+                            │  ●◆ swapchain.rs                                   │ 13     slot_5: u32, // 5
+                            │ ▌ ◆ vulkan_device.rs                             M │ 14     slot_6: u32, // 6
+                            │   ◆ 日本語のメモ.txt                               │ 15     slot_7: u32, // 7
+                            │                                                    │ 16     slot_8: u32, // 8
+                            │                                                    │ 17     slot_9: u32, // 9
+                            │                                                    │ 18     slot_10: u32, // 10
+                            │                                                    │ 19     slot_11: u32, // 11
+                            │                                                    │ 20     slot_12: u32, // 12
+                            │                                                    │ 21     slot_13: u32, // 13
+                            │                                                    │ 22     slot_14: u32, // 14
+                            │                                                    │ 23     slot_15: u32, // 15
+                            │                                                    │ 24     slot_16: u32, // 16
+                            │                                                    │ 25     slot_17: u32, // 17
+                            │                                                    │ 26     slot_18: u32, // 18
+                            │                                                    │ 27     slot_19: u32, // 19
+                            │                                                    │ 28     slot_20: u32, // 20
+                            │                                                    │ 29     slot_21: u32, // 21
+                            │                                                    │ 30     slot_22: u32, // 22
+                            │                                                    │ 31     slot_23: u32, // 23
+                            │                                                    │ 32     slot_24: u32, // 24
+                            │                                                    │ 33     slot_25: u32, // 25
+                            │                                                    │ 34     slot_26: u32, // 26
+                            │                                                    │ 35     slot_27: u32, // 27
+                            │                                                    │ 36     slot_28: u32, // 28
+                            │                                                    │ 37     slot_29: u32, // 29
+                            │                                                    │ 38 }
+                            │                                                    │ 39 const MAX_FRAMES: usize = 2; // render
+                            │                                                    │
+                            │                                                    │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                                           16/17 · 1 selected
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..143 fg=#e8e3dc bg=reset bold
+  0 143..148 fg=#a9a29a bg=reset bold
+  0 148..151 fg=#a9a29a bg=reset
+  0 151..154 fg=#92c07f bg=reset
+  0 154..157 fg=#e5b567 bg=reset
+  0 157..160 fg=#c9a27f bg=reset
+  1   0..160 fg=#403a35 bg=reset
+  2   2..28  fg=#7fa8c9 bg=reset dim
+  2  28..32  fg=#403a35 bg=reset
+  2  32..34  fg=#7fa8c9 bg=reset
+  2  34..81  fg=#b799d9 bg=reset
+  2  81..83  fg=#403a35 bg=reset
+  2  83..136 fg=#e8e3dc bg=reset bold
+  2 136..160 fg=#a9a29a bg=reset
+  3   2..28  fg=#7fa8c9 bg=reset dim
+  3  28..32  fg=#403a35 bg=reset
+  3  32..79  fg=#7fa8c9 bg=reset
+  3  79..81  fg=#e5b567 bg=reset
+  3  81..160 fg=#403a35 bg=reset
+  4   0..1   fg=#e8e3dc bg=#2f2a26
+  4   1..2   fg=#d97757 bg=#2f2a26
+  4   2..13  fg=#7fa8c9 bg=#2f2a26 bold
+  4  13..28  fg=#e8e3dc bg=#2f2a26
+  4  28..32  fg=#403a35 bg=reset
+  4  32..79  fg=#7fa8c9 bg=reset
+  4  79..81  fg=#625c56 bg=reset
+  4  81..84  fg=#403a35 bg=reset
+  4  84..86  fg=#716b64 bg=reset
+  4  86..90  fg=#d97757 bg=reset
+  4  90..97  fg=#e8e3dc bg=reset
+  4  97..160 fg=#9a948a bg=reset
+  5   2..28  fg=#7fa8c9 bg=reset dim
+  5  28..32  fg=#403a35 bg=reset
+  5  32..34  fg=#a9a29a bg=reset
+  5  34..81  fg=#e8e3dc bg=reset
+  5  81..84  fg=#403a35 bg=reset
+  5  84..86  fg=#716b64 bg=reset
+  5  86..90  fg=#d97757 bg=reset
+  5  90..103 fg=#e8e3dc bg=reset
+  5 103..104 fg=#9a948a bg=reset
+  5 104..110 fg=#e5c07b bg=reset
+  5 110..112 fg=#9a948a bg=reset
+  5 112..118 fg=#e5c07b bg=reset
+  5 118..160 fg=#9a948a bg=reset
+  6   2..28  fg=#a9a29a bg=reset
+  6  28..32  fg=#403a35 bg=reset
+  6  32..81  fg=#92c07f bg=reset
+  6  81..84  fg=#403a35 bg=reset
+  6  84..160 fg=#716b64 bg=reset
+  7  28..32  fg=#403a35 bg=reset
+  7  32..34  fg=#a9a29a bg=reset
+  7  34..81  fg=#e8e3dc bg=reset
+  7  81..84  fg=#403a35 bg=reset
+  7  84..86  fg=#716b64 bg=reset
+  7  86..97  fg=#d97757 bg=reset
+  7  97..110 fg=#e5c07b bg=reset
+  7 110..160 fg=#9a948a bg=reset
+  8  28..32  fg=#403a35 bg=reset
+  8  32..34  fg=#a9a29a bg=reset
+  8  34..79  fg=#e8e3dc bg=reset
+  8  79..81  fg=#92c07f bg=reset
+  8  81..84  fg=#403a35 bg=reset
+  8  84..90  fg=#716b64 bg=reset
+  8  90..98  fg=#e8e3dc bg=reset
+  8  98..100 fg=#9a948a bg=reset
+  8 100..113 fg=#e5c07b bg=reset
+  8 113..160 fg=#9a948a bg=reset
+  9  28..32  fg=#403a35 bg=reset
+  9  32..34  fg=#a9a29a bg=reset
+  9  34..81  fg=#e8e3dc bg=reset
+  9  81..84  fg=#403a35 bg=reset
+  9  84..90  fg=#716b64 bg=reset
+  9  90..98  fg=#e8e3dc bg=reset
+  9  98..100 fg=#9a948a bg=reset
+  9 100..118 fg=#e5c07b bg=reset
+  9 118..160 fg=#9a948a bg=reset
+ 10  28..32  fg=#403a35 bg=reset
+ 10  32..34  fg=#a9a29a bg=reset
+ 10  34..81  fg=#e8e3dc bg=reset
+ 10  81..84  fg=#403a35 bg=reset
+ 10  84..90  fg=#716b64 bg=reset
+ 10  90..160 fg=#7a746c bg=reset italic
+ 11  28..32  fg=#403a35 bg=reset
+ 11  32..34  fg=#a9a29a bg=reset
+ 11  34..81  fg=#e8e3dc bg=reset
+ 11  81..84  fg=#403a35 bg=reset
+ 11  84..90  fg=#716b64 bg=reset
+ 11  90..96  fg=#e8e3dc bg=reset
+ 11  96..98  fg=#9a948a bg=reset
+ 11  98..101 fg=#e5c07b bg=reset
+ 11 101..103 fg=#9a948a bg=reset
+ 11 103..160 fg=#7a746c bg=reset italic
+ 12  28..32  fg=#403a35 bg=reset
+ 12  32..34  fg=#a9a29a bg=reset
+ 12  34..79  fg=#e8e3dc bg=reset
+ 12  79..81  fg=#c9a27f bg=reset
+ 12  81..84  fg=#403a35 bg=reset
+ 12  84..90  fg=#716b64 bg=reset
+ 12  90..96  fg=#e8e3dc bg=reset
+ 12  96..98  fg=#9a948a bg=reset
+ 12  98..101 fg=#e5c07b bg=reset
+ 12 101..103 fg=#9a948a bg=reset
+ 12 103..160 fg=#7a746c bg=reset italic
+ 13  28..32  fg=#403a35 bg=reset
+ 13  32..34  fg=#a9a29a bg=reset
+ 13  34..81  fg=#a9a29a bg=reset italic
+ 13  81..83  fg=#403a35 bg=reset
+ 13  83..90  fg=#716b64 bg=reset
+ 13  90..96  fg=#e8e3dc bg=reset
+ 13  96..98  fg=#9a948a bg=reset
+ 13  98..101 fg=#e5c07b bg=reset
+ 13 101..103 fg=#9a948a bg=reset
+ 13 103..160 fg=#7a746c bg=reset italic
+ 14  28..32  fg=#403a35 bg=reset
+ 14  32..34  fg=#a9a29a bg=reset
+ 14  34..81  fg=#e8e3dc bg=reset
+ 14  81..83  fg=#403a35 bg=reset
+ 14  83..90  fg=#716b64 bg=reset
+ 14  90..96  fg=#e8e3dc bg=reset
+ 14  96..98  fg=#9a948a bg=reset
+ 14  98..101 fg=#e5c07b bg=reset
+ 14 101..103 fg=#9a948a bg=reset
+ 14 103..160 fg=#7a746c bg=reset italic
+ 15  28..32  fg=#403a35 bg=reset
+ 15  32..34  fg=#a9a29a bg=reset
+ 15  34..81  fg=#e8e3dc bg=reset
+ 15  81..83  fg=#403a35 bg=reset
+ 15  83..90  fg=#716b64 bg=reset
+ 15  90..96  fg=#e8e3dc bg=reset
+ 15  96..98  fg=#9a948a bg=reset
+ 15  98..101 fg=#e5c07b bg=reset
+ 15 101..103 fg=#9a948a bg=reset
+ 15 103..160 fg=#7a746c bg=reset italic
+ 16  28..31  fg=#403a35 bg=reset
+ 16  31..32  fg=#d97757 bg=reset
+ 16  32..34  fg=#a9a29a bg=reset
+ 16  34..81  fg=#d97757 bg=reset bold
+ 16  81..83  fg=#403a35 bg=reset
+ 16  83..90  fg=#716b64 bg=reset
+ 16  90..96  fg=#e8e3dc bg=reset
+ 16  96..98  fg=#9a948a bg=reset
+ 16  98..101 fg=#e5c07b bg=reset
+ 16 101..103 fg=#9a948a bg=reset
+ 16 103..160 fg=#7a746c bg=reset italic
+ 17  28..29  fg=#403a35 bg=reset
+ 17  29..30  fg=#e8e3dc bg=#2f2a26
+ 17  30..32  fg=#d97757 bg=#2f2a26
+ 17  32..34  fg=#a9a29a bg=#2f2a26
+ 17  34..79  fg=#e8e3dc bg=#2f2a26
+ 17  79..80  fg=#e5b567 bg=#2f2a26
+ 17  80..81  fg=#e8e3dc bg=#2f2a26
+ 17  81..83  fg=#403a35 bg=reset
+ 17  83..90  fg=#716b64 bg=reset
+ 17  90..96  fg=#e8e3dc bg=reset
+ 17  96..98  fg=#9a948a bg=reset
+ 17  98..101 fg=#e5c07b bg=reset
+ 17 101..103 fg=#9a948a bg=reset
+ 17 103..160 fg=#7a746c bg=reset italic
+ 18  28..32  fg=#403a35 bg=reset
+ 18  32..34  fg=#a9a29a bg=reset
+ 18  34..81  fg=#e8e3dc bg=reset
+ 18  81..83  fg=#403a35 bg=reset
+ 18  83..90  fg=#716b64 bg=reset
+ 18  90..96  fg=#e8e3dc bg=reset
+ 18  96..98  fg=#9a948a bg=reset
+ 18  98..101 fg=#e5c07b bg=reset
+ 18 101..103 fg=#9a948a bg=reset
+ 18 103..160 fg=#7a746c bg=reset italic
+ 19  28..83  fg=#403a35 bg=reset
+ 19  83..90  fg=#716b64 bg=reset
+ 19  90..96  fg=#e8e3dc bg=reset
+ 19  96..98  fg=#9a948a bg=reset
+ 19  98..101 fg=#e5c07b bg=reset
+ 19 101..103 fg=#9a948a bg=reset
+ 19 103..160 fg=#7a746c bg=reset italic
+ 20  28..83  fg=#403a35 bg=reset
+ 20  83..90  fg=#716b64 bg=reset
+ 20  90..96  fg=#e8e3dc bg=reset
+ 20  96..98  fg=#9a948a bg=reset
+ 20  98..101 fg=#e5c07b bg=reset
+ 20 101..103 fg=#9a948a bg=reset
+ 20 103..160 fg=#7a746c bg=reset italic
+ 21  28..83  fg=#403a35 bg=reset
+ 21  83..90  fg=#716b64 bg=reset
+ 21  90..97  fg=#e8e3dc bg=reset
+ 21  97..99  fg=#9a948a bg=reset
+ 21  99..102 fg=#e5c07b bg=reset
+ 21 102..104 fg=#9a948a bg=reset
+ 21 104..160 fg=#7a746c bg=reset italic
+ 22  28..83  fg=#403a35 bg=reset
+ 22  83..90  fg=#716b64 bg=reset
+ 22  90..97  fg=#e8e3dc bg=reset
+ 22  97..99  fg=#9a948a bg=reset
+ 22  99..102 fg=#e5c07b bg=reset
+ 22 102..104 fg=#9a948a bg=reset
+ 22 104..160 fg=#7a746c bg=reset italic
+ 23  28..83  fg=#403a35 bg=reset
+ 23  83..90  fg=#716b64 bg=reset
+ 23  90..97  fg=#e8e3dc bg=reset
+ 23  97..99  fg=#9a948a bg=reset
+ 23  99..102 fg=#e5c07b bg=reset
+ 23 102..104 fg=#9a948a bg=reset
+ 23 104..160 fg=#7a746c bg=reset italic
+ 24  28..83  fg=#403a35 bg=reset
+ 24  83..90  fg=#716b64 bg=reset
+ 24  90..97  fg=#e8e3dc bg=reset
+ 24  97..99  fg=#9a948a bg=reset
+ 24  99..102 fg=#e5c07b bg=reset
+ 24 102..104 fg=#9a948a bg=reset
+ 24 104..160 fg=#7a746c bg=reset italic
+ 25  28..83  fg=#403a35 bg=reset
+ 25  83..90  fg=#716b64 bg=reset
+ 25  90..97  fg=#e8e3dc bg=reset
+ 25  97..99  fg=#9a948a bg=reset
+ 25  99..102 fg=#e5c07b bg=reset
+ 25 102..104 fg=#9a948a bg=reset
+ 25 104..160 fg=#7a746c bg=reset italic
+ 26  28..83  fg=#403a35 bg=reset
+ 26  83..90  fg=#716b64 bg=reset
+ 26  90..97  fg=#e8e3dc bg=reset
+ 26  97..99  fg=#9a948a bg=reset
+ 26  99..102 fg=#e5c07b bg=reset
+ 26 102..104 fg=#9a948a bg=reset
+ 26 104..160 fg=#7a746c bg=reset italic
+ 27  28..83  fg=#403a35 bg=reset
+ 27  83..90  fg=#716b64 bg=reset
+ 27  90..97  fg=#e8e3dc bg=reset
+ 27  97..99  fg=#9a948a bg=reset
+ 27  99..102 fg=#e5c07b bg=reset
+ 27 102..104 fg=#9a948a bg=reset
+ 27 104..160 fg=#7a746c bg=reset italic
+ 28  28..83  fg=#403a35 bg=reset
+ 28  83..90  fg=#716b64 bg=reset
+ 28  90..97  fg=#e8e3dc bg=reset
+ 28  97..99  fg=#9a948a bg=reset
+ 28  99..102 fg=#e5c07b bg=reset
+ 28 102..104 fg=#9a948a bg=reset
+ 28 104..160 fg=#7a746c bg=reset italic
+ 29  28..83  fg=#403a35 bg=reset
+ 29  83..90  fg=#716b64 bg=reset
+ 29  90..97  fg=#e8e3dc bg=reset
+ 29  97..99  fg=#9a948a bg=reset
+ 29  99..102 fg=#e5c07b bg=reset
+ 29 102..104 fg=#9a948a bg=reset
+ 29 104..160 fg=#7a746c bg=reset italic
+ 30  28..83  fg=#403a35 bg=reset
+ 30  83..90  fg=#716b64 bg=reset
+ 30  90..97  fg=#e8e3dc bg=reset
+ 30  97..99  fg=#9a948a bg=reset
+ 30  99..102 fg=#e5c07b bg=reset
+ 30 102..104 fg=#9a948a bg=reset
+ 30 104..160 fg=#7a746c bg=reset italic
+ 31  28..83  fg=#403a35 bg=reset
+ 31  83..90  fg=#716b64 bg=reset
+ 31  90..97  fg=#e8e3dc bg=reset
+ 31  97..99  fg=#9a948a bg=reset
+ 31  99..102 fg=#e5c07b bg=reset
+ 31 102..104 fg=#9a948a bg=reset
+ 31 104..160 fg=#7a746c bg=reset italic
+ 32  28..83  fg=#403a35 bg=reset
+ 32  83..90  fg=#716b64 bg=reset
+ 32  90..97  fg=#e8e3dc bg=reset
+ 32  97..99  fg=#9a948a bg=reset
+ 32  99..102 fg=#e5c07b bg=reset
+ 32 102..104 fg=#9a948a bg=reset
+ 32 104..160 fg=#7a746c bg=reset italic
+ 33  28..83  fg=#403a35 bg=reset
+ 33  83..90  fg=#716b64 bg=reset
+ 33  90..97  fg=#e8e3dc bg=reset
+ 33  97..99  fg=#9a948a bg=reset
+ 33  99..102 fg=#e5c07b bg=reset
+ 33 102..104 fg=#9a948a bg=reset
+ 33 104..160 fg=#7a746c bg=reset italic
+ 34  28..83  fg=#403a35 bg=reset
+ 34  83..90  fg=#716b64 bg=reset
+ 34  90..97  fg=#e8e3dc bg=reset
+ 34  97..99  fg=#9a948a bg=reset
+ 34  99..102 fg=#e5c07b bg=reset
+ 34 102..104 fg=#9a948a bg=reset
+ 34 104..160 fg=#7a746c bg=reset italic
+ 35  28..83  fg=#403a35 bg=reset
+ 35  83..90  fg=#716b64 bg=reset
+ 35  90..97  fg=#e8e3dc bg=reset
+ 35  97..99  fg=#9a948a bg=reset
+ 35  99..102 fg=#e5c07b bg=reset
+ 35 102..104 fg=#9a948a bg=reset
+ 35 104..160 fg=#7a746c bg=reset italic
+ 36  28..83  fg=#403a35 bg=reset
+ 36  83..90  fg=#716b64 bg=reset
+ 36  90..97  fg=#e8e3dc bg=reset
+ 36  97..99  fg=#9a948a bg=reset
+ 36  99..102 fg=#e5c07b bg=reset
+ 36 102..104 fg=#9a948a bg=reset
+ 36 104..160 fg=#7a746c bg=reset italic
+ 37  28..83  fg=#403a35 bg=reset
+ 37  83..90  fg=#716b64 bg=reset
+ 37  90..97  fg=#e8e3dc bg=reset
+ 37  97..99  fg=#9a948a bg=reset
+ 37  99..102 fg=#e5c07b bg=reset
+ 37 102..104 fg=#9a948a bg=reset
+ 37 104..160 fg=#7a746c bg=reset italic
+ 38  28..83  fg=#403a35 bg=reset
+ 38  83..90  fg=#716b64 bg=reset
+ 38  90..97  fg=#e8e3dc bg=reset
+ 38  97..99  fg=#9a948a bg=reset
+ 38  99..102 fg=#e5c07b bg=reset
+ 38 102..104 fg=#9a948a bg=reset
+ 38 104..160 fg=#7a746c bg=reset italic
+ 39  28..83  fg=#403a35 bg=reset
+ 39  83..90  fg=#716b64 bg=reset
+ 39  90..97  fg=#e8e3dc bg=reset
+ 39  97..99  fg=#9a948a bg=reset
+ 39  99..102 fg=#e5c07b bg=reset
+ 39 102..104 fg=#9a948a bg=reset
+ 39 104..160 fg=#7a746c bg=reset italic
+ 40  28..83  fg=#403a35 bg=reset
+ 40  83..90  fg=#716b64 bg=reset
+ 40  90..97  fg=#e8e3dc bg=reset
+ 40  97..99  fg=#9a948a bg=reset
+ 40  99..102 fg=#e5c07b bg=reset
+ 40 102..104 fg=#9a948a bg=reset
+ 40 104..160 fg=#7a746c bg=reset italic
+ 41  28..83  fg=#403a35 bg=reset
+ 41  83..86  fg=#716b64 bg=reset
+ 41  86..160 fg=#9a948a bg=reset
+ 42  28..83  fg=#403a35 bg=reset
+ 42  83..86  fg=#716b64 bg=reset
+ 42  86..92  fg=#d97757 bg=reset
+ 42  92..102 fg=#e8e3dc bg=reset
+ 42 102..104 fg=#9a948a bg=reset
+ 42 104..110 fg=#e5c07b bg=reset
+ 42 110..112 fg=#9a948a bg=reset
+ 42 112..113 fg=#c68fd9 bg=reset
+ 42 113..115 fg=#9a948a bg=reset
+ 42 115..118 fg=#7a746c bg=reset italic
+ 42 118..160 fg=#7ab0d8 bg=reset
+ 43  28..160 fg=#403a35 bg=reset
+ 44  28..160 fg=#403a35 bg=reset
+ 45   0..160 fg=#403a35 bg=reset
+ 46   1..141 fg=#d97757 bg=reset bold
+ 46 141..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..5   fg=#a9a29a bg=reset
+ 47   5..16  fg=#716b64 bg=reset
+ 47  16..17  fg=#a9a29a bg=reset
+ 47  17..26  fg=#716b64 bg=reset
+ 47  26..31  fg=#a9a29a bg=reset
+ 47  31..40  fg=#716b64 bg=reset
+ 47  40..41  fg=#a9a29a bg=reset
+ 47  41..52  fg=#716b64 bg=reset
+ 47  52..55  fg=#a9a29a bg=reset
+ 47  55..66  fg=#716b64 bg=reset
+ 47  66..67  fg=#a9a29a bg=reset
+ 47  67..160 fg=#716b64 bg=reset

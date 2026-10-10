@@ -18,6 +18,7 @@ use crate::layout;
 use crate::mode::{KeyContext, Mode, Overlay};
 use crate::nav::{History, PendingNav};
 use crate::palette::PaletteState;
+use crate::preview::PreviewState;
 use crate::tabs::Tabs;
 use crate::view::DirView;
 
@@ -133,6 +134,8 @@ pub struct AppState {
     pub themes: Vec<String>,
     /// File operations: yank register, jobs table, dialogs, pager (P6).
     pub fileops: FileOps,
+    /// The preview pane and parent column.
+    pub preview: PreviewState,
     pub(crate) history: History,
     /// Where the cursor was in directories left earlier (by entry name).
     pub(crate) cursor_memory: HashMap<PathBuf, OsString>,
@@ -150,6 +153,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(params: StartParams) -> Self {
         let view = DirView::new(params.config.sort.clone(), params.config.files.show_hidden);
+        let preview = PreviewState::new(&params.config);
         Self {
             cwd: params.cwd,
             home: params.home,
@@ -178,6 +182,7 @@ impl AppState {
             help: HelpState::default(),
             themes: Vec::new(),
             fileops: FileOps::default(),
+            preview,
             history: History::default(),
             cursor_memory: HashMap::new(),
             nav: None,

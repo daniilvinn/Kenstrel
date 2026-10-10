@@ -209,6 +209,13 @@ where
     }
     runner.configure(&state.config);
     let mut foreground = options.foreground;
+    runner.set_preview_palette(theme.syntax_palette());
+    // A background image encode finished: ask for a redraw. `try_send` because the notifier
+    // runs on a worker thread and a full queue already guarantees a redraw.
+    let image_tx = tx.clone();
+    ks_ui::images::set_notifier(move || {
+        let _ = image_tx.try_send(Msg::ImageReady);
+    });
     spawn_interrupt_listener(tx);
     let mut events = std::pin::pin!(events);
 
@@ -245,6 +252,17 @@ where
                 .context("drawing a frame failed")?;
             state.dirty = false;
             last_draw = Some(Instant::now());
+            // Terminal graphics (Sixel) stay on screen until overpainted: when the image
+            // moved or went away, wipe the screen and draw again.
+            if ks_ui::images::finish_frame() {
+                terminal
+                    .clear()
+                    .map_err(anyhow::Error::new)
+                    .context("clearing the screen failed")?;
+                state.dirty = true;
+                // Redraw at once: the throttle must not leave the wiped screen up.
+                last_draw = None;
+            }
             if std::mem::take(&mut panic_armed) {
                 panic!("--debug-panic: forced panic after the first frame");
             }
@@ -267,7 +285,12 @@ where
                 None => return Err(anyhow!("terminal input stream closed")),
             },
             Some(msg) = rx.recv() => Some(msg),
-            Some(side) = side_rx.recv() => Some(take_side(side, &mut theme, &loop_tx)),
+            Some(side) = side_rx.recv() => {
+                let msg = take_side(side, &mut theme, &loop_tx);
+                // A theme switch changes the syntax colours of text previews.
+                runner.set_preview_palette(theme.syntax_palette());
+                Some(msg)
+            }
             _ = spinner.tick(), if state.has_running_jobs() => Some(Msg::Tick),
             _ = clock.tick() => Some(Msg::Clock {
                 now: SystemTime::now(),

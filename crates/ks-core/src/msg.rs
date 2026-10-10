@@ -14,6 +14,7 @@ use crate::generation::Gen;
 use crate::git::GitSnapshot;
 use crate::key::KeyChord;
 use crate::keymap::Keymap;
+use crate::preview::PreviewMsg;
 use crate::state::{JobId, Level, Size};
 
 /// A delayed wake-up requested through [`Effect::StartTimer`](crate::effect::Effect).
@@ -119,4 +120,11 @@ pub enum Msg {
     },
     /// The edited bulk-rename file was validated.
     BulkPlanned(BulkPlanResult),
+    /// The preview engine finished the request for the main pane. Stale generations are
+    /// dropped.
+    Preview(PreviewMsg),
+    /// The preview engine listed the parent directory for the parent column.
+    ParentPreview(PreviewMsg),
+    /// A background resize and encode of the preview image finished; redraw.
+    ImageReady,
 }

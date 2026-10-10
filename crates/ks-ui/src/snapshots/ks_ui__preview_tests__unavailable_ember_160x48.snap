@@ -1,0 +1,197 @@
+---
+source: crates/ks-ui/src/preview_tests.rs
+assertion_line: 56
+expression: "draw(&state, &theme)"
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   ◆ current/                                                  │ photo_from_phone.jpg                                                       4.0 MB · 2025-02-22
+   ◆ passes/                                               7 M │────────────────────────────────────────────────────────────────────────────────────────────────
+   ◆ shaders/                                             12 ! │ Cloud placeholder: the content is not on this PC, so it is not downloaded
+   ◆ a_rather_long_file_name_that_must_be_…_row.rs   75.2 KB   │
+   ◆ build.ps1                                        1.9 KB   │ Name      photo_from_phone.jpg
+   ◆ bundle.zip                                      21.5 KB   │ Path      /home/me/projects/omniforce/src/renderer\photo_from_phone.jpg
+   ◆ descriptors.rs                                   6.1 KB + │ Type      file
+   ◆ firmware.bin                                     4.0 KB   │ Size      4.0 MB (4200000 bytes)
+   ◆ logo.png                                       510.7 KB   │ Created   2025-02-02 12:00:00
+   ◆ mod.rs                                            412 B   │ Modified  2025-03-14 09:00:00
+   ◆ new_pass.rs                                         0 B ? │ Accessed  2025-03-14 11:50:00
+ ▌ ◆ photo_from_phone.jpg                             4.0 MB   │ Attrs     archive, cloud
+   ◆ pipeline_cache.rs                                3.3 KB   │
+   ◆ README.md                                        3.0 KB   │
+  ●◆ swapchain.rs                                     9.8 KB   │
+   ◆ vulkan_device.rs                                14.2 KB M │
+   ◆ 日本語のメモ.txt                                  220 B   │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+                                                               │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                                                           12/17 · 1 selected
+   ‹h› parent  ‹l› open  ‹space› mark  ‹.› hidden  ‹g /› drives  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..143 fg=#e8e3dc bg=reset bold
+  0 143..148 fg=#a9a29a bg=reset bold
+  0 148..151 fg=#a9a29a bg=reset
+  0 151..154 fg=#92c07f bg=reset
+  0 154..157 fg=#e5b567 bg=reset
+  0 157..160 fg=#c9a27f bg=reset
+  1   0..160 fg=#403a35 bg=reset
+  2   3..5   fg=#7fa8c9 bg=reset
+  2   5..63  fg=#b799d9 bg=reset
+  2  63..65  fg=#403a35 bg=reset
+  2  65..140 fg=#e8e3dc bg=reset bold
+  2 140..160 fg=#a9a29a bg=reset
+  3   3..59  fg=#7fa8c9 bg=reset
+  3  59..61  fg=#a9a29a bg=reset
+  3  61..63  fg=#e5b567 bg=reset
+  3  63..160 fg=#403a35 bg=reset
+  4   3..58  fg=#7fa8c9 bg=reset
+  4  58..61  fg=#a9a29a bg=reset
+  4  61..63  fg=#625c56 bg=reset
+  4  63..65  fg=#403a35 bg=reset
+  4  65..160 fg=#e5b567 bg=reset
+  5   3..5   fg=#a9a29a bg=reset
+  5   5..53  fg=#e8e3dc bg=reset
+  5  53..63  fg=#a9a29a bg=reset
+  5  63..160 fg=#403a35 bg=reset
+  6   3..54  fg=#92c07f bg=reset
+  6  54..63  fg=#a9a29a bg=reset
+  6  63..65  fg=#403a35 bg=reset
+  6  65..75  fg=#716b64 bg=reset
+  6  75..160 fg=#e8e3dc bg=reset
+  7   3..5   fg=#a9a29a bg=reset
+  7   5..53  fg=#e8e3dc bg=reset
+  7  53..63  fg=#a9a29a bg=reset
+  7  63..65  fg=#403a35 bg=reset
+  7  65..75  fg=#716b64 bg=reset
+  7  75..160 fg=#e8e3dc bg=reset
+  8   3..5   fg=#a9a29a bg=reset
+  8   5..54  fg=#e8e3dc bg=reset
+  8  54..61  fg=#a9a29a bg=reset
+  8  61..63  fg=#92c07f bg=reset
+  8  63..65  fg=#403a35 bg=reset
+  8  65..75  fg=#716b64 bg=reset
+  8  75..160 fg=#e8e3dc bg=reset
+  9   3..5   fg=#a9a29a bg=reset
+  9   5..54  fg=#e8e3dc bg=reset
+  9  54..63  fg=#a9a29a bg=reset
+  9  63..65  fg=#403a35 bg=reset
+  9  65..75  fg=#716b64 bg=reset
+  9  75..160 fg=#e8e3dc bg=reset
+ 10   3..5   fg=#a9a29a bg=reset
+ 10   5..52  fg=#e8e3dc bg=reset
+ 10  52..63  fg=#a9a29a bg=reset
+ 10  63..65  fg=#403a35 bg=reset
+ 10  65..75  fg=#716b64 bg=reset
+ 10  75..160 fg=#e8e3dc bg=reset
+ 11   3..5   fg=#a9a29a bg=reset
+ 11   5..55  fg=#e8e3dc bg=reset
+ 11  55..63  fg=#a9a29a bg=reset
+ 11  63..65  fg=#403a35 bg=reset
+ 11  65..75  fg=#716b64 bg=reset
+ 11  75..160 fg=#e8e3dc bg=reset
+ 12   3..5   fg=#a9a29a bg=reset
+ 12   5..57  fg=#e8e3dc bg=reset
+ 12  57..61  fg=#a9a29a bg=reset
+ 12  61..63  fg=#c9a27f bg=reset
+ 12  63..65  fg=#403a35 bg=reset
+ 12  65..75  fg=#716b64 bg=reset
+ 12  75..160 fg=#e8e3dc bg=reset
+ 13   0..1   fg=#e8e3dc bg=#2f2a26
+ 13   1..3   fg=#d97757 bg=#2f2a26
+ 13   3..5   fg=#a9a29a bg=#2f2a26
+ 13   5..25  fg=#a9a29a bg=#2f2a26 italic
+ 13  25..51  fg=#e8e3dc bg=#2f2a26
+ 13  51..60  fg=#a9a29a bg=#2f2a26
+ 13  60..63  fg=#e8e3dc bg=#2f2a26
+ 13  63..65  fg=#403a35 bg=reset
+ 13  65..75  fg=#716b64 bg=reset
+ 13  75..160 fg=#e8e3dc bg=reset
+ 14   3..5   fg=#a9a29a bg=reset
+ 14   5..54  fg=#e8e3dc bg=reset
+ 14  54..63  fg=#a9a29a bg=reset
+ 14  63..160 fg=#403a35 bg=reset
+ 15   3..5   fg=#a9a29a bg=reset
+ 15   5..54  fg=#e8e3dc bg=reset
+ 15  54..63  fg=#a9a29a bg=reset
+ 15  63..160 fg=#403a35 bg=reset
+ 16   2..3   fg=#d97757 bg=reset
+ 16   3..5   fg=#a9a29a bg=reset
+ 16   5..54  fg=#d97757 bg=reset bold
+ 16  54..63  fg=#a9a29a bg=reset
+ 16  63..160 fg=#403a35 bg=reset
+ 17   3..5   fg=#a9a29a bg=reset
+ 17   5..53  fg=#e8e3dc bg=reset
+ 17  53..61  fg=#a9a29a bg=reset
+ 17  61..63  fg=#e5b567 bg=reset
+ 17  63..160 fg=#403a35 bg=reset
+ 18   3..5   fg=#a9a29a bg=reset
+ 18   5..55  fg=#e8e3dc bg=reset
+ 18  55..63  fg=#a9a29a bg=reset
+ 18  63..160 fg=#403a35 bg=reset
+ 19  63..160 fg=#403a35 bg=reset
+ 20  63..160 fg=#403a35 bg=reset
+ 21  63..160 fg=#403a35 bg=reset
+ 22  63..160 fg=#403a35 bg=reset
+ 23  63..160 fg=#403a35 bg=reset
+ 24  63..160 fg=#403a35 bg=reset
+ 25  63..160 fg=#403a35 bg=reset
+ 26  63..160 fg=#403a35 bg=reset
+ 27  63..160 fg=#403a35 bg=reset
+ 28  63..160 fg=#403a35 bg=reset
+ 29  63..160 fg=#403a35 bg=reset
+ 30  63..160 fg=#403a35 bg=reset
+ 31  63..160 fg=#403a35 bg=reset
+ 32  63..160 fg=#403a35 bg=reset
+ 33  63..160 fg=#403a35 bg=reset
+ 34  63..160 fg=#403a35 bg=reset
+ 35  63..160 fg=#403a35 bg=reset
+ 36  63..160 fg=#403a35 bg=reset
+ 37  63..160 fg=#403a35 bg=reset
+ 38  63..160 fg=#403a35 bg=reset
+ 39  63..160 fg=#403a35 bg=reset
+ 40  63..160 fg=#403a35 bg=reset
+ 41  63..160 fg=#403a35 bg=reset
+ 42  63..160 fg=#403a35 bg=reset
+ 43  63..160 fg=#403a35 bg=reset
+ 44  63..160 fg=#403a35 bg=reset
+ 45   0..160 fg=#403a35 bg=reset
+ 46   1..141 fg=#d97757 bg=reset bold
+ 46 141..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..5   fg=#a9a29a bg=reset
+ 47   5..16  fg=#716b64 bg=reset
+ 47  16..17  fg=#a9a29a bg=reset
+ 47  17..26  fg=#716b64 bg=reset
+ 47  26..31  fg=#a9a29a bg=reset
+ 47  31..40  fg=#716b64 bg=reset
+ 47  40..41  fg=#a9a29a bg=reset
+ 47  41..52  fg=#716b64 bg=reset
+ 47  52..55  fg=#a9a29a bg=reset
+ 47  55..66  fg=#716b64 bg=reset
+ 47  66..67  fg=#a9a29a bg=reset
+ 47  67..160 fg=#716b64 bg=reset

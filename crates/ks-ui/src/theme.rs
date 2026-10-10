@@ -7,6 +7,8 @@ use ratatui::style::{Color, Modifier, Style};
 use serde::{Deserialize, Deserializer};
 use thiserror::Error;
 
+use crate::syntax::{DeriveFrom, SyntaxFile, SyntaxTheme};
+
 const EMBER: &str = include_str!("../../../assets/themes/ember.toml");
 const PAPER: &str = include_str!("../../../assets/themes/paper.toml");
 
@@ -152,18 +154,35 @@ macro_rules! theme_tokens {
         pub struct Theme {
             pub name: String,
             $(pub $field: Color,)+
+            /// Syntax highlighting colours (the optional `[syntax]` table).
+            pub syntax: SyntaxTheme,
+            depth: ColorDepth,
             raw: Palette,
         }
 
         impl Theme {
-            fn from_palette(name: String, palette: Palette, depth: ColorDepth) -> Result<Theme, ThemeError> {
+            fn from_palette(name: String, palette: Palette, syntax: SyntaxFile, depth: ColorDepth) -> Result<Theme, ThemeError> {
                 let missing = palette.missing();
                 if !missing.is_empty() {
                     return Err(ThemeError::MissingTokens { name, tokens: missing.join(", ") });
                 }
+                let token = |color: Option<ThemeColor>| color.unwrap_or(ThemeColor::Reset);
+                let derive = DeriveFrom {
+                    fg: token(palette.fg),
+                    accent: token(palette.accent),
+                    success: token(palette.success),
+                    fg_muted: token(palette.fg_muted),
+                    fg_dim: token(palette.fg_dim),
+                    dir: token(palette.dir),
+                    warning: token(palette.warning),
+                    symlink: token(palette.symlink),
+                    git_untracked: token(palette.git_untracked),
+                };
                 Ok(Theme {
                     name,
                     $($field: palette.$field.unwrap_or(ThemeColor::Reset).to_color(depth),)+
+                    syntax: SyntaxTheme::resolve(syntax, derive),
+                    depth,
                     raw: palette,
                 })
             }
@@ -207,6 +226,9 @@ struct ThemeFile {
     base: Option<String>,
     #[serde(default)]
     colors: Palette,
+    /// Optional syntax highlighting colours; unset keys are derived from `colors`.
+    #[serde(default)]
+    syntax: SyntaxFile,
 }
 
 #[derive(Debug, Error)]
@@ -256,15 +278,33 @@ impl Theme {
             name: name.to_owned(),
             message: e.to_string(),
         })?;
-        let palette = if inherit {
+        let (palette, syntax) = if inherit {
             let base_name = file.base.as_deref().unwrap_or(FALLBACK_THEME);
             let base = Theme::builtin(base_name, depth)
                 .map_err(|_| ThemeError::BadBase(base_name.to_owned()))?;
-            file.colors.over(&base)
+            (
+                file.colors.over(&base),
+                file.syntax.over(&base.syntax.explicit),
+            )
         } else {
-            file.colors
+            (file.colors, file.syntax)
         };
-        Theme::from_palette(name.to_owned(), palette, depth)
+        Theme::from_palette(name.to_owned(), palette, syntax, depth)
+    }
+
+    /// The colour depth this theme was resolved for.
+    pub fn depth(&self) -> ColorDepth {
+        self.depth
+    }
+
+    /// The palette for the preview engine's syntax highlighter.
+    pub fn syntax_palette(&self) -> ks_preview::Palette {
+        self.syntax.palette()
+    }
+
+    /// A concrete RGB colour from the preview engine at this theme's colour depth.
+    pub fn rgb(&self, rgb: ks_preview::Rgb) -> Color {
+        ThemeColor::Rgb(rgb.r, rgb.g, rgb.b).to_color(self.depth)
     }
 
     /// Foreground on the theme background.
@@ -497,6 +537,103 @@ mod tests {
         assert_eq!(mine.accent, Color::Rgb(0x11, 0x22, 0x33));
         assert_eq!(mine.fg, paper.fg);
         assert_eq!(mine.name, "mine");
+    }
+
+    fn ember_without_syntax() -> String {
+        let cut = EMBER.find("[syntax]").expect("ember has a [syntax] table");
+        EMBER[..cut].to_owned()
+    }
+
+    fn rgb(r: u8, g: u8, b: u8) -> ThemeColor {
+        ThemeColor::Rgb(r, g, b)
+    }
+
+    #[test]
+    fn missing_syntax_table_derives_from_the_regular_tokens() {
+        let theme = Theme::parse(
+            "plain",
+            &ember_without_syntax(),
+            ColorDepth::TrueColor,
+            false,
+        )
+        .unwrap();
+        // ember: accent #d97757, success #92c07f, fg_muted #716b64, dir #7fa8c9.
+        assert_eq!(theme.syntax.keyword, rgb(0xd9, 0x77, 0x57));
+        assert_eq!(theme.syntax.string, rgb(0x92, 0xc0, 0x7f));
+        assert_eq!(theme.syntax.comment, rgb(0x71, 0x6b, 0x64));
+        assert_eq!(theme.syntax.function, rgb(0x7f, 0xa8, 0xc9));
+        assert_eq!(theme.syntax.operator, theme.syntax.punctuation);
+    }
+
+    #[test]
+    fn syntax_palette_maps_every_role_to_its_token() {
+        let theme = Theme::parse(
+            "plain",
+            &ember_without_syntax(),
+            ColorDepth::TrueColor,
+            false,
+        )
+        .unwrap();
+        let p = theme.syntax_palette();
+        let s = &theme.syntax;
+        let want = |c: ThemeColor| match c {
+            ThemeColor::Rgb(r, g, b) => ks_preview::Rgb::new(r, g, b),
+            ThemeColor::Reset => panic!("ember has no reset syntax colours"),
+        };
+        assert_eq!(p.fg, want(s.fg));
+        assert_eq!(p.keyword, want(s.keyword));
+        assert_eq!(p.string, want(s.string));
+        assert_eq!(p.comment, want(s.comment));
+        assert_eq!(p.function, want(s.function));
+        assert_eq!(p.type_, want(s.type_));
+        assert_eq!(p.number, want(s.number));
+        assert_eq!(p.constant, want(s.constant));
+        assert_eq!(p.operator, want(s.operator));
+        assert_eq!(p.punctuation, want(s.punctuation));
+        // And the six themed tokens differ from each other, so a mix-up would show.
+        assert_ne!(p.keyword, p.string);
+        assert_ne!(p.function, p.type_);
+    }
+
+    #[test]
+    fn user_theme_inherits_the_base_syntax_colours_and_overrides_some() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("mine.toml"),
+            "base = \"paper\"
+[syntax]
+keyword = \"#010203\"
+",
+        )
+        .unwrap();
+        let loader = ThemeLoader::new(Some(dir.path().to_owned()), ColorDepth::TrueColor);
+        let mine = loader.load("mine").unwrap();
+        let paper = Theme::builtin("paper", ColorDepth::TrueColor).unwrap();
+        assert_eq!(mine.syntax.keyword, rgb(1, 2, 3));
+        assert_eq!(mine.syntax.string, paper.syntax.string);
+        assert_eq!(mine.syntax.comment, paper.syntax.comment);
+    }
+
+    #[test]
+    fn an_invalid_syntax_colour_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("bad.toml"),
+            "[syntax]
+keyword = \"orange\"
+",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("typo.toml"),
+            "[syntax]
+keywrd = \"#000000\"
+",
+        )
+        .unwrap();
+        let loader = ThemeLoader::new(Some(dir.path().to_owned()), ColorDepth::TrueColor);
+        assert!(matches!(loader.load("bad"), Err(ThemeError::Parse { .. })));
+        assert!(matches!(loader.load("typo"), Err(ThemeError::Parse { .. })));
     }
 
     #[test]

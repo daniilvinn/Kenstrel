@@ -14,6 +14,7 @@ use crate::keymap::{Invocation, Resolution};
 use crate::mode::{Mode, Overlay};
 use crate::msg::{Msg, TimerKind};
 use crate::nav;
+use crate::preview;
 use crate::state::{AppState, Level, QuitKind, Status};
 use crate::tabs;
 use crate::{help, palette};
@@ -85,6 +86,8 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         }
         Msg::ThemeApplied(name) => {
             state.config.theme = name;
+            // Syntax colours are baked into text previews: request the file again.
+            state.preview.theme_epoch = state.preview.theme_epoch.wrapping_add(1);
             state.dirty = true;
         }
         Msg::Job(job) => fileops::on_job(state, job, &mut effects),
@@ -97,12 +100,17 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             fileops::on_open_handlers(state, path, names, &mut effects);
         }
         Msg::BulkPlanned(result) => fileops::on_bulk_planned(state, result, &mut effects),
+        Msg::Preview(msg) => preview::on_preview(state, msg),
+        Msg::ParentPreview(msg) => preview::on_parent(state, msg),
+        Msg::ImageReady => state.dirty = true,
     }
     // The view drops visual mode when its anchor vanishes (refresh, hidden toggle).
     if state.mode == Mode::Visual && !state.view.in_visual_mode() {
         state.mode = Mode::Normal;
         state.dirty = true;
     }
+    // The preview pane follows the cursor, whatever moved it.
+    preview::sync(state, &mut effects);
     effects
 }
 
@@ -262,6 +270,13 @@ pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: 
         Action::SortSize => nav::sort_by(state, effects, SortKey::Size),
         Action::SortMtime => nav::sort_by(state, effects, SortKey::Mtime),
         Action::SortExt => nav::sort_by(state, effects, SortKey::Ext),
+        Action::PreviewToggle
+        | Action::ParentColumnToggle
+        | Action::MetadataToggle
+        | Action::PreviewScrollDown
+        | Action::PreviewScrollUp => {
+            preview::run_action(state, invocation.action, effects);
+        }
         other => set_status(
             state,
             Level::Info,

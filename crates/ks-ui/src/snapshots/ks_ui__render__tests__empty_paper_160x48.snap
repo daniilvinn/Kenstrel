@@ -1,5 +1,6 @@
 ---
 source: crates/ks-ui/src/render.rs
+assertion_line: 483
 expression: "draw(&s, &theme(name))"
 ---
  ~/projects/omniforce/src/renderer

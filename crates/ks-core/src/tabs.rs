@@ -139,6 +139,9 @@ fn classify_state_fields(state: &AppState) {
         git_gen: _,
         git_timer_gen: _,
         children_gen: _,
+        // Shared by all tabs: the pane follows the active tab's cursor (a different cursor
+        // path makes `preview::sync` request it), and `w`/`P`/`i` are global toggles.
+        preview: _,
         // Shared by all tabs.
         home: _,
         places: _,

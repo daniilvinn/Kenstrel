@@ -24,3 +24,17 @@ git_untracked = "#c9a27f"
 git_ignored = "#625c56"
 git_conflict = "#e8707a"
 match = "#f4a582"
+
+# Syntax highlighting for the preview pane. Every key is optional; unset keys are derived
+# from the tokens above (keyword=accent, string=success, comment=fg_muted, function=dir,
+# type=warning, number=symlink, constant=git_untracked, operator/punctuation=fg_dim).
+[syntax]
+keyword = "#d97757"
+string = "#9cc27a"
+comment = "#7a746c"
+function = "#7ab0d8"
+type = "#e5c07b"
+number = "#c68fd9"
+constant = "#d19a66"
+operator = "#b8b0a4"
+punctuation = "#9a948a"
