@@ -315,12 +315,15 @@ mod tests {
         assert!(errs
             .iter()
             .all(|e| !matches!(e, BulkError::Duplicate { .. })));
-        let errs = b.plan("x\nX\ny\n").unwrap_err();
         if cfg!(windows) {
+            let errs = b.plan("x\nX\ny\n").unwrap_err();
             assert!(errs.contains(&BulkError::Duplicate {
                 line: 2,
                 name: "X".into()
             }));
+        } else {
+            // File names are case-sensitive here, so `x` and `X` are two different names.
+            assert!(b.plan("x\nX\ny\n").is_ok());
         }
         let errs = b.plan("a:b\nCON\nok.\n").unwrap_err();
         assert_eq!(errs.len(), 3);

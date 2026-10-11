@@ -207,7 +207,21 @@ pub fn recycle_bin_usable() -> bool {
         let dir = tempfile::tempdir().expect("scratch dir");
         let probe = dir.path().join("kestrel-trash-probe.txt");
         std::fs::write(&probe, "probe").expect("probe file");
-        let usable = trash::delete(&probe).is_ok() && !probe.exists();
+        let mut usable = trash::delete(&probe).is_ok() && !probe.exists();
+        // Deleting is not enough: undo needs the bin to list the item back (a CI runner's
+        // Recycle Bin accepts files but lists nothing).
+        #[cfg(any(windows, all(unix, not(target_os = "macos"))))]
+        if usable {
+            let key = |p: &Path| p.to_string_lossy().to_lowercase();
+            let want = key(dunce::simplified(dir.path()));
+            usable = trash::os_limited::list()
+                .map(|items| {
+                    items
+                        .iter()
+                        .any(|i| key(&i.original_parent).starts_with(&want))
+                })
+                .unwrap_or(false);
+        }
         purge_trash_under(dir.path());
         if !usable {
             #[allow(clippy::print_stderr)]

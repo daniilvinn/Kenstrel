@@ -7,7 +7,7 @@ expression: "draw(&state, &theme)"
    ◆ current/                                                  │ vulkan_device.rs                                                              14.2 KB · 3h ago
    ◆ passes/                                               7 M │────────────────────────────────────────────────────────────────────────────────────────────────
    ◆ shaders/                                             12 ! │ Name      vulkan_device.rs
-   ◆ a_rather_long_file_name_that_must_be_…_row.rs   75.2 KB   │ Path      /home/me/projects/omniforce/src/renderer\vulkan_device.rs
+   ◆ a_rather_long_file_name_that_must_be_…_row.rs   75.2 KB   │ Path      /home/me/projects/omniforce/src/renderer/vulkan_device.rs
    ◆ build.ps1                                        1.9 KB   │ Type      file
    ◆ bundle.zip                                      21.5 KB   │ Size      14.2 KB (14540 bytes)
    ◆ descriptors.rs                                   6.1 KB + │ Created   2025-02-02 12:00:00

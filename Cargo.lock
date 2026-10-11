@@ -1673,6 +1673,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "trash",
 ]
 
 [[package]]

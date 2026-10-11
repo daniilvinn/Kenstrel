@@ -200,7 +200,14 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::print_stderr)]
     fn deferred_events_wait_for_the_first_frame_and_then_wake_the_loop() {
+        // crossterm's event stream reads the controlling terminal; a headless runner has none.
+        #[cfg(unix)]
+        if std::fs::File::open("/dev/tty").is_err() {
+            eprintln!("SKIP: no controlling terminal for crossterm's event stream");
+            return;
+        }
         let (mut events, mut foreground) =
             PausableEvents::deferred(Some(ImageProtocol::Halfblocks));
         let flag = Arc::new(Flag(AtomicBool::new(false)));

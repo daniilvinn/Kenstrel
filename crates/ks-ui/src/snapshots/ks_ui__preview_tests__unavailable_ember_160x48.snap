@@ -9,7 +9,7 @@ expression: "draw(&state, &theme)"
    ◆ shaders/                                             12 ! │ Cloud placeholder: the content is not on this PC, so it is not downloaded
    ◆ a_rather_long_file_name_that_must_be_…_row.rs   75.2 KB   │
    ◆ build.ps1                                        1.9 KB   │ Name      photo_from_phone.jpg
-   ◆ bundle.zip                                      21.5 KB   │ Path      /home/me/projects/omniforce/src/renderer\photo_from_phone.jpg
+   ◆ bundle.zip                                      21.5 KB   │ Path      /home/me/projects/omniforce/src/renderer/photo_from_phone.jpg
    ◆ descriptors.rs                                   6.1 KB + │ Type      file
    ◆ firmware.bin                                     4.0 KB   │ Size      4.0 MB (4200000 bytes)
    ◆ logo.png                                       510.7 KB   │ Created   2025-02-02 12:00:00

@@ -559,6 +559,9 @@ fn run_git(dir: &Path, args: &[&std::ffi::OsStr]) -> std::io::Result<(bool, Vec<
     Ok((capped || status.success(), out))
 }
 
+/// The empty file `git diff --no-index` compares an untracked file against.
+const NULL_DEVICE: &str = if cfg!(windows) { "NUL" } else { "/dev/null" };
+
 /// [`git_diff`] that gives up (with a placeholder text nobody shows) once `stale()` is true.
 fn git_diff_until(path: &Path, stale: impl Fn() -> bool) -> String {
     let (Some(dir), Some(name)) = (path.parent(), path.file_name()) else {
@@ -604,7 +607,7 @@ fn git_diff_until(path: &Path, stale: impl Fn() -> bool) -> String {
             OsStr::new("--no-textconv"),
             OsStr::new("--no-index"),
             OsStr::new("--"),
-            OsStr::new("NUL"),
+            OsStr::new(NULL_DEVICE),
             name,
         ]) {
             Ok((_, out)) => String::from_utf8_lossy(&out).into_owned(),

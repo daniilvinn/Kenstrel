@@ -16,10 +16,12 @@ pub enum Shell {
 // page unless told otherwise, which would garble non-ASCII directory names, hence `-Encoding`.
 const POWERSHELL: &str = r#"# Kestrel: run `k` instead of `ks`; quitting with Q changes to the directory you ended in.
 function k {
-    $cwdFile = New-TemporaryFile
+    # Not New-TemporaryFile: a Windows PowerShell started from pwsh 7 inherits its PSModulePath
+    # and then cannot load that cmdlet.
+    $cwdFile = [IO.Path]::GetTempFileName()
     try {
-        ks --cwd-file $cwdFile.FullName @args
-        $dir = Get-Content -LiteralPath $cwdFile.FullName -Encoding UTF8 -Raw
+        ks --cwd-file $cwdFile @args
+        $dir = Get-Content -LiteralPath $cwdFile -Encoding UTF8 -Raw
         if ($dir) {
             $dir = $dir.TrimEnd("`r", "`n")
             if ($dir -and (Test-Path -LiteralPath $dir -PathType Container)) {
@@ -28,7 +30,7 @@ function k {
         }
     }
     finally {
-        Remove-Item -LiteralPath $cwdFile.FullName -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $cwdFile -Force -ErrorAction SilentlyContinue
     }
 }
 "#;
@@ -75,8 +77,9 @@ mod tests {
 
     #[test]
     fn powershell_reads_the_file_as_utf8() {
-        assert!(script(Shell::Powershell)
-            .contains("Get-Content -LiteralPath $cwdFile.FullName -Encoding UTF8"));
+        assert!(
+            script(Shell::Powershell).contains("Get-Content -LiteralPath $cwdFile -Encoding UTF8")
+        );
     }
 
     #[test]
