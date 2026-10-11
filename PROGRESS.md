@@ -6,9 +6,10 @@ Consolidated record of the implementation of [PLAN.md](PLAN.md), one section per
 This file is the summary. The per-track working notes stay as the detailed history in
 [docs/progress/](docs/progress/README.md) (index there); each section links the notes it was built
 from. When a later note contradicts an earlier one, the later one wins, and statements that the code
-has since overtaken were re-checked against the tree at `06b00a8` before they were kept or dropped.
+has since overtaken were re-checked against the tree at `06b00a8` before they were kept or dropped
+(the round-3 merges `93121d6` and `5205290` and the final P8 measurements are folded in on top).
 
-State: main at `06b00a8` (1293 tests) contains P0 to P8 and P10 plus three audit/fix rounds
+State: main at `5205290` (1299 tests, all gates clean; the P8 measurement commit follows it) contains P0 to P8 and P10 plus three audit/fix rounds
 (section [Audit and fix rounds](#audit-and-fix-rounds)). P9 is skipped by decision. Everything that
 needs a real Windows Terminal, a live Claude turn or GitHub is collected in
 [Manual verification needed](#manual-verification-needed); no agent could run the TUI interactively.
@@ -22,7 +23,7 @@ needs a real Windows Terminal, a live Claude turn or GitHub is collected in
 | P5 | Palette, help, which-key, keymap config, themes | done | [p5](docs/progress/p5.md) |
 | P6 | File operations | done | [engine-ops](docs/progress/engine-ops.md), [p6](docs/progress/p6.md) |
 | P7 | Tabs, bookmarks, frecency, shell integration | done | [p7](docs/progress/p7.md) |
-| P8 | Polish, performance, docs, release | done in code and docs; real-terminal measurements and GIFs pending | [f1](docs/progress/f1.md) to [f4](docs/progress/f4.md) |
+| P8 | Polish, performance, docs, release | done in code and docs; budgets measured on the final release build (2026-10-11), all met headless except the end-to-end cold start (not demonstrated, see open issue 24); real-terminal numbers and GIFs pending | [f1](docs/progress/f1.md) to [f4](docs/progress/f4.md) |
 | P9 | Whole-disk search | skipped (user decision) | |
 | P10 | Claude Code integration | done (10a, 10b, 10c, 10d, 10e); 10f not wanted | [engine-claude](docs/progress/engine-claude.md), [p10](docs/progress/p10.md), [spike](docs/spikes/claude-pty.md) |
 
@@ -49,6 +50,8 @@ order. The per-merge decisions are summarised in each phase's "Integration" bull
 | Fix wave | `fix/f4`, `fix/f1`, `fix/f2`, `fix/f3` (to `2208fef`) |
 | Audit round 1 | `audit/a1`, `a2`, `a3` (to `eab9211`) |
 | Audit round 2 | `r2/b4`, `b3`, `b1`, `b2` (to `06b00a8`) |
+| Round 3 | `r3/d1` docs consolidation, then `r3/c1` watcher cancellation gate, arming catch-up and deterministic flakes (`93121d6`); notes merged to `5205290` |
+| Final P8 measurements | `P8: final measurements and progress update` (release build of `5205290`) |
 
 ---
 
@@ -807,6 +810,12 @@ Terminal profile snippet, `cargo install` / release `.exe`. Notes: [f1](docs/pro
 
 - Release exe import scan: only advapi32, api-ms-win-core-synch, bcrypt, combase, conpty, dbghelp,
   kernel32, ntdll, ole32, oleaut32, propsys, shell32, user32, userenv, ws2_32 (b3).
+- Final pass (2026-10-11, release build of `5205290`): `dumpbin /dependents` lists kernel32, advapi32,
+  api-ms-win-core-synch-l1-2-0, shell32, combase, ole32, oleaut32, ntdll, userenv, propsys,
+  bcryptprimitives, ws2_32, user32 and bcrypt; no vcruntime, msvcp, ucrtbase or api-ms-win-crt import
+  (the b3 byte scan above also named dbghelp and conpty, which are not in the import table; they are
+  presumably runtime-loaded names).
+  Size 15,449,088 bytes. Budget measurements: see the table below.
 - `ks --help`, `--version`, `--print-shell-init pwsh` run and match the README. Both workflow files
   parse as YAML but **have never run on GitHub**; the Windows CI job failed once (logs unavailable, a3)
   and was hardened blind.
@@ -816,37 +825,93 @@ Terminal profile snippet, `cargo install` / release `.exe`. Notes: [f1](docs/pro
 
 ### Measurements
 
-Budgets are PLAN sections 11/12. "Re-measure" marks numbers taken on intermediate builds, on a
-machine shared with other tracks, or headless; they must be re-taken on the final release build
-(`cargo build --release`, idle machine, warm cache) before P8 can be called closed on evidence.
+Final headless pass taken **2026-10-11 on a release build of `5205290`** (`cargo build --release -p ks-app`,
+`cargo test --release` for the ignored perf tests, `cargo bench -p ks-search`). Budgets are PLAN
+sections 11 and 12 (P8). Every metric was run at least 3 times (n is given); "median / worst" are over
+those runs. Nothing else ran on the machine and no cargo job overlapped a measurement.
 
-| Metric | Budget | Latest recorded | Source | Re-measure on final build |
+Machine: AMD Ryzen 9 9950X3D (16 cores, 32 threads), Windows 11 Pro 10.0.26200, rustc 1.99.0, release
+profile `lto = "thin"`, `codegen-units = 1`, `strip = true`, `+crt-static`. Microsoft Defender real-time
+protection was **on** (it matters for process start, see the first row). Disks (from `Get-PhysicalDisk`):
+**E:** Samsung 990 EVO Plus 4 TB, NVMe SSD; **C:** Samsung 980 500 GB, NVMe SSD; **D:** WDC WD62PURZ, SATA
+**HDD**. The performance corpora that touch the disk were generated on **E: (NVMe)** under
+`target\bench-corpus` (100k-file directory, 200k and 20k file grep trees, the 300-file start-up
+directory, the watcher test and the benchmark scratch dirs); the `~\.cargo\registry\src` grep corpus is
+an existing tree on **C: (NVMe)**. `TEMP` was on D: (HDD) only for runs whose timed part does not
+touch the disk (key-to-frame, finder and memory guards use synthetic in-memory data; the headless
+cold-start fixture is 300 tiny files). All corpora created for this pass were deleted afterwards.
+Files were created just before each run, so every directory/file number is a **warm cache** number;
+a cold cache (after a reboot) was not measured.
+
+| Metric | Budget | Result (median / worst, n) | Met? | Method and notes |
 |---|---|---|---|---|
-| Cold start to first frame (dir < 5k) | < 60 ms | 0.97 ms headless release (session build + loop up to the first-frame hook, 300-file dir); excludes process start, raw mode, alternate screen. Real number is logged as `first frame elapsed_ms=...` | f1 | **yes**, read the log line on a real Windows Terminal run (and `Measure-Command { ks --version }` for the bare process) |
-| Key press to frame | < 16 ms p99 | mean 234 µs, p99 411 µs, max 557 µs (release, `update` + render 160x48, 1000 entries; re-taken on r3/d1 at 06b00a8, machine shared with other tracks); earlier mean 227 µs, p99 458 µs | f4, p2, d1 | re-taken (still met); terminal-side latency unmeasured |
-| Enter dir with 100k entries | first frame < 150 ms, listed < 1 s | first rows 10.7 to 12.4 ms, complete and sorted 86 to 98 ms (release); debug 28 ms / 479 ms. Re-measure attempt FAILED to complete: the ignored test spent over 5 min creating the 100k-file corpus on the shared D: HDD (sys time dominated) | f2, P1 | **yes**, still outstanding, run on an idle machine |
-| Fuzzy finder keystroke -> results (500k paths) | < 25 ms | criterion worst 14.2 ms (`h`); ks-app worker path worst 15.8 to 19.3 ms, re-taken on r3/d1: worst 12.5 ms (500k paths, loaded machine); ks-search release guard worst 21.9 ms (23.1 and 24.0 ms seen under load) | engine-search, p34, f2, d1 | ks-app path re-taken (met); the ks-search guard **yes**, on an idle machine (margin is thin under load) |
-| Content search vs `rg` | within 1.5x | 0.43x to 0.67x of rg 15.2.0 wall time (7 cases, identical match counts); 1.6 to 1.7 GiB/s over 2.06 GB | f2, engine-search | optional (code path unchanged) |
-| Memory with a 1M-path finder cache | < 250 MB | 204 to 210 MB steady and peak (one cached root + one open session, 147k matches) | f2 | yes (`finder_cache_1m_paths_under_250mb`, ignored guard) |
-| 1 GiB copy throughput (no budget) | n/a | 0.30 s, about 3.4 GiB/s (page cache to page cache) | engine-ops | not a budget |
-| Walk of 200k files (no budget) | n/a | 58 ms | engine-search | no |
-| `z` ranking at the 5,000 entry cap (no budget) | frame budget | 2.3 ms open, 2.7 ms per key (release) | p7 | no |
-| `ks hook` process start to exit | fast | median 36 ms (release) | engine-claude | no |
-| Full `cargo test --workspace` wall time (information) | n/a | about 90 s incl. incremental build | a3 | no |
+| Cold start to first frame, **in-process** | < 60 ms | `first frame elapsed_ms` log line: **5 ms / 6 ms** (n=10 real `ks.exe` launches); headless test (`cold_start`): **634 µs / 645 µs** (n=5, each a best-of-5) | yes (this part) | The log line counts from `startup::mark_process_start()` (first thing in `run`, after clap) to the first drawn frame, with the real raw mode, alternate screen and ConPTY terminal. The test builds the session and runs the loop to the first-frame hook on a `TestBackend`. |
+| Cold start, **end to end** (process creation to a visible listing) | < 60 ms | `ks.exe` launched in a hidden ConPTY (Win32 `CreatePseudoConsole` harness, 120x32, 300-file dir): first bytes **73 ms / 250 ms** (the 250 ms is the first launch after a rebuild, 87 ms otherwise), listing visible **118 ms / 288 ms** (134 ms otherwise); n=10, plus a ConPTY floor of 23 ms for `cmd /c echo` | **not demonstrated; probably not met on this machine** | Real Windows Terminal number stays manual. The bare process is the cost: kernel-measured `ks --version` lifetime is **77 ms median (73 min, 98 max, n=20)** against 29 ms for a minimal static-CRT Rust exe, 30 ms for `cmd /c exit`, 43 ms for `rg --version`. A 13.9 MB dummy exe (random data, no code) costs 72 ms, so the overhead is proportional to image size (about 3 ms per MB, most likely Defender's scan on exec), not to Kestrel's start-up code or DLL imports (a minimal exe importing user32/shell32/ole32/propsys/ws2_32/userenv still takes 29 ms). Subtracting process creation, Kestrel's own work to the first frame is 5 to 6 ms. See open issue 24. |
+| Key press to frame | < 16 ms p99 | p50 **214 µs / 216 µs**, p99 **278 µs / 406 µs**, mean 217 µs, max 461 µs (n=5 runs of 200 presses) | yes | `ks-ui` `keypress_to_frame_stays_within_budget`: `update` + full render at 160x48 with a 1000-entry list and a text preview. The test now prints p50 as well. Terminal and ConPTY latency is not included (manual). |
+| Enter a directory with 100k entries | first rows < 150 ms, complete < 1 s | first rows **1.1 ms / 1.4 ms**; complete and sorted **61 ms / 67 ms** (n=3) | yes | `navigation::a_directory_of_100k_files_meets_the_budget` on E: (NVMe), 100,000 empty files created seconds before (4.2 to 5.8 s to create; the same step took over 5 min on the D: HDD), warm cache. Earlier: first rows 10.7 to 12.4 ms, complete 86 to 98 ms on a busy machine. Cold cache not measured. |
+| Fuzzy finder keystroke to results (500k paths) | < 25 ms | `ks-app` worker path (real worker thread + channel): worst keystroke **12.8 ms / 13.0 ms** (n=5; `h` is the slowest, later keys 1 to 8 ms); `ks-search` guard: **17.1 ms / 19.1 ms** (n=5, 13.8 to 19.1); criterion `h`: **11.8 ms** (11.6 to 12.0), `backspace_to_empty` 0.34 ms | yes | The ks-search guard has the thinnest margin (19.1 of 25 ms); its figure includes `tick` polling and result materialisation on one thread. |
+| Content search vs `rg` | within 1.5x | ratio of wall times (ks / rg), medians of 5: **0.52 to 0.80**; worst case `unsafe` on the cargo registry 0.80 (308 ms vs 386 ms) | yes | `grepbench` example vs `rg 15.2.0 -c -S [-F]` (built into `target\tools`), alternating runs, whole-process wall time of both. Identical match counts in all 9 cases. Table below. Engine time alone on the 200k-file, 2058 MB tree: 785 ms for `NEEDLE_MARKER` (about 2.4 GiB/s), 1314 ms for `handler` (7.8M matching lines). |
+| Memory with a 1M-path finder cache | < 250 MB | peak working set **206 MB / 210 MB** (204, 204, 206, 209, 210; n=5) | yes | `ks-search` `memory` guard: the `mem` example holds a 1M-path cache plus one open session (147k matches), the test reads `PeakWorkingSet64` from outside. It measures the finder, not the whole app; a real `ks.exe` idle in a 300-file directory peaks at 20 to 21 MB (n=10), so adding the two (an estimate, the sum was not measured in one process) gives about 227 MB, still under the budget. |
+| External change appears in the list (PLAN P1: about 200 ms) | ~200 ms | create to visible: **171 ms / 186 ms** (n=7; 155 to 186) | yes (thin) | `navigation::external_changes_appear_quickly_and_the_cursor_stays_on_its_entry` on E:, `TestBackend` (no terminal draw). Debounce plus atomic re-list; the test's own assertion allows 2.5 s because of load flakes. |
+| `ks.exe` size and C runtime | no vcruntime import | **15,449,088 bytes (14.74 MiB)**; `dumpbin /dependents`: kernel32, advapi32, api-ms-win-core-synch-l1-2-0, shell32, combase, ole32, oleaut32, ntdll, userenv, propsys, bcryptprimitives, ws2_32, user32, bcrypt | yes | No `vcruntime*`, `msvcp*`, `ucrtbase` or `api-ms-win-crt-*` import (`dumpbin /imports` finds 0 lines); `static_crt` test passes. |
+| Walk of 200k files (no budget) | n/a | 66 ms (criterion, 66.1 to 66.7) | n/a | `tree_200000_files/walk`. Criterion grep on the same tree: 838 ms rare literal, 838 ms no match, 862 ms common-word regex. |
+| 1 GiB copy (no budget) | n/a | 0.20 / 0.21 s, 4.7 to 4.9 GiB/s (n=3) | n/a | `ops_bench` on E:, page cache to page cache. |
+| `z` ranking at the 5,000 entry cap (no budget) | frame budget | open 2.4 ms (2.37 to 2.47), 2.75 to 2.84 ms per key (n=3) | n/a | `ks-core` `z_ranking_time`, runs on the UI thread. |
+| IPC round trip, pane draw (no budget) | n/a | IPC 102 to 106 µs; `convert_screen` 200x60 241 to 300 µs; frame draw with pane 150 to 154 µs; vt100 1.1 MiB 4.0 to 4.7 ms (n=3) | n/a | `ks-claude` and `ks-app` ignored `perf` tests. |
+| `ks hook` process start to exit (no budget) | fast | kernel lifetime median **77.6 ms** (74 to 92, n=15) | n/a | The earlier "36 ms" is not comparable (different method and exe size); it is the same image-size cost as the cold-start row. Runs once per Claude tool call. |
+| Full `cargo test --workspace` wall time (information) | n/a | 71 s, 1299 tests (debug, incremental build already warm) | n/a | Gate run of this pass. |
 
-Commands: `cargo test -p ks-app --release --test navigation a_directory_of_100k -- --ignored
---nocapture`; `cargo test -p ks-app --release --test search -- --ignored finder_keystroke --nocapture`;
-`cargo test -p ks-search --release -- --ignored finder_keystroke_latency`; `cargo bench -p ks-search`;
-`cargo run -p ks-search --release --example grepbench` (compares with `rg`; `--gen` builds the tree);
-`cargo test -p ks-search --release --test memory -- --ignored`; `cargo test --release -p ks-ui
-keypress_to_frame_stays_within_budget -- --nocapture`. Delete generated corpora afterwards.
+Content search detail (median and worst of 5 alternating runs after one warm-up; `ks wall` and `rg wall` both
+include process start; `ks engine` is the time the example reports for the search itself):
+
+| Corpus | Pattern | rg wall (median / worst) | ks wall (median / worst) | ks engine (median / worst) | Ratio | Matching lines (ks = rg) |
+|---|---|---|---|---|---|---|
+| generated, 20k files, 209 MB (E:) | `NEEDLE_MARKER` | 218 / 249 ms | 129 / 135 ms | 86 / 88 ms | 0.59 | 7,543 |
+| same | `handler` | 285 / 323 ms | 195 / 210 ms | 137 / 156 ms | 0.68 | 792,910 |
+| same | `needle_marker` (smart case) | 235 / 251 ms | 135 / 143 ms | 87 / 92 ms | 0.57 | 7,543 |
+| same | regex `NEEDLE_\w+ line1\d\d\d` | 213 / 217 ms | 139 / 148 ms | 89 / 95 ms | 0.65 | 941 |
+| generated, 200k files, 2058 MB (E:) | `NEEDLE_MARKER` | 1646 / 1651 ms | 854 / 865 ms | 785 / 805 ms | 0.52 | 74,490 |
+| same | `handler` | 2200 / 2279 ms | 1376 / 1438 ms | 1314 / 1367 ms | 0.63 | 7,800,310 |
+| `~\.cargo\registry\src` (C:) | `unsafe` | 386 / 393 ms | 308 / 312 ms | 261 / 261 ms | 0.80 | 682,629 |
+| same | `fn main` | 378 / 387 ms | 249 / 262 ms | 185 / 200 ms | 0.66 | 3,267 |
+| same | `Windows` | 381 / 399 ms | 225 / 240 ms | 179 / 182 ms | 0.59 | 24,710 |
+
+Not measurable headless (manual, real Windows Terminal; checklist section 10): the real cold start
+(process start to a visible first frame in WT), terminal-side keypress latency, and the real
+cold-cache directory entry.
+
+Commands (set `TEMP`/`TMP` to a fast disk for the tests that create files; `rg` is installed with
+`cargo install ripgrep --root target\tools`, which is gitignored):
+
+```
+cargo build --release -p ks-app
+cargo test --release -p ks-ui keypress_to_frame_stays_within_budget -- --nocapture
+cargo test --release -p ks-app --test cold_start -- --nocapture
+cargo test -p ks-app --release --test navigation a_directory_of_100k -- --ignored --nocapture
+cargo test -p ks-app --release --test navigation external_changes_appear_quickly -- --nocapture
+cargo test -p ks-app --release --test search -- --ignored finder_keystroke --nocapture
+cargo test -p ks-search --release --lib -- --ignored finder_keystroke_latency --nocapture
+cargo test -p ks-search --release --test memory -- --ignored --nocapture
+cargo bench -p ks-search --bench search
+cargo run -p ks-search --release --example grepbench -- <root> <pattern> [--regex] [--gen <files>] [--runs <n>]
+dumpbin /dependents target\release\ks.exe
+```
+
+The ConPTY start-up harness and the process-lifetime probes were throwaway scripts (a C# `CreatePseudoConsole`
+wrapper compiled with `Add-Type`, and `Process.ExitTime - StartTime`); they are not in the repository.
+Earlier numbers, kept for context (older builds, busy machine): key to frame mean 227 to 234 µs and p99
+411 to 458 µs; 100k entries 10.7 to 12.4 ms / 86 to 98 ms; finder worst 14.2 to 24.0 ms; rg ratio 0.43 to
+0.67 at 1.6 to 1.7 GiB/s; 1M-path memory 204 to 210 MB (301 MB before the shared-`Arc<str>` change).
 
 ### Open issues
 
 - GIFs/screenshots are not recorded; `cargo install --path crates/ks-app --locked` and the release
   zip were not tried on a clean machine; the workflows have not run on GitHub.
 - The cold-start and key-to-frame budgets are met only in headless measurements; the 60 ms budget
-  needs a real run (manual).
+  needs a real run (manual). The end-to-end cold start is **not demonstrated and probably not met on
+  the development machine**: Kestrel's own start-up is 5 to 6 ms, but the OS charges about 77 ms to
+  create a process from the 14.7 MB `ks.exe` with Defender on (open issue 24). P8's "all budgets met or
+  documented with the reason" is satisfied for this one by the documentation here, not by a pass.
 - Debug-profile syntect speed (see P2); MSRV undeclared.
 - Documentation drift: the README key tables were
   verified at `5b58d42` and have been spot-checked by later merges (no default key changed except
@@ -991,7 +1056,8 @@ regression test names.
 Not a bug hunt but the polish list left by the phases: f1 preview polish and Claude senders, f2
 search freshness / multi-tab watching / memory / rg ratio / drives timeout, f3 file-ops and UI polish
 (cut dimming, registry open-with, bulk re-edit, pid-alive sweep, hint priority), f4 README / manual
-test / examples / CI / release. Gates were clean at each merge (1179 tests at the f3 merge; 1293 at `06b00a8`).
+test / examples / CI / release. Gates were clean at each merge (1179 tests at the f3 merge; 1293 at
+`06b00a8`; 1299 at `5205290` after the r3/c1 tests).
 
 ### Round 1: audit a1 to a3 (29 confirmed findings, all fixed)
 
@@ -1019,18 +1085,49 @@ semantics, frecency merge protection, and 80x24 diff-guard snapshots.
 
 ### Round 3: bug finders and stress run
 
-The round-3 finders reported **0 new bugs**. A stress run confirmed **5 timing flakes**, one of which
-revealed a product race. They are being fixed in track `r3/c1` (code, `crates/**`); this document
-does not cover them. The five are not named in any note yet; the list that follows is historical context from earlier notes, not a statement about which tests are affected. Load-sensitive families seen earlier: the
-watcher tests, `claude_flow` (fake claude over ConPTY), the PowerShell/cmd fake-editor bulk-rename
-tests, persist concurrency tests, `navigation::a_deleted_current_directory_moves_to_its_parent`, and
-the event-loop palette tests (the last family was rewritten without sleeps in b2/b4).
+The round-3 finders reported **0 new bugs**. A stress run (tests run many copies wide at once) confirmed
+**5 timing flakes**, one of which was a product race. All were fixed in track `r3/c1`, merged as `93121d6`
+(notes: [c1](docs/progress/c1.md)); the docs consolidation `r3/d1` merged as `5205290` (1299 tests).
+
+Fixed in c1:
+
+| Area | Change |
+|---|---|
+| Watcher cancellation race (the product bug) | `spawn_watch` gates the OS callback on the cancellation token, so a cancelled watch is silent whatever the watcher handle or the blocking pool is doing; a watcher that finishes arming after the cancel is dropped at once. Test `a_watch_cancelled_before_it_is_armed_never_reports`. A stale `ParkedDirChanged` was already harmless (`tabs::on_parked_dir_changed` ignores a path no parked tab shows; ks-core test added). |
+| Gap between listing and watcher arming | After arming, one catch-up event is delivered when the directory mtime read before and after `DirWatcher::new` differs, or arming took over 30 ms (`needs_catch_up`, a pure function with a unit test; also gated on the token and racing the cancel in a `select!`). Tests `a_change_between_listing_and_arming_is_caught_up`, `a_catch_up_is_not_delivered_after_the_cancel`. |
+| Flaky tests made deterministic | `parked_directories_are_watched_as_a_set` (wait and drain after the shrinking `WatchParked`), `shutdown_stops_watching` (drains the legitimate catch-up), `shutdown_cancels_a_running_copy_and_cleans_up` (waits for the job queue to be idle; completed vs cancelled decided from the output file), `permanent_delete_requires_the_typed_word` (fixed by the catch-up, test unchanged), `ipc_work` search budgets made injectable (`search_files_with_budget` / `search_contents_with_budget`, new test `an_exhausted_budget_reports_truncation`). |
+| Load robustness found along the way | `persist` `concurrent_instances_lose_no_bookmark` (test-only `with_lock_stale`: a starved machine kept the lock past the 30 s staleness threshold), `rename_with_retry` now retries about 2.4 s instead of 250 ms (product hardening on the persist writer thread), fileops test `until` uses an inactivity bound plus a hard limit (a progressing 200 MB copy no longer times out), navigation latency assertion 1 s -> 2.5 s (the measured latency is 171 ms median). |
+
+Stress results from c1 (VERIFY): ks-app lib test exe, 64 runs 16-wide: **64/64 ok** (before: 19 of 48 failed);
+fileops exe, 16 runs 16-wide: **16/16 ok** (before: 3 to 4 of 16 failed, from the fixed shutdown assumption and
+disk starvation of 16 concurrent 200 MB copies); lib exe 40 copies 40-wide: **40/40 ok** (before: 10 failed in
+persist); 9 full workspace runs plus 3 final ones, 0 failures after the last fix; fmt and clippy `-D warnings`
+clean. The final gate run of the P8 measurement pass: 1299 tests, 0 failures.
+
+Deferred / open from c1 (all Low, none is a known bug in a normal run):
+
+- The mtime catch-up cannot see a change that lands between `ListDir` and the first mtime read unless arming
+  takes over 30 ms, nor content-only writes. Closing it needs `WatchDir` before `ListDir` in
+  `nav::commit_dir` (a hub file) or an unconditional catch-up (one extra re-list per navigation).
+- Slow arming of a parked set can queue one extra `ParkedDirChanged` per directory (bounded, wasted I/O only).
+- The runner test for "cancelled before armed" cannot tell the gate from the drop without a hook after arming;
+  the gate is covered by `a_catch_up_is_not_delivered_after_the_cancel`.
+- PLAN defines no manual refresh key or command, so none was added.
+- Fileops stress at 16-wide on the HDD is I/O bound (215 to 245 s per run).
+- Scratch directories from the c1 stress runs (`D:\kestrel-base`, `D:\kestrel-base-target`, logs under
+  `D:\kestrel-tmp`) could not be deleted by the agent; delete them by hand.
+
+Load-sensitive families seen in earlier notes (still the first suspects if a test fails on a loaded
+machine): the watcher tests, `claude_flow` (fake claude over ConPTY), the PowerShell/cmd fake-editor
+bulk-rename tests, persist concurrency tests, `navigation::a_deleted_current_directory_moves_to_its_parent`
+and the event-loop palette tests (rewritten without sleeps in b2/b4).
 
 ---
 
 ## Open issues
 
-Consolidated and deduplicated from all notes. Items that later notes or the code at `06b00a8` show as
+Consolidated and deduplicated from all notes (updated for the r3/c1 merge and the final P8 measurements,
+issues 6, 22, 23 and 24). Items that later notes or the code at `06b00a8` show as
 fixed were removed (for example: cut dimming, `O` ignoring marks, registry open-with, results-list
 stats, new directories in the walk cache, `ctrl-r` duplicate roots, parked-tab watching, owner
 display, image clone on the UI thread, quit-with-jobs/Claude confirm, stale launch-dir sweep, the
@@ -1048,7 +1145,7 @@ GitHub; the "Manual verification needed" section groups them.
 | 3 | Claude: `@path` mention resolution (quoted paths, `#L` ranges), live PostToolUse payload, WT split against a real `wt`, post-trust UI in the pane, dialogs in WT, `ctrl-\` free in Claude and decoded in a real console, paste-burst heuristic | Medium | yes |
 | 4 | Keys that terminals may eat or change: `ctrl-enter`, `alt-.`, `alt-g`, `alt-m`, `alt-c`, `V`, `ctrl-\` (AltGr layouts) | Medium | yes |
 | 5 | GitHub workflows (CI, release) never ran; the Windows CI job failed once undiagnosed; Linux tests never executed (only check/clippy; `ks-search` tests and benches not compiled for Linux from Windows); aarch64 and MSRV unverified | Medium | yes (GitHub) |
-| 6 | Cold start (60 ms), key-to-frame and finder-latency budgets measured headless or on a loaded machine only; re-measure on the final build (P8 table) | Medium | yes |
+| 6 | Cold start (60 ms) and terminal-side key latency can only be measured in a real Windows Terminal. Re-measured headless on the final release build (2026-10-11, P8 table): key-to-frame p99 0.28 ms, finder worst 13 to 19 ms, 100k entries 61 ms: all met. Cold start: Kestrel's own part is 5 to 6 ms, the end-to-end approximation is not met (issue 24) | Medium | yes |
 | 7 | A real keypress-driven session (`q`, `Q`, resize), Nerd Font glyphs, `×` / `◆` / `●` rendering, palette / help / which-key feel not seen in a real terminal | Low | yes |
 | 8 | README GIFs / screenshots are placeholders; `cargo install` and the release zip untried on a clean machine; Windows symlinks (developer mode) and dead network shares not exercised | Low | yes |
 | 9 | Running instances do not see another instance's bookmark / frecency writes until restart; stale-lock break race; lock fall-through after 8 s can lose a merge; orphan `.*.tmp` in the state directory not swept | Low | no |
@@ -1064,8 +1161,9 @@ GitHub; the "Manual verification needed" section groups them.
 | 19 | Git status is recomputed per directory change with no repo-wide cache (large repositories with big ignored trees may be slow) | Low | no |
 | 20 | Claude: vt100 limits (no OSC title, no sync-output buffering, kitty keyboard queries unanswered); named pipe default security; changes log lives for the process; WT split has no resume and ignores `[claude] binary`; a project path whose encoding differs from Claude's never offers Resume; resumed session starts in its creation directory | Low | no |
 | 21 | Debug builds highlight slowly (`[profile.dev.package."*"] opt-level = 3` recommended, not applied) | Low | no |
-| 22 | Documentation drift: `docs/manual-test.md` section 10 says Kestrel logs no first-frame line, but `event_loop.rs` logs `first frame elapsed_ms=...` (fix left out of the docs track; belongs with c1/next doc pass); README key tables have no drift test; some per-track notes under docs/progress still list items that were fixed later (each marked RESOLVED where the owner noticed) | Low | no |
-| 23 | Timing-sensitive tests can still fail on a loaded machine; five flakes from the round-3 stress run (one product race) are in `r3/c1`. About a dozen tests are `#[ignore]`d on purpose (perf and memory guards, real `claude`, real registry, 1 GiB copy) | Medium until c1 merges | no |
+| 22 | Documentation drift: README key tables have no drift test; some per-track notes under docs/progress still list items that were fixed later (each marked RESOLVED where the owner noticed). (The `docs/manual-test.md` section 10 claim that Kestrel logs no first-frame line, and its stale latency and ripgrep statements, were corrected in the final P8 pass.) | Low | no |
+| 23 | Timing-sensitive tests can still fail on a machine under heavy load or starved of disk I/O. The five flakes of the round-3 stress run (one a watcher product race) are fixed and merged (`r3/c1`, `93121d6`): 64/64 and 16/16 stress runs 16-wide, 40/40 at 40-wide, 1299 tests clean in every gate run since. What c1 deferred (Low): the mtime catch-up misses a change between `ListDir` and the first mtime read when arming is fast, and content-only writes; one extra `ParkedDirChanged` per directory on slow parked arming; the cancelled-before-armed runner test cannot tell the gate from the drop. About a dozen tests are `#[ignore]`d on purpose (perf and memory guards, real `claude`, real registry, 1 GiB copy) | Low (was Medium until c1 merged) | no |
+| 24 | Process start cost: the bare `ks.exe` process (`ks --version`) lives 77 ms (median, n=20) on the development machine against 29 ms for a minimal Rust exe; a 13.9 MB dummy exe costs 72 ms, so the cost follows image size (about 3 ms per MB, most likely Defender's scan on exec), not Kestrel's start-up code (5 to 6 ms to the first frame) or its DLL imports. The PLAN cold-start budget of 60 ms to first frame is therefore probably not met end to end on a machine with real-time protection, and the same cost applies to every `ks hook` call. Possible levers: a smaller image (`opt-level = "s"` / fewer syntect or image codecs, `panic = "abort"`), a Defender exclusion for the install folder. Not tried | Medium | yes (real WT, ideally on a machine without real-time scanning) |
 
 ## Manual verification needed
 
@@ -1081,7 +1179,9 @@ Claude Code, performance). Highest-value checks, by open-issue number:
 3. Section 9: mention resolution, hook payload, WT split, `ctrl-\`, paste of a multi-line text, quit
    with a session running (issues 3 and 4).
 4. Section 5 and 6: `ctrl-enter`, `alt-*` chords, `V` (issue 4).
-5. Section 10 and the P8 table: start-up, key latency, finder latency (issue 6).
+5. Section 10 and the P8 table: the real start-up number (read the `first frame elapsed_ms=` log line and
+   time the launch by eye; headless it is 5 to 6 ms in-process but about 77 ms of process creation on the
+   development machine, issue 24), terminal-side key latency (issue 6).
 6. Push to a throwaway GitHub repository to see the CI and release workflows run (issue 5).
 7. A plain `q` / `Q` session with the shell function from `ks --print-shell-init` (issue 7).
 

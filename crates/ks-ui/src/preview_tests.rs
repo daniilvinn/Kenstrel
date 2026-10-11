@@ -503,9 +503,10 @@ fn keypress_to_frame_stays_within_budget() {
     }
     times.sort();
     let mean = times.iter().sum::<Duration>() / presses;
+    let p50 = times[times.len() / 2];
     let p99 = times[times.len() * 99 / 100];
     println!(
-        "keypress -> frame: mean {mean:?}, p99 {p99:?}, max {:?} over {presses} presses",
+        "keypress -> frame: mean {mean:?}, p50 {p50:?}, p99 {p99:?}, max {:?} over {presses} presses",
         times[times.len() - 1]
     );
     // Other tests share the machine (the image tests scale large images in debug builds), so

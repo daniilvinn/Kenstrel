@@ -29,6 +29,8 @@ PROGRESS.md (and the code) win.
 | [b2.md](b2.md) | r2/b2 | bidi sanitising, finder case rename, columns, grapheme truncation (round 2) |
 | [b3.md](b3.md) | r2/b3 | Claude session keying, git hardening, hook quoting, static CRT, watcher (round 2) |
 | [b4.md](b4.md) | r2/b4 | deterministic flaky tests, persistence robustness (round 2) |
+| [c1.md](c1.md) | r3/c1 | watcher cancellation gate, post-arming catch-up, deterministic flaky tests, persist and fileops load robustness (round 3) |
+| [d1.md](d1.md) | r3/d1 | `PROGRESS.md` consolidated per phase, this index (round 3) |
 | [claude-wiring-ref.patch](claude-wiring-ref.patch) | reference | the P10 wiring patch written against an early base; reference only, never applied |
 
 Related: [../spikes/claude-pty.md](../spikes/claude-pty.md) (the 10b embedding spike),
@@ -36,4 +38,4 @@ Related: [../spikes/claude-pty.md](../spikes/claude-pty.md) (the 10b embedding s
 [../keymap.md](../keymap.md) (generated, drift-tested), [../config.example.toml](../config.example.toml),
 [../theme.example.toml](../theme.example.toml).
 
-Notes for the round-3 track (`r3/c1`, timing flakes) will appear here when that branch merges.
+Round 3: [d1](d1.md) (documentation consolidation) and [c1](c1.md) (watcher cancellation gate, arming catch-up, deterministic flaky tests; merged as `93121d6`) are indexed above. The final P8 measurement pass has no per-track note: its numbers are in the P8 Measurements table of PROGRESS.md.

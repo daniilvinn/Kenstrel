@@ -259,12 +259,15 @@ exchange counts against your plan. Keep it to the minimum below.
 ## 10. Performance
 
 - [ ] **Start-up.** Run `ks` from a warm shell. Expect: the first frame appears with no noticeable delay
-  (budget: under 60 ms from launch). Kestrel does not log a first-frame line; compare the
-  `starting` and `image protocol ... took_ms=` lines in the newest log (the second shows how long
-  the terminal query took, at most 250 ms in a terminal that never answers) and judge the launch
-  by eye or with `Measure-Command { ks --version }` for the bare process cost.
+  (budget: under 60 ms from launch). The newest log has a `first frame elapsed_ms=...` line: the time
+  from the start of `run` to the first drawn frame (5 to 6 ms on the development machine), which does
+  **not** include process creation or the loader. That part is the bare process cost: time it with
+  `Measure-Command { ks --version }` (about 75 to 80 ms there with Defender real-time protection on, almost
+  all of it because the image is 14.7 MB, see PROGRESS.md open issue 24) and add the two to judge the
+  launch, or judge it by eye. The `image protocol ... took_ms=` line shows how long the terminal query
+  took (it runs after the first frame; at most 250 ms in a terminal that never answers).
 - [ ] **Keypress latency.** `cargo test --release -p ks-ui keypress_to_frame_stays_within_budget -- --nocapture`.
-  Expect: p99 under 16 ms (measured about 0.5 ms).
+  Expect: p99 under 16 ms (measured p50 about 0.21 ms, p99 0.26 to 0.41 ms on the final build; the terminal's own latency is not part of it).
 - [ ] **Ignored performance tests.** Run each in release mode, read the numbers it prints:
 
   ```powershell
@@ -279,8 +282,13 @@ exchange counts against your plan. Keep it to the minimum below.
   ```
 
   Expect: 100k-entry listing complete in under 1 s (first rows under 150 ms), finder keystroke to
-  results under 25 ms on 500k paths, all asserts passing.
+  results under 25 ms on 500k paths, all asserts passing. The memory guard
+  (`cargo test -p ks-search --release --test memory -- --ignored --nocapture`, peak working set under
+  250 MB for a 1M-path cache) needs the `mem` example built first (`cargo build -p ks-search --release --examples`).
+  The 100k-file test creates its files in `%TEMP%`: point `TEMP` at a fast SSD (on an HDD the creation alone
+  took over 5 minutes). Final numbers: PROGRESS.md, P8 Measurements.
 - [ ] **Grep versus ripgrep.** If `rg` is installed, in a large repository time
   `Measure-Command { rg --count "TODO" . }` and compare with the time until the footer of
-  `ctrl-f` for `TODO` stops spinning. Expect: the same order of magnitude. Record both numbers in
-  `docs/progress/` (this comparison has not been measured yet).
+  `ctrl-f` for `TODO` stops spinning. Expect: the same order of magnitude (the engine measured 0.52 to
+  0.80 times the wall time of `rg` on three corpora; the table is in PROGRESS.md, P8 Measurements, and the
+  `grepbench` example compares the two headlessly: `cargo run -p ks-search --release --example grepbench -- <root> <pattern>`).
