@@ -235,8 +235,10 @@ async fn bookmarks_and_frecency_survive_a_restart() {
     assert!(alpha.rank >= 3.0, "{alpha:?}");
 
     // `z` finds the directory, `enter` goes there.
-    second.keys("g h");
-    second.listed("the home listing").await;
+    // Leave alpha (jump hits skip the current directory); the test places have no home.
+    second.keys("h");
+    second.until("the root", |s| same(&s.cwd, &root)).await;
+    second.listed("the root listing").await;
     second.keys("z a l p");
     assert_eq!(second.state.aids.jump.hits.len(), 1);
     second.keys("enter");

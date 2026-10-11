@@ -496,3 +496,11 @@ Merged `fix/f2` (finder cache freshness with background re-walk, `Touched` cache
 - **Keymap**: `docs/keymap.md` regenerated; `preview.select_lines` (`V`) and `grep.mark` / `grep.send_claude` appear with titles; the `preview_lines` context is listed. README key tables already match (V, alt-m, alt-c); no default key changed.
 - **Open issues**: as in `docs/progress/f3.md` (kept bulk-rename temp file leaks on ctrl-c, no real-terminal check of the cut glyph or hint line). `move_undo_and_trash_undo` is now split: `move_undo` always runs, `trash_undo` (real Recycle Bin) is `#[ignore]`.
 - **Gates**: fmt, clippy `-D warnings` clean; `cargo test --workspace` all pass (1179 tests), no flakes this run.
+
+## Integration: audit/a1
+
+- **Conflicts**: none; `git merge --no-ff audit/a1` applied cleanly (a1 is the first audit branch). Cargo.lock untouched.
+- **Decisions**: kept a1's overwrite key change (`o` to `O`); README and `docs/keymap.md` already match (no Action added, regeneration produced no diff). No `.snap.new` left; a1's conflict-dialog snapshots are as it committed them. `JobReport`/`JobDone` now carry `consumed_sources`: a2/a3 constructors must set it.
+- **Test fix**: `bookmarks_and_frecency_survive_a_restart` (ks-app `tabs_and_state`) failed deterministically on main too: it pressed `g h` with a harness that has no home, so the cwd stayed in `alpha` and the jump list (which skips the cwd) was empty. The test now goes up with `h`.
+- **Open issues**: `ks-fs ops_paths::trash_and_restore_deep_file` (real Recycle Bin) fails with `undo: Empty` when TEMP is on D: (also on 2208fef); it passes with the default C: TEMP. Environmental, not a code regression. Deferred a1 items: render-coupled conflict arming, results-list cursor/reveal after file ops.
+- **Gates**: fmt, clippy `-D warnings` clean; `cargo test --workspace --no-fail-fast` 1196 passed, the only failure being the D: TEMP Recycle Bin test above.
