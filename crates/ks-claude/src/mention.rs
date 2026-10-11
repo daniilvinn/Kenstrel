@@ -165,56 +165,78 @@ pub fn format_mentions_with<P: AsRef<Path>>(
 mod tests {
     use super::*;
 
+    /// An absolute test path: `/w/a.rs` is `C:\w\a.rs` on Windows and stays `/w/a.rs` elsewhere,
+    /// so the same expectations hold on every platform (the Windows-only behaviour has its own
+    /// `cfg(windows)` tests below).
+    fn abs(p: &str) -> PathBuf {
+        if cfg!(windows) {
+            PathBuf::from(format!("C:{}", p.replace('/', "\\")))
+        } else {
+            PathBuf::from(p)
+        }
+    }
+
+    /// What an absolute path looks like inside a mention (forward slashes, drive kept).
+    const DRIVE: &str = if cfg!(windows) { "C:" } else { "" };
+
     #[test]
     fn range_mentions_end_with_a_space() {
-        let cwd = Path::new(r"C:\work\proj");
-        let a = format_range_mention(Path::new(r"C:\work\proj\a.rs"), cwd, 3, 3);
-        let b = format_range_mention(Path::new(r"C:\work\proj\b c.rs"), cwd, 2, 5);
+        let cwd = abs("/work/proj");
+        let a = format_range_mention(&abs("/work/proj/a.rs"), &cwd, 3, 3);
+        let b = format_range_mention(&abs("/work/proj/b c.rs"), &cwd, 2, 5);
         assert_eq!(format!("{a}{b}"), "@a.rs#L3 @\"b c.rs\"#L2-5 ");
     }
 
     #[test]
     fn relative_and_absolute() {
-        let cwd = Path::new("C:\\work\\proj");
+        let cwd = abs("/work/proj");
         assert_eq!(
-            format_mention(Path::new("C:\\work\\proj\\src\\main.rs"), cwd, None),
+            format_mention(&abs("/work/proj/src/main.rs"), &cwd, None),
             "@src/main.rs"
         );
         assert_eq!(
-            format_mention(Path::new("C:\\other\\x.txt"), cwd, None),
-            "@C:/other/x.txt"
+            format_mention(&abs("/other/x.txt"), &cwd, None),
+            format!("@{DRIVE}/other/x.txt")
         );
-        assert_eq!(format_mention(Path::new("C:\\work\\proj"), cwd, None), "@.");
+        assert_eq!(format_mention(&abs("/work/proj"), &cwd, None), "@.");
         // prefix of a different dir name must not match
         assert_eq!(
-            format_mention(Path::new("C:\\work\\project2\\a"), cwd, None),
-            "@C:/work/project2/a"
+            format_mention(&abs("/work/project2/a"), &cwd, None),
+            format!("@{DRIVE}/work/project2/a")
         );
     }
 
+    #[cfg(windows)]
     #[test]
     fn windows_case_insensitive() {
-        if cfg!(windows) {
-            assert_eq!(
-                format_mention(
-                    Path::new("c:\\WORK\\proj\\A.rs"),
-                    Path::new("C:\\work\\proj"),
-                    None
-                ),
-                "@A.rs"
-            );
-        }
+        assert_eq!(
+            format_mention(
+                Path::new(r"c:\WORK\proj\A.rs"),
+                Path::new(r"C:\work\proj"),
+                None
+            ),
+            "@A.rs"
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn unix_paths_are_case_sensitive() {
+        assert_eq!(
+            format_mention(Path::new("/WORK/proj/A.rs"), Path::new("/work/proj"), None),
+            "@/WORK/proj/A.rs"
+        );
     }
 
     #[test]
     fn spaces_are_quoted() {
-        let cwd = Path::new("C:\\w");
+        let cwd = abs("/w");
         assert_eq!(
-            format_mention(Path::new("C:\\w\\my dir\\a b.md"), cwd, None),
+            format_mention(&abs("/w/my dir/a b.md"), &cwd, None),
             "@\"my dir/a b.md\""
         );
         assert_eq!(
-            format_mention(Path::new("C:\\w\\my dir\\a.md"), cwd, Some((3, 9))),
+            format_mention(&abs("/w/my dir/a.md"), &cwd, Some((3, 9))),
             "@\"my dir/a.md\"#L3-9"
         );
     }
@@ -224,100 +246,99 @@ mod tests {
         let plain = MentionOptions {
             style: MentionStyle::Plain,
         };
-        let cwd = Path::new("C:\\w");
+        let cwd = abs("/w");
         assert_eq!(
-            format_mention_with(Path::new("C:\\w\\my dir\\a b.md"), cwd, Some((1, 2)), plain),
+            format_mention_with(&abs("/w/my dir/a b.md"), &cwd, Some((1, 2)), plain),
             "@my dir/a b.md#L1-2"
         );
-        assert_eq!(
-            format_mentions_with(&[Path::new("C:\\w\\a b")], cwd, plain),
-            "@a b "
-        );
+        assert_eq!(format_mentions_with(&[abs("/w/a b")], &cwd, plain), "@a b ");
     }
 
     #[test]
     fn line_ranges() {
-        let cwd = Path::new("C:\\w");
-        let p = Path::new("C:\\w\\a.rs");
-        assert_eq!(format_mention(p, cwd, Some((10, 20))), "@a.rs#L10-20");
-        assert_eq!(format_mention(p, cwd, Some((7, 7))), "@a.rs#L7");
-        assert_eq!(format_mention(p, cwd, Some((0, 0))), "@a.rs");
+        let cwd = abs("/w");
+        let p = abs("/w/a.rs");
+        assert_eq!(format_mention(&p, &cwd, Some((10, 20))), "@a.rs#L10-20");
+        assert_eq!(format_mention(&p, &cwd, Some((7, 7))), "@a.rs#L7");
+        assert_eq!(format_mention(&p, &cwd, Some((0, 0))), "@a.rs");
         // reversed ranges are swapped
-        assert_eq!(format_mention(p, cwd, Some((20, 10))), "@a.rs#L10-20");
+        assert_eq!(format_mention(&p, &cwd, Some((20, 10))), "@a.rs#L10-20");
     }
 
     #[test]
     fn hash_and_quote_in_paths() {
-        let cwd = Path::new("C:\\w");
+        let cwd = abs("/w");
         // '#' is left alone (only the trailing #L range is syntax)
         assert_eq!(
-            format_mention(Path::new("C:\\w\\c#\\a.cs"), cwd, Some((2, 4))),
+            format_mention(&abs("/w/c#/a.cs"), &cwd, Some((2, 4))),
             "@c#/a.cs#L2-4"
         );
         // a quote forces quoting + escaping, and the range follows the closing quote
         assert_eq!(
-            format_mention(Path::new("C:\\w\\a\"b.txt"), cwd, Some((2, 4))),
+            format_mention(&abs("/w/a\"b.txt"), &cwd, Some((2, 4))),
             "@\"a\\\"b.txt\"#L2-4"
         );
     }
 
+    #[cfg(windows)]
     #[test]
     fn unc_and_other_drive_with_spaces_stay_absolute() {
-        let cwd = Path::new("C:\\w");
+        let cwd = Path::new(r"C:\w");
         assert_eq!(
-            format_mention(Path::new("D:\\my files\\x.txt"), cwd, None),
+            format_mention(Path::new(r"D:\my files\x.txt"), cwd, None),
             "@\"D:/my files/x.txt\""
         );
         assert_eq!(
-            format_mention(Path::new("\\\\srv\\share dir\\x.txt"), cwd, None),
+            format_mention(Path::new(r"\\srv\share dir\x.txt"), cwd, None),
             "@\"//srv/share dir/x.txt\""
         );
     }
 
     #[test]
     fn directory_with_trailing_separator() {
-        let cwd = Path::new("C:\\w");
-        assert_eq!(format_mention(Path::new("C:\\w\\src\\"), cwd, None), "@src");
-        assert_eq!(format_mention(Path::new("C:\\w\\"), cwd, None), "@.");
+        let cwd = abs("/w");
+        let sep = std::path::MAIN_SEPARATOR;
+        let with_sep = |p: &str| PathBuf::from(format!("{}{sep}", abs(p).display()));
+        assert_eq!(format_mention(&with_sep("/w/src"), &cwd, None), "@src");
+        assert_eq!(format_mention(&with_sep("/w"), &cwd, None), "@.");
     }
 
     #[test]
-    fn verbatim_and_dotdot_are_normalised() {
-        let cwd = Path::new("C:\\w\\proj");
+    fn dotdot_components_are_normalised() {
+        let cwd = abs("/w/proj");
         assert_eq!(
-            format_mention(Path::new("\\\\?\\C:\\w\\proj\\src\\a.rs"), cwd, None),
-            "@src/a.rs"
-        );
-        assert_eq!(
-            format_mention(
-                Path::new("\\\\?\\C:\\w\\proj"),
-                Path::new("C:\\w\\proj"),
-                None
-            ),
-            "@."
-        );
-        assert_eq!(
-            format_mention(Path::new("C:\\w\\proj\\src\\..\\lib\\.\\b.rs"), cwd, None),
+            format_mention(&abs("/w/proj/src/../lib/./b.rs"), &cwd, None),
             "@lib/b.rs"
         );
         // escaping the working directory with .. is outside, hence absolute and normalised
         assert_eq!(
-            format_mention(Path::new("C:\\w\\proj\\..\\other\\c.rs"), cwd, None),
-            "@C:/w/other/c.rs"
+            format_mention(&abs("/w/proj/../other/c.rs"), &cwd, None),
+            format!("@{DRIVE}/w/other/c.rs")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn verbatim_prefixes_are_removed() {
+        let cwd = Path::new(r"C:\w\proj");
+        assert_eq!(
+            format_mention(Path::new(r"\\?\C:\w\proj\src\a.rs"), cwd, None),
+            "@src/a.rs"
         );
         assert_eq!(
-            format_mention(Path::new("\\\\?\\UNC\\srv\\sh\\a"), cwd, None),
+            format_mention(Path::new(r"\\?\C:\w\proj"), Path::new(r"C:\w\proj"), None),
+            "@."
+        );
+        assert_eq!(
+            format_mention(Path::new(r"\\?\UNC\srv\sh\a"), cwd, None),
             "@//srv/sh/a"
         );
     }
 
     #[test]
     fn multiple_space_separated() {
-        let cwd = Path::new("C:\\w");
-        let v = [
-            PathBuf::from("C:\\w\\a.rs"),
-            PathBuf::from("C:\\w\\b\\c.rs"),
-        ];
-        assert_eq!(format_mentions(&v, cwd), "@a.rs @b/c.rs ");
+        let cwd = abs("/w");
+        let v = [abs("/w/a.rs"), abs("/w/b/c.rs")];
+        assert_eq!(format_mentions(&v, &cwd), "@a.rs @b/c.rs ");
     }
 }
