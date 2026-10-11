@@ -141,7 +141,7 @@ pub fn render_pane(
     if let Some(activity) = activity_line(state) {
         let budget = usize::from(outer.width).saturating_sub(left_width + 6);
         if budget >= 6 {
-            let text = truncate_start(&activity, budget);
+            let text = truncate_start(&crate::text::sanitize(&activity), budget);
             block = block.title_top(
                 Line::from(vec![
                     Span::raw(" "),
@@ -239,7 +239,7 @@ pub fn render_overlays(frame: &mut Frame, state: &AppState, theme: &Theme) {
 fn display_path(path: &Path, state: &AppState) -> String {
     let root = state.claude.root.as_deref().unwrap_or(&state.cwd);
     let rel = path.strip_prefix(root).unwrap_or(path);
-    rel.to_string_lossy().replace('\\', "/")
+    crate::text::sanitize(&rel.to_string_lossy().replace('\\', "/"))
 }
 
 fn render_changes(frame: &mut Frame, state: &AppState, theme: &Theme) {
@@ -312,7 +312,11 @@ fn render_changes(frame: &mut Frame, state: &AppState, theme: &Theme) {
                     theme.accent_style().patch(row_bg),
                 ),
                 Span::styled(
-                    format!("{}{} ", change.tool, " ".repeat(pad)),
+                    format!(
+                        "{}{} ",
+                        crate::text::sanitize(&change.tool),
+                        " ".repeat(pad)
+                    ),
                     theme.dim().patch(row_bg),
                 ),
                 Span::styled(
@@ -714,6 +718,18 @@ Then run claude once and log in with /login. More text follows to make the body 
     }
 
     // ----- the changes view -----
+
+    #[test]
+    fn changes_view_neutralises_bidi_overrides_in_paths() {
+        let mut s = listing_state(100, 30);
+        edit(&mut s, "Write", "invoice\u{202E}fdp.exe");
+        update(&mut s, Msg::Key("g".parse::<KeyChord>().unwrap()));
+        update(&mut s, Msg::Key("a".parse::<KeyChord>().unwrap()));
+        let rendered = draw(&s, &theme("ember"));
+        assert!(rendered.contains("Claude changes"), "{rendered}");
+        assert!(rendered.contains("invoice?fdp.exe"), "{rendered}");
+        assert!(!rendered.contains('\u{202E}'));
+    }
 
     #[test]
     fn changes_view_snapshots() {

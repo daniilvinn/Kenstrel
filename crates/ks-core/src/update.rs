@@ -368,6 +368,14 @@ fn on_config_reloaded(
 ) {
     // The active theme only changes once it has actually loaded (`Msg::ThemeApplied`).
     let wanted_theme = std::mem::replace(&mut config.theme, state.config.theme.clone());
+    // A changed `[files]` default re-seeds the finder toggles; unchanged ones keep any
+    // session toggle (`alt-.` / `alt-g`).
+    if config.files.show_hidden != state.config.files.show_hidden {
+        state.search.finder_hidden = config.files.show_hidden;
+    }
+    if config.files.show_ignored != state.config.files.show_ignored {
+        state.search.finder_gitignore = config.files.show_ignored;
+    }
     state.config = config;
     state.keymap = keymap;
     let (level, text) = match issues.split_first() {

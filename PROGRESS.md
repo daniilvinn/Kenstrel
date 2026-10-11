@@ -540,3 +540,11 @@ Merged `fix/f2` (finder cache freshness with background re-walk, `Touched` cache
 - No keys or Actions changed, so docs/keymap.md and README tables are unchanged.
 - Gates: fmt, clippy -D warnings clean; workspace 1279 tests passed, 0 failed, no flakes this run, no .snap.new files.
 - Open: markdown and UTF-16/32 grep hits beyond head limits still show the head preview with a beyond-limit status; windowed read scans sequentially to the window start (no line index); hidden-match reveal message appears when the listing completes.
+
+## Integration: r2/b2
+
+- Merged last (b4, b3, b1, b2). Two conflicts. `crates/ks-app/src/event_loop.rs`: took b2's frame-gated `drive_with_config` stream (keys wait on drawn frames, quit sent once `done` holds). `crates/ks-ui/src/preview_tests.rs`: both sides added tests at the file end; kept both (b1's windowed-gutter test and b2's 120x32 snapshot test). Cargo.lock merged cleanly (adds `unicode-segmentation`).
+- No snapshot hand-merging: the full workspace run produced no `.snap.new` files, so b2's updated and new snapshots (size column, `main_*_120x32`, `finder_denied_*`) match the merged code.
+- No Actions or default keys changed, so `docs/keymap.md` is unchanged. README and `docs/manual-test.md` size-column statement (terminal >= 60 columns and list pane >= 30 cells) still matches `Columns::for_width`.
+- Gates: fmt, clippy `-D warnings` clean; `cargo test --workspace --no-fail-fast` all passed, 0 failed, no flakes this run.
+- Open: a cursor inside a grapheme cluster in a finder input highlights the whole cluster; the time column still keys on pane width >= 90 only.

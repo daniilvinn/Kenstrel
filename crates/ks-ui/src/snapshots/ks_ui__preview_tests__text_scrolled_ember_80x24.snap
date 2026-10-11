@@ -5,22 +5,22 @@ expression: "draw(&state, &theme)"
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────
    ◆ current/                  │ vulkan_device.rs       Rust · 14.2 KB · 3h ago
-   ◆ passes/                 M │────────────────────────────────────────────────
-   ◆ shaders/                ! │ 17     slot_9: u32, // 9
-   ◆ a_rather_long_f…_row.rs   │ 18     slot_10: u32, // 10
-   ◆ build.ps1                 │ 19     slot_11: u32, // 11
-   ◆ bundle.zip                │ 20     slot_12: u32, // 12
-   ◆ descriptors.rs          + │ 21     slot_13: u32, // 13
-   ◆ firmware.bin              │ 22     slot_14: u32, // 14
-   ◆ logo.png                  │ 23     slot_15: u32, // 15
-   ◆ mod.rs                    │ 24     slot_16: u32, // 16
-   ◆ new_pass.rs             ? │ 25     slot_17: u32, // 17
-   ◆ photo_from_phone.jpg      │ 26     slot_18: u32, // 18
-   ◆ pipeline_cache.rs         │ 27     slot_19: u32, // 19
-   ◆ README.md                 │ 28     slot_20: u32, // 20
-  ●◆ swapchain.rs              │ 29     slot_21: u32, // 21
- ▌ ◆ vulkan_device.rs        M │ 30     slot_22: u32, // 22
-   ◆ 日本語のメモ.txt          │ 31     slot_23: u32, // 23
+   ◆ passes/               7 M │────────────────────────────────────────────────
+   ◆ shaders/             12 ! │ 17     slot_9: u32, // 9
+   ◆ a_rath…row.rs   75.2 KB   │ 18     slot_10: u32, // 10
+   ◆ build.ps1        1.9 KB   │ 19     slot_11: u32, // 11
+   ◆ bundle.zip      21.5 KB   │ 20     slot_12: u32, // 12
+   ◆ descri…ors.rs    6.1 KB + │ 21     slot_13: u32, // 13
+   ◆ firmware.bin     4.0 KB   │ 22     slot_14: u32, // 14
+   ◆ logo.png       510.7 KB   │ 23     slot_15: u32, // 15
+   ◆ mod.rs            412 B   │ 24     slot_16: u32, // 16
+   ◆ new_pass.rs         0 B ? │ 25     slot_17: u32, // 17
+   ◆ photo_…ne.jpg    4.0 MB   │ 26     slot_18: u32, // 18
+   ◆ pipeli…che.rs    3.3 KB   │ 27     slot_19: u32, // 19
+   ◆ README.md        3.0 KB   │ 28     slot_20: u32, // 20
+  ●◆ swapchain.rs     9.8 KB   │ 29     slot_21: u32, // 21
+ ▌ ◆ vulkan…ice.rs   14.2 KB M │ 30     slot_22: u32, // 22
+   ◆ 日本語…モ.txt     220 B   │ 31     slot_23: u32, // 23
                                │ 32     slot_24: u32, // 24
                                │ 33     slot_25: u32, // 25
 ────────────────────────────────────────────────────────────────────────────────
@@ -40,10 +40,12 @@ expression: "draw(&state, &theme)"
   2  31..33  fg=#403a35 bg=reset
   2  33..56  fg=#e8e3dc bg=reset bold
   2  56..80  fg=#a9a29a bg=reset
-  3   3..29  fg=#7fa8c9 bg=reset
+  3   3..27  fg=#7fa8c9 bg=reset
+  3  27..29  fg=#a9a29a bg=reset
   3  29..31  fg=#e5b567 bg=reset
   3  31..80  fg=#403a35 bg=reset
-  4   3..29  fg=#7fa8c9 bg=reset
+  4   3..26  fg=#7fa8c9 bg=reset
+  4  26..29  fg=#a9a29a bg=reset
   4  29..31  fg=#625c56 bg=reset
   4  31..33  fg=#403a35 bg=reset
   4  33..40  fg=#716b64 bg=reset
@@ -53,7 +55,8 @@ expression: "draw(&state, &theme)"
   4  51..53  fg=#9a948a bg=reset
   4  53..80  fg=#7a746c bg=reset italic
   5   3..5   fg=#a9a29a bg=reset
-  5   5..31  fg=#e8e3dc bg=reset
+  5   5..21  fg=#e8e3dc bg=reset
+  5  21..31  fg=#a9a29a bg=reset
   5  31..33  fg=#403a35 bg=reset
   5  33..40  fg=#716b64 bg=reset
   5  40..47  fg=#e8e3dc bg=reset
@@ -61,7 +64,8 @@ expression: "draw(&state, &theme)"
   5  49..52  fg=#e5c07b bg=reset
   5  52..54  fg=#9a948a bg=reset
   5  54..80  fg=#7a746c bg=reset italic
-  6   3..31  fg=#92c07f bg=reset
+  6   3..22  fg=#92c07f bg=reset
+  6  22..31  fg=#a9a29a bg=reset
   6  31..33  fg=#403a35 bg=reset
   6  33..40  fg=#716b64 bg=reset
   6  40..47  fg=#e8e3dc bg=reset
@@ -70,7 +74,8 @@ expression: "draw(&state, &theme)"
   6  52..54  fg=#9a948a bg=reset
   6  54..80  fg=#7a746c bg=reset italic
   7   3..5   fg=#a9a29a bg=reset
-  7   5..31  fg=#e8e3dc bg=reset
+  7   5..21  fg=#e8e3dc bg=reset
+  7  21..31  fg=#a9a29a bg=reset
   7  31..33  fg=#403a35 bg=reset
   7  33..40  fg=#716b64 bg=reset
   7  40..47  fg=#e8e3dc bg=reset
@@ -79,7 +84,8 @@ expression: "draw(&state, &theme)"
   7  52..54  fg=#9a948a bg=reset
   7  54..80  fg=#7a746c bg=reset italic
   8   3..5   fg=#a9a29a bg=reset
-  8   5..29  fg=#e8e3dc bg=reset
+  8   5..22  fg=#e8e3dc bg=reset
+  8  22..29  fg=#a9a29a bg=reset
   8  29..31  fg=#92c07f bg=reset
   8  31..33  fg=#403a35 bg=reset
   8  33..40  fg=#716b64 bg=reset
@@ -89,7 +95,8 @@ expression: "draw(&state, &theme)"
   8  52..54  fg=#9a948a bg=reset
   8  54..80  fg=#7a746c bg=reset italic
   9   3..5   fg=#a9a29a bg=reset
-  9   5..31  fg=#e8e3dc bg=reset
+  9   5..22  fg=#e8e3dc bg=reset
+  9  22..31  fg=#a9a29a bg=reset
   9  31..33  fg=#403a35 bg=reset
   9  33..40  fg=#716b64 bg=reset
   9  40..47  fg=#e8e3dc bg=reset
@@ -98,7 +105,8 @@ expression: "draw(&state, &theme)"
   9  52..54  fg=#9a948a bg=reset
   9  54..80  fg=#7a746c bg=reset italic
  10   3..5   fg=#a9a29a bg=reset
- 10   5..31  fg=#e8e3dc bg=reset
+ 10   5..20  fg=#e8e3dc bg=reset
+ 10  20..31  fg=#a9a29a bg=reset
  10  31..33  fg=#403a35 bg=reset
  10  33..40  fg=#716b64 bg=reset
  10  40..47  fg=#e8e3dc bg=reset
@@ -107,7 +115,8 @@ expression: "draw(&state, &theme)"
  10  52..54  fg=#9a948a bg=reset
  10  54..80  fg=#7a746c bg=reset italic
  11   3..5   fg=#a9a29a bg=reset
- 11   5..31  fg=#e8e3dc bg=reset
+ 11   5..23  fg=#e8e3dc bg=reset
+ 11  23..31  fg=#a9a29a bg=reset
  11  31..33  fg=#403a35 bg=reset
  11  33..40  fg=#716b64 bg=reset
  11  40..47  fg=#e8e3dc bg=reset
@@ -116,7 +125,8 @@ expression: "draw(&state, &theme)"
  11  52..54  fg=#9a948a bg=reset
  11  54..80  fg=#7a746c bg=reset italic
  12   3..5   fg=#a9a29a bg=reset
- 12   5..29  fg=#e8e3dc bg=reset
+ 12   5..25  fg=#e8e3dc bg=reset
+ 12  25..29  fg=#a9a29a bg=reset
  12  29..31  fg=#c9a27f bg=reset
  12  31..33  fg=#403a35 bg=reset
  12  33..40  fg=#716b64 bg=reset
@@ -126,7 +136,8 @@ expression: "draw(&state, &theme)"
  12  52..54  fg=#9a948a bg=reset
  12  54..80  fg=#7a746c bg=reset italic
  13   3..5   fg=#a9a29a bg=reset
- 13   5..31  fg=#a9a29a bg=reset italic
+ 13   5..22  fg=#a9a29a bg=reset italic
+ 13  22..31  fg=#a9a29a bg=reset
  13  31..33  fg=#403a35 bg=reset
  13  33..40  fg=#716b64 bg=reset
  13  40..47  fg=#e8e3dc bg=reset
@@ -135,7 +146,8 @@ expression: "draw(&state, &theme)"
  13  52..54  fg=#9a948a bg=reset
  13  54..80  fg=#7a746c bg=reset italic
  14   3..5   fg=#a9a29a bg=reset
- 14   5..31  fg=#e8e3dc bg=reset
+ 14   5..22  fg=#e8e3dc bg=reset
+ 14  22..31  fg=#a9a29a bg=reset
  14  31..33  fg=#403a35 bg=reset
  14  33..40  fg=#716b64 bg=reset
  14  40..47  fg=#e8e3dc bg=reset
@@ -144,7 +156,8 @@ expression: "draw(&state, &theme)"
  14  52..54  fg=#9a948a bg=reset
  14  54..80  fg=#7a746c bg=reset italic
  15   3..5   fg=#a9a29a bg=reset
- 15   5..31  fg=#e8e3dc bg=reset
+ 15   5..22  fg=#e8e3dc bg=reset
+ 15  22..31  fg=#a9a29a bg=reset
  15  31..33  fg=#403a35 bg=reset
  15  33..40  fg=#716b64 bg=reset
  15  40..47  fg=#e8e3dc bg=reset
@@ -154,7 +167,8 @@ expression: "draw(&state, &theme)"
  15  54..80  fg=#7a746c bg=reset italic
  16   2..3   fg=#d97757 bg=reset
  16   3..5   fg=#a9a29a bg=reset
- 16   5..31  fg=#d97757 bg=reset bold
+ 16   5..22  fg=#d97757 bg=reset bold
+ 16  22..31  fg=#a9a29a bg=reset
  16  31..33  fg=#403a35 bg=reset
  16  33..40  fg=#716b64 bg=reset
  16  40..47  fg=#e8e3dc bg=reset
@@ -165,7 +179,9 @@ expression: "draw(&state, &theme)"
  17   0..1   fg=#e8e3dc bg=#2f2a26
  17   1..3   fg=#d97757 bg=#2f2a26
  17   3..5   fg=#a9a29a bg=#2f2a26
- 17   5..29  fg=#e8e3dc bg=#2f2a26
+ 17   5..19  fg=#e8e3dc bg=#2f2a26
+ 17  19..28  fg=#a9a29a bg=#2f2a26
+ 17  28..29  fg=#e8e3dc bg=#2f2a26
  17  29..30  fg=#e5b567 bg=#2f2a26
  17  30..31  fg=#e8e3dc bg=#2f2a26
  17  31..33  fg=#403a35 bg=reset
@@ -176,7 +192,8 @@ expression: "draw(&state, &theme)"
  17  52..54  fg=#9a948a bg=reset
  17  54..80  fg=#7a746c bg=reset italic
  18   3..5   fg=#a9a29a bg=reset
- 18   5..31  fg=#e8e3dc bg=reset
+ 18   5..23  fg=#e8e3dc bg=reset
+ 18  23..31  fg=#a9a29a bg=reset
  18  31..33  fg=#403a35 bg=reset
  18  33..40  fg=#716b64 bg=reset
  18  40..47  fg=#e8e3dc bg=reset

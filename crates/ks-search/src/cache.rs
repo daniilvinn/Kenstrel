@@ -30,6 +30,8 @@ pub(crate) type RawNames = HashMap<Box<str>, Box<OsStr>>;
 pub(crate) struct Walked {
     pub items: Vec<FinderItem>,
     pub raws: RawNames,
+    /// Directories the walk skipped as access denied (shown again when served from cache).
+    pub denied: u64,
 }
 
 /// Identity of a cached walk. The root is compared normalized (see the module docs).
@@ -134,6 +136,7 @@ impl WalkCache {
             Arc::new(Walked {
                 items,
                 raws: RawNames::new(),
+                denied: 0,
             }),
         );
     }
@@ -366,24 +369,6 @@ fn fold(s: &str) -> String {
         }
     }
     out
-}
-
-/// Hash of the folded form of `s` (see [`fold`]); `buf` is scratch space reused across calls.
-pub(crate) fn fold_hash(buf: &mut String, s: &str) -> u64 {
-    use std::hash::BuildHasher;
-    buf.clear();
-    let s = strip_verbatim(s);
-    for c in s.chars() {
-        if is_sep(c) {
-            buf.push('\\');
-        } else if cfg!(windows) {
-            buf.extend(c.to_lowercase());
-        } else {
-            buf.push(c);
-        }
-    }
-    std::hash::BuildHasherDefault::<std::collections::hash_map::DefaultHasher>::default()
-        .hash_one(buf.as_str())
 }
 
 /// Normalized identity of a root directory (no trailing separator).
@@ -853,6 +838,7 @@ mod tests {
         let fresh = Arc::new(Walked {
             items: vec![FinderItem::new("a.txt", EntryKind::File)],
             raws: RawNames::new(),
+            denied: 0,
         });
         cache.put_walked_if_unchanged(key.clone(), &snapshot, fresh.clone());
         assert_eq!(cache.len_of(&key), Some(2));

@@ -5,18 +5,18 @@ expression: rendered
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────
    ◆ current/                           ╭ Claude ────── ◆ Edit vulkan_device.rs
-   ◆ passes/                          M │ * Welcome to Claude Code
-   ◆ shaders/                         ! │ cwd: /home/me/projects/omniforce
-   ◆ a_rather_long_file_name_…_row.rs   │ > refactor the renderer
-   ◆ build.ps1                          │ [inverse]
-   ◆ descriptors.rs                   + │
-   ◆ mod.rs                             │
-   ◆ new_pass.rs                      ? │
-   ◆ photo_from_phone.jpg               │
-   ◆ pipeline_cache.rs                  │
-  ●◆ swapchain.rs                       │
- ▌ ◆ vulkan_device.rs               ◆ M │
-   ◆ 日本語のメモ.txt                   │
+   ◆ passes/                        7 M │ * Welcome to Claude Code
+   ◆ shaders/                      12 ! │ cwd: /home/me/projects/omniforce
+   ◆ a_rather_long_…_row.rs   75.2 KB   │ > refactor the renderer
+   ◆ build.ps1                 1.9 KB   │ [inverse]
+   ◆ descriptors.rs            6.1 KB + │
+   ◆ mod.rs                     412 B   │
+   ◆ new_pass.rs                  0 B ? │
+   ◆ photo_from_phone.jpg      4.0 MB   │
+   ◆ pipeline_cache.rs         3.3 KB   │
+  ●◆ swapchain.rs              9.8 KB   │
+ ▌ ◆ vulkan_device.rs     ◆   14.2 KB M │
+   ◆ 日本語のメモ.txt           220 B   │
                                         │
                                         │
                                         │
@@ -42,55 +42,68 @@ expression: rendered
   2  49..56  fg=#8f5c47 bg=reset
   2  56..58  fg=#d97757 bg=reset
   2  58..80  fg=#a9a29a bg=reset
-  3   3..38  fg=#7fa8c9 bg=reset
+  3   3..36  fg=#7fa8c9 bg=reset
+  3  36..38  fg=#a9a29a bg=reset
   3  38..40  fg=#e5b567 bg=reset
   3  40..42  fg=#8f5c47 bg=reset
   3  42..80  fg=#d97757 bg=reset bold
-  4   3..38  fg=#7fa8c9 bg=reset
+  4   3..35  fg=#7fa8c9 bg=reset
+  4  35..38  fg=#a9a29a bg=reset
   4  38..40  fg=#625c56 bg=reset
   4  40..42  fg=#8f5c47 bg=reset
   4  42..80  fg=#e8e3dc bg=reset dim
   5   3..5   fg=#a9a29a bg=reset
-  5   5..40  fg=#e8e3dc bg=reset
+  5   5..30  fg=#e8e3dc bg=reset
+  5  30..40  fg=#a9a29a bg=reset
   5  40..42  fg=#8f5c47 bg=reset
   5  42..44  fg=#e8e3dc bg=reset
   5  44..53  fg=idx6 bg=reset
   5  53..80  fg=#e8e3dc bg=reset
-  6   3..40  fg=#92c07f bg=reset
+  6   3..31  fg=#92c07f bg=reset
+  6  31..40  fg=#a9a29a bg=reset
   6  40..42  fg=#8f5c47 bg=reset
   6  42..80  fg=black bg=#e8e3dc
   7   3..5   fg=#a9a29a bg=reset
-  7   5..38  fg=#e8e3dc bg=reset
+  7   5..31  fg=#e8e3dc bg=reset
+  7  31..38  fg=#a9a29a bg=reset
   7  38..40  fg=#92c07f bg=reset
   7  40..80  fg=#8f5c47 bg=reset
   8   3..5   fg=#a9a29a bg=reset
-  8   5..40  fg=#e8e3dc bg=reset
+  8   5..32  fg=#e8e3dc bg=reset
+  8  32..40  fg=#a9a29a bg=reset
   8  40..80  fg=#8f5c47 bg=reset
   9   3..5   fg=#a9a29a bg=reset
-  9   5..38  fg=#e8e3dc bg=reset
+  9   5..34  fg=#e8e3dc bg=reset
+  9  34..38  fg=#a9a29a bg=reset
   9  38..40  fg=#c9a27f bg=reset
   9  40..80  fg=#8f5c47 bg=reset
  10   3..5   fg=#a9a29a bg=reset
- 10   5..40  fg=#a9a29a bg=reset italic
+ 10   5..31  fg=#a9a29a bg=reset italic
+ 10  31..40  fg=#a9a29a bg=reset
  10  40..80  fg=#8f5c47 bg=reset
  11   3..5   fg=#a9a29a bg=reset
- 11   5..40  fg=#e8e3dc bg=reset
+ 11   5..31  fg=#e8e3dc bg=reset
+ 11  31..40  fg=#a9a29a bg=reset
  11  40..80  fg=#8f5c47 bg=reset
  12   2..3   fg=#d97757 bg=reset
  12   3..5   fg=#a9a29a bg=reset
- 12   5..40  fg=#d97757 bg=reset bold
+ 12   5..31  fg=#d97757 bg=reset bold
+ 12  31..40  fg=#a9a29a bg=reset
  12  40..80  fg=#8f5c47 bg=reset
  13   0..1   fg=#e8e3dc bg=#2f2a26
  13   1..3   fg=#d97757 bg=#2f2a26
  13   3..5   fg=#a9a29a bg=#2f2a26
- 13   5..35  fg=#e8e3dc bg=#2f2a26
- 13  35..37  fg=#d97757 bg=#2f2a26
+ 13   5..25  fg=#e8e3dc bg=#2f2a26
+ 13  25..27  fg=#d97757 bg=#2f2a26
+ 13  27..28  fg=#e8e3dc bg=#2f2a26
+ 13  28..37  fg=#a9a29a bg=#2f2a26
  13  37..38  fg=#e8e3dc bg=#2f2a26
  13  38..39  fg=#e5b567 bg=#2f2a26
  13  39..40  fg=#e8e3dc bg=#2f2a26
  13  40..80  fg=#8f5c47 bg=reset
  14   3..5   fg=#a9a29a bg=reset
- 14   5..40  fg=#e8e3dc bg=reset
+ 14   5..32  fg=#e8e3dc bg=reset
+ 14  32..40  fg=#a9a29a bg=reset
  14  40..80  fg=#8f5c47 bg=reset
  15  40..80  fg=#8f5c47 bg=reset
  16  40..80  fg=#8f5c47 bg=reset

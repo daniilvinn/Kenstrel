@@ -895,21 +895,143 @@ mod tests {
         }
     }
 
-    /// Like `drive`, but with a reloader over a temporary config directory.
+    /// A `TestBackend` that publishes a copy of every drawn frame, so a test can wait for
+    /// a condition on screen instead of sleeping.
+    struct Probe {
+        inner: TestBackend,
+        frame: Frames,
+    }
+
+    impl Backend for Probe {
+        type Error = <TestBackend as Backend>::Error;
+
+        fn draw<'a, I>(&mut self, content: I) -> std::result::Result<(), Self::Error>
+        where
+            I: Iterator<Item = (u16, u16, &'a ratatui::buffer::Cell)>,
+        {
+            self.inner.draw(content)
+        }
+        fn hide_cursor(&mut self) -> std::result::Result<(), Self::Error> {
+            self.inner.hide_cursor()
+        }
+        fn show_cursor(&mut self) -> std::result::Result<(), Self::Error> {
+            self.inner.show_cursor()
+        }
+        fn get_cursor_position(
+            &mut self,
+        ) -> std::result::Result<ratatui::layout::Position, Self::Error> {
+            self.inner.get_cursor_position()
+        }
+        fn set_cursor_position<P: Into<ratatui::layout::Position>>(
+            &mut self,
+            position: P,
+        ) -> std::result::Result<(), Self::Error> {
+            self.inner.set_cursor_position(position)
+        }
+        fn clear(&mut self) -> std::result::Result<(), Self::Error> {
+            self.inner.clear()
+        }
+        fn clear_region(
+            &mut self,
+            clear_type: ratatui::backend::ClearType,
+        ) -> std::result::Result<(), Self::Error> {
+            self.inner.clear_region(clear_type)
+        }
+        fn size(&self) -> std::result::Result<ratatui::layout::Size, Self::Error> {
+            self.inner.size()
+        }
+        fn window_size(
+            &mut self,
+        ) -> std::result::Result<ratatui::backend::WindowSize, Self::Error> {
+            self.inner.window_size()
+        }
+        fn flush(&mut self) -> std::result::Result<(), Self::Error> {
+            // `flush` ends every draw: publish the frame as it now stands.
+            *self.frame.lock().unwrap() = Some(self.inner.buffer().clone());
+            self.inner.flush()
+        }
+    }
+
+    type Frames = Arc<std::sync::Mutex<Option<ratatui::buffer::Buffer>>>;
+
+    /// Resolves once the latest drawn frame satisfies `ready`.
+    async fn wait_for_frame(frames: &Frames, ready: impl Fn(&ratatui::buffer::Buffer) -> bool) {
+        loop {
+            if frames.lock().unwrap().as_ref().is_some_and(&ready) {
+                return;
+            }
+            sleep(Duration::from_millis(5)).await;
+        }
+    }
+
+    fn screen_has(buffer: &ratatui::buffer::Buffer, needle: &str) -> bool {
+        (0..buffer.area.height).any(|y| {
+            (0..buffer.area.width)
+                .map(|x| buffer[(x, y)].symbol())
+                .collect::<String>()
+                .contains(needle)
+        })
+    }
+
+    fn header_is_paper(buffer: &ratatui::buffer::Buffer) -> bool {
+        let paper = Theme::builtin("paper", ColorDepth::TrueColor).unwrap();
+        (0..buffer.area.width).any(|x| buffer[(x, 0)].fg == paper.fg_dim)
+    }
+
+    /// Like `drive`, but with a reloader over a temporary config directory. Keys are sent
+    /// in order; `gates` holds `(index, text)`: before the key at `index` is sent, the
+    /// screen must show `text` (waiting on frames, never on the clock). The loop quits
+    /// once the screen satisfies `done`.
     async fn drive_with_config(
         config_toml: Option<&str>,
         events: Vec<std::io::Result<Event>>,
+        gates: &[(usize, &'static str)],
+        done: fn(&ratatui::buffer::Buffer) -> bool,
         state: &mut AppState,
-    ) -> (Result<QuitKind>, Terminal<TestBackend>, tempfile::TempDir) {
+    ) -> (Result<QuitKind>, Terminal<Probe>, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
         let paths = crate::paths::AppPaths::under(dir.path());
         if let Some(text) = config_toml {
             std::fs::create_dir_all(paths.config_dir()).unwrap();
             std::fs::write(paths.config_file(), text).unwrap();
         }
-        let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+        let frames: Frames = Arc::default();
+        let probe = Probe {
+            inner: TestBackend::new(80, 24),
+            frame: Arc::clone(&frames),
+        };
+        let mut terminal = Terminal::new(probe).unwrap();
         let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
-        let stream = stream::iter(events).chain(stream::pending());
+        let gates: Vec<(usize, &'static str)> = gates.to_vec();
+        let keys = stream::iter(events.into_iter().enumerate()).then({
+            let frames = Arc::clone(&frames);
+            move |(i, event)| {
+                let frames = Arc::clone(&frames);
+                let gate = gates.iter().find(|(at, _)| *at == i).map(|(_, t)| *t);
+                async move {
+                    match gate {
+                        Some(text) => wait_for_frame(&frames, |b| screen_has(b, text)).await,
+                        // The first key also waits for the first frame, i.e. for start-up.
+                        None if i == 0 => wait_for_frame(&frames, |_| true).await,
+                        None => {}
+                    }
+                    event
+                }
+            }
+        });
+        let quit = stream::once({
+            let frames = Arc::clone(&frames);
+            async move {
+                wait_for_frame(&frames, done).await;
+                Ok(Event::Key(KeyEvent {
+                    code: KeyCode::Char('c'),
+                    modifiers: KeyModifiers::CONTROL,
+                    kind: KeyEventKind::Press,
+                    state: KeyEventState::NONE,
+                }))
+            }
+        });
+        let stream = keys.chain(quit).chain(stream::pending());
         let result = run_with(
             &mut terminal,
             stream,
@@ -924,7 +1046,7 @@ mod tests {
         (result, terminal, dir)
     }
 
-    // Real time: config and theme reads run on blocking threads.
+    // Waits on drawn frames, not the clock: config and theme reads run on blocking threads.
     #[tokio::test]
     async fn palette_reload_config_applies_keymap_icons_and_theme() {
         let mut state = state();
@@ -936,7 +1058,8 @@ icons = \"ascii\"
 \"q\" = \"none\"
 \"T\" = \"file.trash\"
 ";
-        let (result, terminal, _dir) = drive_with_config(Some(config), events, &mut state).await;
+        let (result, terminal, _dir) =
+            drive_with_config(Some(config), events, &[], header_is_paper, &mut state).await;
         assert_eq!(result.unwrap(), QuitKind::Exit);
         assert_eq!(state.config.theme, "paper");
         assert_eq!(state.config.icons, ks_core::config::IconSet::Ascii);
@@ -951,31 +1074,30 @@ icons = \"ascii\"
             .iter()
             .all(|k| k != "q"));
         // The frame was redrawn with the paper theme (light text colour differs from ember).
-        let paper = Theme::builtin("paper", ColorDepth::TrueColor).unwrap();
-        let buffer = terminal.backend().buffer();
-        assert!(
-            (0..buffer.area.width).any(|x| buffer[(x, 0)].fg == paper.fg_dim),
-            "header should use the paper palette"
-        );
+        assert!(header_is_paper(terminal.backend().inner.buffer()));
     }
 
-    // Real time: config and theme reads run on blocking threads.
+    // Waits on drawn frames, not the clock: config and theme reads run on blocking threads.
     #[tokio::test]
     async fn palette_switch_theme_changes_the_drawn_colours() {
         let mut state = state();
         let mut events = typed(":switch theme");
         events.push(special(KeyCode::Enter));
+        // The theme picker lists "paper" only once the start-up theme listing arrived.
+        let down = events.len();
         events.push(special(KeyCode::Down));
         events.push(special(KeyCode::Enter));
-        let (result, terminal, _dir) = drive_with_config(None, events, &mut state).await;
+        let (result, terminal, _dir) = drive_with_config(
+            None,
+            events,
+            &[(down, "paper")],
+            header_is_paper,
+            &mut state,
+        )
+        .await;
         assert!(result.is_ok());
         assert_eq!(state.config.theme, "paper");
-        let paper = Theme::builtin("paper", ColorDepth::TrueColor).unwrap();
-        let buffer = terminal.backend().buffer();
-        assert!(
-            (0..buffer.area.width).any(|x| buffer[(x, 0)].fg == paper.fg_dim),
-            "header should use the paper palette"
-        );
+        assert!(header_is_paper(terminal.backend().inner.buffer()));
     }
 
     // Real time: config and theme reads run on blocking threads.

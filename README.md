@@ -105,7 +105,7 @@ cursor.
 The preview pane shows on terminals 80 columns wide or more; the list gets `[layout]
 list_percent` (40 %) of the width. `w` forces the preview on or off at any width, `P` toggles the
 parent-directory column (it needs 100 columns), `i` switches the preview between content and
-metadata, `J` `K` scroll the preview. File sizes disappear below 60 columns.
+metadata, `J` `K` scroll the preview. File sizes and folder item counts show from 60 terminal columns (while the list pane stays at least 30 cells wide) and disappear below that.
 
 The preview runs in the background and never blocks the keys; it is cancelled when the cursor
 moves. It renders:

@@ -34,6 +34,8 @@ pub struct FinderSnapshot {
     pub walking: bool,
     /// The walk was served from the cache.
     pub from_cache: bool,
+    /// Directories the walk skipped as access denied (0 for a cache-served walk).
+    pub denied: u64,
     /// Rank of `results[0]`.
     pub offset: u32,
     pub results: Vec<FinderResult>,
@@ -52,6 +54,8 @@ pub struct FinderState {
     pub total: u32,
     pub walking: bool,
     pub from_cache: bool,
+    /// Directories skipped as access denied by the last finished walk.
+    pub denied: u64,
     /// Results `window_offset..window_offset + results.len()` of the ranking.
     pub results: Vec<FinderResult>,
     pub window_offset: u32,
@@ -110,6 +114,7 @@ pub(crate) fn open(state: &mut AppState, effects: &mut Vec<Effect>) {
         total: 0,
         walking: true,
         from_cache: false,
+        denied: 0,
         results: Vec::new(),
         window_offset: 0,
         selected: 0,
@@ -210,6 +215,7 @@ pub(crate) fn on_results(
     f.total = snapshot.total;
     f.walking = snapshot.walking;
     f.from_cache = snapshot.from_cache;
+    f.denied = snapshot.denied;
     f.window_offset = snapshot.offset;
     f.results = snapshot.results;
     f.selected = f.selected.min(f.matched.saturating_sub(1));

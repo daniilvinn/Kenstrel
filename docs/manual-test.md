@@ -64,12 +64,11 @@ Steps in order, starting from `ks C:\`.
 ## 3. Layout
 
 - [ ] **80 x 24.** Resize to 80 columns by 24 rows. Expect: the preview pane is shown (the preview
-  appears from 80 columns), the list has about 40 % of the width and shows no size column. At 79
+  appears from 80 columns), the list has about 40 % of the width and shows the size column (item counts for folders). At 79
   columns the preview disappears and the list uses the full width with sizes.
 - [ ] **`w` forces.** At 70 columns press `w`: Expect: the preview appears (or a status message says
   there is no room); `w` again hides it. The choice survives resizes.
-- [ ] **Sizes vanish.** Make the list pane narrower than 60 columns (hide the preview with `w`, then
-  narrow the window to 59). Expect: the size column is gone, names remain.
+- [ ] **Sizes vanish.** Narrow the window to 59 columns (hide the preview with `w` first if needed). Expect: the size column is gone, names remain.
 - [ ] **Parent column.** At 100 columns or more press `P`. Expect: a column with the parent
   directory appears to the left, the current directory highlighted. Below 100 columns it does not
   show.

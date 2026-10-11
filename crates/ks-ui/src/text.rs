@@ -2,7 +2,8 @@
 
 use std::path::{Component, Path};
 
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 
 const ELLIPSIS: &str = "…";
 
@@ -11,7 +12,8 @@ pub fn width(s: &str) -> usize {
     UnicodeWidthStr::width(s)
 }
 
-/// Truncates the end of `s` with `…` so that it fits in `max` cells.
+/// Truncates the end of `s` with `…` so that it fits in `max` cells. Cuts fall between grapheme
+/// clusters, so an emoji sequence is never split and its width is measured as a whole.
 pub fn truncate_end(s: &str, max: usize) -> String {
     if width(s) <= max {
         return s.to_owned();
@@ -21,12 +23,12 @@ pub fn truncate_end(s: &str, max: usize) -> String {
     }
     let mut out = String::new();
     let mut used = 0;
-    for c in s.chars() {
-        let w = c.width().unwrap_or(0);
+    for g in s.graphemes(true) {
+        let w = width(g);
         if used + w + 1 > max {
             break;
         }
-        out.push(c);
+        out.push_str(g);
         used += w;
     }
     out.push_str(ELLIPSIS);
@@ -41,18 +43,18 @@ pub fn truncate_start(s: &str, max: usize) -> String {
     if max == 0 {
         return String::new();
     }
-    let mut kept: Vec<char> = Vec::new();
+    let mut kept: Vec<&str> = Vec::new();
     let mut used = 0;
-    for c in s.chars().rev() {
-        let w = c.width().unwrap_or(0);
+    for g in s.graphemes(true).rev() {
+        let w = width(g);
         if used + w + 1 > max {
             break;
         }
-        kept.push(c);
+        kept.push(g);
         used += w;
     }
-    kept.push('…');
-    kept.iter().rev().collect()
+    kept.push(ELLIPSIS);
+    kept.iter().rev().copied().collect()
 }
 
 /// Replaces control characters (which could move the cursor or inject escape sequences) and
@@ -92,26 +94,31 @@ pub fn truncate_middle(name: &str, max: usize, keep_extension: bool) -> String {
 
     let mut head = String::new();
     let mut used = 0;
-    for c in stem.chars() {
-        let w = c.width().unwrap_or(0);
+    for g in stem.graphemes(true) {
+        let w = width(g);
         if used + w > head_budget {
             break;
         }
-        head.push(c);
+        head.push_str(g);
         used += w;
     }
-    let mut tail: Vec<char> = Vec::new();
+    let mut tail: Vec<&str> = Vec::new();
     let mut used = 0;
-    for c in stem[head.len()..].chars().rev() {
-        let w = c.width().unwrap_or(0);
+    for g in stem[head.len()..].graphemes(true).rev() {
+        let w = width(g);
         if used + w > tail_budget {
             break;
         }
-        tail.push(c);
+        tail.push(g);
         used += w;
     }
     let tail: String = tail.into_iter().rev().collect();
-    format!("{head}{ELLIPSIS}{tail}{ext}")
+    let out = format!("{head}{ELLIPSIS}{tail}{ext}");
+    // Cluster widths add up in all but exotic cases; never exceed the budget regardless.
+    if width(&out) > max {
+        return truncate_end(name, max);
+    }
+    out
 }
 
 /// Strips `home` from the front of `path`, component by component. Windows paths compare
@@ -279,6 +286,9 @@ mod tests {
             "emoji🎉name🎉name🎉.md",
             "a.b.c.d.e.f.g.h.i.j.k",
             "noext_but_long_name",
+            "\u{2764}\u{FE0F}\u{2764}\u{FE0F}\u{2764}\u{FE0F}\u{2764}\u{FE0F}\u{2764}\u{FE0F}\u{2764}\u{FE0F}.txt",
+            "1\u{FE0F}\u{20E3}1\u{FE0F}\u{20E3}1\u{FE0F}\u{20E3}1\u{FE0F}\u{20E3}1\u{FE0F}\u{20E3}.md",
+            "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}.rs",
         ];
         for name in names {
             for keep in [true, false] {
@@ -288,6 +298,25 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn end_and_start_truncation_respect_grapheme_clusters() {
+        let hearts = "\u{2764}\u{FE0F}".repeat(12) + ".txt";
+        let family = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}".repeat(5);
+        let keycaps = "1\u{FE0F}\u{20E3}".repeat(6);
+        for text in [&hearts, &family, &keycaps] {
+            for max in 0..30 {
+                for out in [truncate_end(text, max), truncate_start(text, max)] {
+                    assert!(width(&out) <= max, "{out:?} ({max})");
+                    assert!(!out.starts_with('\u{FE0F}') && !out.starts_with('\u{200D}'));
+                    assert!(!out.ends_with('\u{200D}'));
+                }
+            }
+        }
+        // A ZWJ family is one two-cell cluster: three of them plus the ellipsis fit 7 cells.
+        let fam = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
+        assert_eq!(truncate_end(&family, 7), fam.repeat(3) + "…");
     }
 
     fn p(s: &str) -> PathBuf {

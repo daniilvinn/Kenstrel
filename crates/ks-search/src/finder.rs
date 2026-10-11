@@ -29,7 +29,7 @@
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
 use nucleo::pattern::{CaseMatching, Normalization};
@@ -37,7 +37,7 @@ use nucleo::{Config, Injector, Matcher, Nucleo, Utf32String};
 use parking_lot::Mutex;
 use tokio_util::sync::CancellationToken;
 
-use crate::cache::{fold_hash, CacheKey, RawNames, WalkCache, Walked};
+use crate::cache::{CacheKey, RawNames, WalkCache, Walked};
 use crate::walk::{walk, EntryKind, WalkEntry, WalkOptions, WalkSink, WalkSummary};
 use crate::Notify;
 
@@ -216,10 +216,14 @@ pub struct FinderResult {
 struct WalkShared {
     walking: AtomicBool,
     summary: Mutex<Option<WalkSummary>>,
+    /// Denied count remembered by the cache entry a session was served from.
+    cached_denied: AtomicU64,
 }
 
 /// What a background re-walk of a cached root found.
 struct RefreshOutcome {
+    /// Denied count of the fresh walk.
+    denied: u64,
     /// Items that were not in the cached walk.
     added: Vec<FinderItem>,
     /// The complete fresh walk, only when something in the cache no longer exists (nucleo
@@ -293,6 +297,16 @@ impl Drop for InjectSink {
     }
 }
 
+/// Hash of the exact path text. Unlike the cache's case-folding hash it keeps two names that
+/// differ only in case apart (case-sensitive directories), and a case-only rename on Windows
+/// misses, which sends the new casing down the added path.
+fn exact_hash(text: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    text.hash(&mut h);
+    h.finish()
+}
+
 /// What one walker thread of a background re-walk found.
 #[derive(Default)]
 struct RefreshPart {
@@ -308,7 +322,6 @@ struct RefreshSink {
     root: PathBuf,
     known: Arc<HashMap<u64, u32>>,
     cached: Arc<Walked>,
-    scratch: String,
     local: RefreshPart,
     out: Arc<Mutex<Vec<RefreshPart>>>,
 }
@@ -317,10 +330,12 @@ impl WalkSink for RefreshSink {
     fn entry(&mut self, entry: WalkEntry) -> bool {
         let rel = entry.rel(&self.root);
         let text = rel.to_string_lossy();
-        let hash = fold_hash(&mut self.scratch, &text);
+        let hash = exact_hash(&text);
         if let Some(&idx) = self.known.get(&hash) {
             let old = &self.cached.items[idx as usize];
-            if old.kind() == entry.kind {
+            // The key is a hash: compare the exact path too (a collision must not reuse a
+            // different path's allocation).
+            if old.kind() == entry.kind && old.rel() == &*text {
                 self.local.items.push(old.clone());
                 self.local.hits += 1;
                 return true;
@@ -404,10 +419,9 @@ fn spawn_refresh(
             // Do not mistake an unreadable or vanished root for an emptied one.
             return finish(None);
         }
-        let mut scratch = String::new();
         let mut known: HashMap<u64, u32> = HashMap::with_capacity(cached.items.len());
         for (i, item) in cached.items.iter().enumerate() {
-            known.insert(fold_hash(&mut scratch, item.rel()), i as u32);
+            known.insert(exact_hash(item.rel()), i as u32);
         }
         let known = Arc::new(known);
         let out: Arc<Mutex<Vec<RefreshPart>>> = Arc::default();
@@ -415,7 +429,6 @@ fn spawn_refresh(
             root: walk_opts.root.clone(),
             known: known.clone(),
             cached: cached.clone(),
-            scratch: String::new(),
             local: RefreshPart::default(),
             out: out.clone(),
         });
@@ -444,15 +457,18 @@ fn spawn_refresh(
             all_raws.retain(|k, _| alive.contains(&**k));
         }
         all_raws.extend(raws.iter().map(|(k, v)| (k.clone(), v.clone())));
+        let denied = summary.denied;
         let fresh = Arc::new(Walked {
             items,
             raws: all_raws,
+            denied,
         });
         cache.put_walked_if_unchanged(key, &cached, fresh.clone());
         finish(Some(RefreshOutcome {
             added,
             full: removed.then_some(fresh),
             raws,
+            denied,
         }));
     };
     if let Err(e) = std::thread::Builder::new()
@@ -505,6 +521,7 @@ impl FinderSession {
         let shared = Arc::new(WalkShared {
             walking: AtomicBool::new(true),
             summary: Mutex::new(None),
+            cached_denied: AtomicU64::new(0),
         });
         let refresh = Arc::new(RefreshShared::default());
         let raws: Arc<Mutex<RawNames>> = Arc::default();
@@ -514,6 +531,9 @@ impl FinderSession {
         let from_cache = cached.is_some();
         if let Some(entries) = cached {
             raws.lock().extend(entries.raws.clone());
+            shared
+                .cached_denied
+                .store(entries.denied, Ordering::Relaxed);
             spawn_feed(
                 entries.clone(),
                 injector.clone(),
@@ -557,7 +577,14 @@ impl FinderSession {
                             .extend(raws.iter().map(|(k, v)| (k.clone(), v.clone())));
                         if let Some(cache) = cache {
                             let all: Vec<FinderItem> = chunks.into_iter().flatten().collect();
-                            cache.put_walked(key, Arc::new(Walked { items: all, raws }));
+                            cache.put_walked(
+                                key,
+                                Arc::new(Walked {
+                                    items: all,
+                                    raws,
+                                    denied: summary.denied,
+                                }),
+                            );
                         }
                     }
                     tracing::debug!(?summary, "finder walk finished");
@@ -618,6 +645,7 @@ impl FinderSession {
             shared: Arc::new(WalkShared {
                 walking: AtomicBool::new(false),
                 summary: Mutex::new(None),
+                cached_denied: AtomicU64::new(0),
             }),
             refresh: Arc::default(),
             raws: Arc::default(),
@@ -684,6 +712,9 @@ impl FinderSession {
             return false;
         };
         self.raws.lock().extend(outcome.raws);
+        self.shared
+            .cached_denied
+            .store(outcome.denied, Ordering::Relaxed);
         match outcome.full {
             Some(full) => {
                 // Something disappeared: rebuild the matcher from the fresh walk. The old
@@ -722,6 +753,15 @@ impl FinderSession {
     /// Walk summary (denied counts etc.) once the walk is done and was not served from cache.
     pub fn walk_summary(&self) -> Option<WalkSummary> {
         *self.shared.summary.lock()
+    }
+
+    /// Directories skipped as access denied: from this session's own walk, or remembered by the
+    /// cache entry it was served from.
+    pub fn denied_count(&self) -> u64 {
+        self.walk_summary().map_or_else(
+            || self.shared.cached_denied.load(Ordering::Relaxed),
+            |w| w.denied,
+        )
     }
 
     /// Number of items matching the query in the current snapshot.
@@ -972,6 +1012,65 @@ mod tests {
         settle(&mut s2);
         assert_eq!(s2.total_count(), 5);
         assert_eq!(s2.matched_count(), 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_case_only_rename_replaces_the_cached_casing() {
+        let t = tempfile::tempdir().unwrap();
+        touch(t.path(), "Readme.md");
+        let cache = Arc::new(WalkCache::new());
+        let opts = FinderOptions::new(t.path());
+        let mut s1 = FinderSession::start(opts.clone(), 1, Some(cache.clone()), noop());
+        settle(&mut s1);
+        drop(s1);
+        fs::rename(t.path().join("Readme.md"), t.path().join("README.md")).unwrap();
+        let mut s2 = FinderSession::start(opts.clone(), 2, Some(cache.clone()), noop());
+        // The refresh applies asynchronously: poll for the condition, no fixed sleeps.
+        let t0 = Instant::now();
+        while s2
+            .results(0, 5)
+            .first()
+            .is_none_or(|r| r.rel != "README.md")
+        {
+            s2.tick(10);
+            assert!(
+                t0.elapsed() < Duration::from_secs(20),
+                "casing never refreshed"
+            );
+        }
+        settle(&mut s2);
+        assert_eq!(s2.total_count(), 1);
+        drop(s2);
+        // The refreshed walk was written back to the cache.
+        let mut s3 = FinderSession::start(opts, 3, Some(cache), noop());
+        settle(&mut s3);
+        assert_eq!(s3.results(0, 5)[0].rel, "README.md");
+    }
+
+    #[test]
+    fn a_cache_served_session_remembers_the_denied_count() {
+        let t = tempfile::tempdir().unwrap();
+        let mut opts = FinderOptions::new(t.path());
+        opts.refresh_cached = false;
+        let cache = Arc::new(WalkCache::new());
+        cache.put_walked(
+            opts.cache_key(),
+            Arc::new(Walked {
+                items: vec![FinderItem::new("a.txt", EntryKind::File)],
+                raws: RawNames::new(),
+                denied: 3,
+            }),
+        );
+        let mut s = FinderSession::start(opts, 1, Some(cache), noop());
+        settle(&mut s);
+        assert!(s.walk_summary().is_none());
+        assert_eq!(s.denied_count(), 3);
+    }
+
+    #[test]
+    fn refresh_keys_keep_names_differing_only_in_case_apart() {
+        assert_ne!(exact_hash("a.txt"), exact_hash("A.txt"));
     }
 
     #[test]

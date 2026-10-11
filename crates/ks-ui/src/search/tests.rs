@@ -154,6 +154,7 @@ fn finder_state(w: u16, h: u16, walking: bool) -> AppState {
         total: 58_910,
         walking,
         from_cache: false,
+        denied: 0,
         offset: 0,
         results,
     };
@@ -662,4 +663,48 @@ fn the_grep_hit_line_is_marked_in_the_preview() {
     assert!(text.contains("line 88"), "{text}");
     assert!(text.contains("let value_87 = compute(87);"), "{text}");
     assert!(!text.contains("preview: wired by P2"), "{text}");
+}
+
+#[test]
+fn finder_footer_counts_access_denied_skips() {
+    let mut s = finder_state(160, 48, false);
+    assert!(!text_only(&s).contains("denied"));
+    s.search.finder.as_mut().unwrap().denied = 1_204;
+    let text = text_only(&s);
+    assert!(text.contains("1,204 denied"), "{text}");
+}
+
+#[test]
+fn finder_denied_footer_snapshots_at_80x24() {
+    for name in THEMES {
+        let mut s = finder_state(80, 24, false);
+        s.search.finder.as_mut().unwrap().denied = 1_204;
+        insta::assert_snapshot!(
+            format!("finder_denied_{name}_80x24"),
+            draw(&s, &theme(name))
+        );
+    }
+}
+
+#[test]
+fn path_spans_measure_zwj_sequences_as_one_cluster_and_highlight_it() {
+    let t = theme("ember");
+    // A family emoji is 2 cells; the over-counting char sum made it 6 and cut it early.
+    let rel = "dir/👨‍👩‍👧.txt";
+    let spans = path_spans(rel, &[], 20, &t, Style::new());
+    let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
+    assert_eq!(text, rel);
+    assert!(width(&text) <= 20);
+    // A match on any char of the cluster highlights the whole cluster, never splitting it.
+    let spans = path_spans(rel, &[6], 20, &t, Style::new());
+    let hl: Vec<_> = spans
+        .iter()
+        .filter(|s| s.style == t.bold_accent())
+        .map(|s| s.content.to_string())
+        .collect();
+    assert_eq!(hl, vec!["👨‍👩‍👧".to_owned()]);
+    // Cut from the left, the result still fits the budget.
+    let cut = path_spans(rel, &[], 8, &t, Style::new());
+    let text: String = cut.iter().map(|s| s.content.as_ref()).collect();
+    assert!(width(&text) <= 8, "{text}");
 }

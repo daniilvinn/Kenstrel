@@ -160,6 +160,10 @@ impl AppState {
         let view = DirView::new(params.config.sort.clone(), params.config.files.show_hidden);
         let preview = PreviewState::new(&params.config);
         let claude = ClaudeState::new(&params.config.claude);
+        let (config_show_hidden, config_show_ignored) = (
+            params.config.files.show_hidden,
+            params.config.files.show_ignored,
+        );
         Self {
             cwd: params.cwd,
             home: params.home,
@@ -200,7 +204,11 @@ impl AppState {
             git_gen: GenCounter::default(),
             git_timer_gen: GenCounter::default(),
             children_gen: GenCounter::default(),
-            search: crate::search::SearchState::default(),
+            search: crate::search::SearchState {
+                finder_hidden: config_show_hidden,
+                finder_gitignore: config_show_ignored,
+                ..crate::search::SearchState::default()
+            },
         }
     }
 

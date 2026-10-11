@@ -84,6 +84,7 @@ impl FinderWorker {
                         total: 0,
                         walking: false,
                         from_cache: false,
+                        denied: 0,
                         offset: 0,
                         results: Vec::new(),
                     }),
@@ -221,6 +222,7 @@ fn run(
                 total: session.total_count(),
                 walking: session.walking(),
                 from_cache,
+                denied: session.denied_count(),
                 offset: window.0,
                 results: session.results(window.0, window.1),
             };
