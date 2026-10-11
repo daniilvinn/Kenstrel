@@ -37,7 +37,7 @@ pub fn with_preview(mut state: AppState) -> AppState {
 /// Makes `body` the engine result for the entry under the cursor.
 pub fn show(state: &mut AppState, body: PreviewBody, meta: Option<FileMetadata>) {
     let name = state.view.current().expect("a cursor entry").name.clone();
-    let path = state.cwd.join(name);
+    let path = fixture_path(state, &name);
     state.preview.target = Some(path.clone());
     state.preview.current = Some(Arc::new(Preview { path, meta, body }));
     state.preview.loading = false;
@@ -269,10 +269,22 @@ pub fn unavailable_body() -> PreviewBody {
     }
 }
 
+/// `name` under the fixture cwd, always joined with `/` so the rendered path (and so the
+/// snapshots) is the same on every platform.
+fn fixture_path(state: &AppState, name: impl AsRef<std::ffi::OsStr>) -> std::path::PathBuf {
+    let cwd = state.cwd.to_string_lossy();
+    format!(
+        "{}/{}",
+        cwd.trim_end_matches(['/', '\\']),
+        name.as_ref().to_string_lossy()
+    )
+    .into()
+}
+
 /// Metadata for the entry called `name` below the fixture directory.
 pub fn metadata_of(state: &AppState, name: &str, size: u64, raw_attrs: u32) -> FileMetadata {
     FileMetadata {
-        path: state.cwd.join(name),
+        path: fixture_path(state, name),
         kind: K::File,
         size,
         created: Some(ago(40 * 86_400)),

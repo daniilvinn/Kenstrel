@@ -507,10 +507,12 @@ async fn trash_undo() {
     h.keys("d");
     h.until("the file to be trashed", |_| !root.join("t.txt").exists())
         .await;
-    assert!(h.status().contains("Recycle Bin") || h.state.has_running_jobs());
     h.gone("t.txt").await;
     // The undo entry is recorded when the trash job finishes; wait for that first.
     h.jobs_idle().await;
+    // (The file can vanish before the job's completion message is handled, so the status
+    // line is only checked once the job is done.)
+    assert!(h.status().contains("Recycle Bin"), "{}", h.status());
     h.keys("u");
     h.until("the file to be restored", |_| root.join("t.txt").exists())
         .await;
