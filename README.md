@@ -218,7 +218,7 @@ On terminals at least 100 columns wide, both overlays preview the highlighted re
 
 Copy, move and delete run as background jobs, and quitting while one runs asks first. On a name
 conflict, choose `O` overwrite, `s` skip, `r` rename, `k` keep both or `c` cancel. Press `a` first
-to apply the next choice to every remaining conflict. The editor is `[editor] open`, else
+to apply the next overwrite, skip or keep-both choice to every remaining conflict. The editor is `[editor] open`, else
 `$VISUAL`, `$EDITOR`, `code`, then `notepad`. Terminal editors (vim, nvim, hx, ...) suspend
 Kestrel while they run. GUI editors start detached.
 
