@@ -63,14 +63,14 @@ jobs:
           if ($bad) { Write-Error "dynamic CRT imports: $bad"; exit 1 }
       - name: Upload binary (Windows)
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ks-windows-x86_64
           path: target/release/ks.exe
           if-no-files-found: error
       - name: Upload binary (Linux)
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ks-linux-x86_64
           path: target/release/ks
