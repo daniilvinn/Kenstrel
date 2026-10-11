@@ -17,8 +17,9 @@ First release.
 
 - Vim-style navigation: `j` `k`, `gg` `G`, half-page scrolling, enter and leave directories, back
   and forward history, jumps to home, Downloads, Desktop, the config directory and This PC.
-- This PC view above a drive root, with label, file system and a free-space bar; empty drives
-  never raise a system dialog.
+- This PC view above a drive root, with label, file system and a free-space bar; it updates
+  within a second when a drive is plugged in or removed, and empty drives never raise a system
+  dialog.
 - Streaming directory listings that draw only the visible rows, so directories with 100,000
   entries open instantly; the list refreshes by itself when files change on disk.
 - Sorting by name, size, modified time or extension, hidden-file toggle, marks, visual range
@@ -55,6 +56,8 @@ First release.
   program; `ctrl-` and `alt-` chords keep working on non-Latin keyboard layouts.
 - Commented `config.toml` written on first run, validated with clear errors that never stop
   Kestrel from starting, and reloadable without a restart.
+- `KESTREL_CONFIG_DIR` and `KESTREL_STATE_DIR` move the configuration and state directories
+  (portable installs).
 - Two built-in themes (`ember` dark, `paper` light) and user themes as small TOML files, with
   256-colour fallback; `nerd`, `unicode` and `ascii` icon sets.
 
