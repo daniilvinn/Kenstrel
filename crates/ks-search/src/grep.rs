@@ -340,7 +340,19 @@ fn build_matcher(q: &GrepQuery) -> Result<RegexMatcher, String> {
         .case_smart(true)
         .word(q.whole_word)
         .build(&pat)
-        .map_err(|e| format!("invalid pattern: {e}"))
+        .map_err(|e| format!("invalid pattern: {}", regex_error_summary(&e.to_string())))
+}
+
+/// The regex crate's errors are multi-line (an echo of the pattern with a caret, then
+/// `error: <reason>`). Only the reason fits a one-row footer and says what is wrong.
+fn regex_error_summary(message: &str) -> String {
+    let last = message
+        .lines()
+        .rev()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or(message)
+        .trim();
+    last.strip_prefix("error: ").unwrap_or(last).to_owned()
 }
 
 fn run_search(
@@ -456,8 +468,9 @@ fn run_search(
     stats.errors.fetch_add(summary.errors, Ordering::Relaxed);
     drop(path_tx);
 
+    let mut crashed = false;
     for w in workers {
-        let _ = w.join();
+        crashed |= w.join().is_err();
     }
     match collector {
         Ok(c) => {
@@ -473,6 +486,13 @@ fn run_search(
         }
     }
 
+    if crashed && !caller_cancel.is_cancelled() {
+        sink(GrepEvent::Error {
+            generation,
+            message: "a search worker crashed; results may be incomplete".into(),
+        });
+        return;
+    }
     let stats = stats.snapshot();
     if caller_cancel.is_cancelled() {
         sink(GrepEvent::Cancelled { generation, stats });
@@ -595,6 +615,11 @@ impl WorkerCtx {
             if self.cancel.is_cancelled() {
                 break;
             }
+            #[cfg(test)]
+            assert!(
+                path.file_name() != Some(std::ffi::OsStr::new("__worker_crash__")),
+                "forced worker crash"
+            );
             let mut sink = LineSink {
                 matcher: &self.matcher,
                 cancel: &self.cancel,
@@ -605,7 +630,21 @@ impl WorkerCtx {
                 lines: Vec::new(),
                 binary: false,
             };
-            let res = searcher.search_path(&self.matcher, &path, &mut sink);
+            // A bug while handling one file must cost that file, not the worker (and with it
+            // every file it would have searched afterwards).
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                #[cfg(test)]
+                assert!(
+                    path.file_name() != Some(std::ffi::OsStr::new("__file_panic__")),
+                    "forced file panic"
+                );
+                searcher.search_path(&self.matcher, &path, &mut sink)
+            }));
+            let Ok(res) = res else {
+                tracing::error!(path = %path.display(), "grep panicked on a file");
+                self.stats.errors.fetch_add(1, Ordering::Relaxed);
+                continue;
+            };
             match res {
                 Ok(()) => {
                     self.stats.files_searched.fetch_add(1, Ordering::Relaxed);
@@ -697,7 +736,7 @@ impl Sink for LineSink<'_> {
 /// edge inside an invalid sequence snaps outward to the replacement character.
 fn lossy_with_ranges(bytes: &[u8], ranges: &[Range<usize>]) -> (String, Vec<Range<usize>>) {
     if let Ok(s) = std::str::from_utf8(bytes) {
-        return (s.to_owned(), ranges.to_vec());
+        return (s.to_owned(), snap_ranges(s, ranges));
     }
     let mut out = String::with_capacity(bytes.len() + 8);
     // start_map[i]: new offset of input offset i (inside an invalid run: the run start);
@@ -740,6 +779,25 @@ fn lossy_with_ranges(bytes: &[u8], ranges: &[Range<usize>]) -> (String, Vec<Rang
     (out, mapped)
 }
 
+/// `ranges` clamped to `text` and moved outward to char boundaries; empty ones are dropped.
+/// A byte-level regex (`(?-u:©)`) can match in the middle of a character.
+fn snap_ranges(text: &str, ranges: &[Range<usize>]) -> Vec<Range<usize>> {
+    ranges
+        .iter()
+        .filter_map(|r| {
+            let mut start = r.start.min(text.len());
+            let mut end = r.end.min(text.len());
+            while !text.is_char_boundary(start) {
+                start -= 1;
+            }
+            while !text.is_char_boundary(end) {
+                end += 1;
+            }
+            (start < end).then_some(start..end)
+        })
+        .collect()
+}
+
 fn trim_eol(mut b: &[u8]) -> &[u8] {
     if let [rest @ .., b'\n'] = b {
         b = rest;
@@ -754,10 +812,10 @@ fn trim_eol(mut b: &[u8]) -> &[u8] {
 /// invisible formatting characters that can spoof the displayed text (bidirectional
 /// overrides/isolates/marks, line and paragraph separators, zero-width space, word joiner and
 /// invisible operators, BOM). Zero-width (non-)joiners are kept for emoji and Indic scripts.
-fn is_unsafe_char(c: char) -> bool {
+pub fn is_unsafe_char(c: char) -> bool {
     c.is_control()
         || matches!(c,
-            '\u{200B}' | '\u{200E}' | '\u{200F}'
+            '\u{061C}' | '\u{200B}' | '\u{200E}' | '\u{200F}'
             | '\u{2028}'..='\u{202E}'
             | '\u{2060}'..='\u{2064}'
             | '\u{2066}'..='\u{206F}'
@@ -772,6 +830,8 @@ pub fn sanitize_line(
     max_chars: usize,
 ) -> (String, Vec<Range<usize>>) {
     let max_chars = max_chars.max(8);
+    // Any caller-supplied range is made safe to slice with.
+    let ranges = &snap_ranges(text, ranges)[..];
     let total_chars = text.chars().count();
     // Window in bytes [ws, we).
     let (mut ws, mut we) = (0, text.len());
@@ -834,6 +894,133 @@ pub fn is_under(root: &Path, path: &Path) -> bool {
 #[allow(clippy::single_range_in_vec_init)]
 mod tests {
     use super::*;
+
+    /// Runs a search over `root` and returns the terminal event.
+    fn finish(root: &std::path::Path, pattern: &str) -> GrepEvent {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let sink = Arc::new(move |e: GrepEvent| {
+            let _ = tx.send(e);
+        });
+        let handle = spawn_search(
+            GrepQuery::new(root, pattern),
+            1,
+            CancellationToken::new(),
+            sink,
+        )
+        .unwrap();
+        let mut last = None;
+        while let Ok(e) = rx.recv_timeout(std::time::Duration::from_secs(30)) {
+            let end = matches!(
+                e,
+                GrepEvent::Done { .. } | GrepEvent::Cancelled { .. } | GrepEvent::Error { .. }
+            );
+            last = Some(e);
+            if end {
+                break;
+            }
+        }
+        handle.join();
+        last.expect("search must terminate")
+    }
+
+    #[test]
+    fn a_panic_on_one_file_costs_that_file_and_counts_one_error() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("__file_panic__"),
+            "needle
+",
+        )
+        .unwrap();
+        std::fs::write(
+            t.path().join("ok.txt"),
+            "needle
+",
+        )
+        .unwrap();
+        let GrepEvent::Done { stats, .. } = finish(t.path(), "needle") else {
+            panic!("the search must still finish normally");
+        };
+        assert_eq!(stats.errors, 1);
+        assert_eq!(stats.files_searched, 1, "the other file is still searched");
+    }
+
+    #[test]
+    fn a_crashed_worker_is_reported_as_an_error_event() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("__worker_crash__"),
+            "needle
+",
+        )
+        .unwrap();
+        std::fs::write(
+            t.path().join("ok.txt"),
+            "needle
+",
+        )
+        .unwrap();
+        let GrepEvent::Error { message, .. } = finish(t.path(), "needle") else {
+            panic!("a worker crash must not look like a clean Done");
+        };
+        assert!(message.contains("crashed"), "{message}");
+    }
+
+    #[test]
+    fn sanitize_never_panics_on_any_range_over_multibyte_text() {
+        let samples = [
+            "é".repeat(400),
+            format!("{}{}", "日本語".repeat(120), "x"),
+            format!("a{}b", "😀é\u{202E}".repeat(150)),
+            "\t\u{0}é".repeat(200),
+            "é".to_owned(),
+            String::new(),
+        ];
+        for text in &samples {
+            let n = text.len();
+            let mut starts: Vec<usize> = (0..=n.min(40)).collect();
+            starts.extend([
+                n / 2,
+                n / 2 + 1,
+                n.saturating_sub(2),
+                n.saturating_sub(1),
+                n,
+                n + 3,
+            ]);
+            for &a in &starts {
+                for &b in &starts {
+                    for max in [0, 8, 50, 300] {
+                        let r = [a..b];
+                        let (t, ranges) = sanitize_line(text, &r, max);
+                        for rg in &ranges {
+                            assert!(rg.start < rg.end && rg.end <= t.len());
+                            assert!(t.is_char_boundary(rg.start) && t.is_char_boundary(rg.end));
+                        }
+                        let (lossy, ranges) =
+                            lossy_with_ranges(text.as_bytes(), &[a.min(n)..b.min(n)]);
+                        let _ = sanitize_line(&lossy, &ranges, max);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn byte_level_match_inside_a_char_is_snapped_outward() {
+        let (text, ranges) = lossy_with_ranges("aéb".as_bytes(), &[2..3]);
+        assert_eq!(&text[ranges[0].clone()], "é");
+    }
+
+    #[test]
+    fn regex_errors_are_reduced_to_their_reason() {
+        let mut q = GrepQuery::new(".", "(");
+        q.regex = true;
+        let msg = build_matcher(&q).unwrap_err();
+        assert!(!msg.contains('\n'), "{msg:?}");
+        assert!(msg.starts_with("invalid pattern: "), "{msg:?}");
+        assert!(msg.contains("unclosed group"), "{msg:?}");
+        assert!(!msg.contains("(?:"), "{msg:?}");
+    }
 
     #[test]
     fn trim_eol_variants() {

@@ -298,7 +298,11 @@ fn label_spans(hit: &JumpHit, budget: usize, theme: &Theme) -> Vec<Span<'static>
             ));
         }
         run_matched = is_match;
-        run.push(if c.is_control() { '?' } else { *c });
+        run.push(if ks_search::is_unsafe_char(*c) {
+            '?'
+        } else {
+            *c
+        });
     }
     if !run.is_empty() {
         spans.push(Span::styled(
@@ -327,6 +331,19 @@ mod tests {
 
     fn theme(name: &str) -> Theme {
         Theme::builtin(name, ColorDepth::TrueColor).unwrap()
+    }
+
+    #[test]
+    fn jump_labels_neutralise_bidi_overrides() {
+        let hit = JumpHit {
+            path: PathBuf::from("/x"),
+            label: "~/invoice\u{202E}fdp.exe".to_owned(),
+            matched: vec![],
+            score: 0.0,
+        };
+        let spans = label_spans(&hit, 60, &theme("ember"));
+        let text: String = spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(text, "~/invoice?fdp.exe");
     }
 
     fn draw(state: &AppState, theme: &Theme) -> String {

@@ -201,6 +201,8 @@ fn graphics_left(prev: Option<Rect>, now: Option<Rect>) -> bool {
 /// The resize decision always uses the full `area` (that is what keeps `needs_resize` stable
 /// between frames); only the drawing position is centred.
 pub(crate) fn render_image(frame: &mut Frame, area: Rect, id: u64, image: &Arc<DynamicImage>) {
+    #[cfg(test)]
+    RENDER_CALLS.with(|c| c.set(c.get() + 1));
     let mut guard = lock(&HOST);
     let host = guard.get_or_insert_with(sync_host);
     if host.current != Some(id) {
@@ -273,6 +275,17 @@ fn sync_host() -> Host {
 /// The host is process-global; tests that draw images run one at a time.
 #[cfg(test)]
 pub(crate) static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+#[cfg(test)]
+thread_local! {
+    static RENDER_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Test helper: how many times this thread called [`render_image`].
+#[cfg(test)]
+pub(crate) fn render_calls_for_tests() -> usize {
+    RENDER_CALLS.with(std::cell::Cell::get)
+}
 
 /// Test helper: forget the installed host so the next draw uses a fresh synchronous one.
 #[cfg(test)]

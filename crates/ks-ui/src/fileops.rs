@@ -122,7 +122,11 @@ fn input_spans(input: &PromptInput, max: usize, theme: &Theme) -> Vec<Span<'stat
     let mut at = String::from(" ");
     for (i, c) in chars.iter().enumerate().skip(start) {
         let w = unicode_width::UnicodeWidthChar::width(*c).unwrap_or(0);
-        let c = if c.is_control() { '?' } else { *c };
+        let c = if ks_search::is_unsafe_char(*c) {
+            '?'
+        } else {
+            *c
+        };
         if i < cursor {
             before.push(c);
         } else if i == cursor {
@@ -811,3 +815,20 @@ fn render_pager(frame: &mut Frame, area: Rect, state: &AppState, pager: &Pager, 
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod bidi_tests {
+    use super::*;
+    use crate::theme::{ColorDepth, Theme};
+
+    #[test]
+    fn prompt_input_neutralises_bidi_overrides() {
+        let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
+        let input = PromptInput::with_text_at_end("invoice\u{202E}fdp.exe");
+        let text: String = input_spans(&input, 40, &theme)
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect();
+        assert!(text.contains("invoice?fdp.exe"), "{text:?}");
+        assert!(!text.contains('\u{202E}'));
+    }
+}

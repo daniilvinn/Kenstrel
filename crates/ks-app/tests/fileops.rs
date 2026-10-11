@@ -601,27 +601,30 @@ impl Harness {
 #[cfg(windows)]
 static BULK_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+/// The edit files a fake editor was handed, from the log it appends to (one path per line).
+/// Counting `kestrel-bulk-rename-*` in the shared temp dir would also see the files of other
+/// test processes running at the same time.
 #[cfg(windows)]
-fn bulk_temp_files() -> Vec<String> {
-    let mut names: Vec<String> = fs::read_dir(std::env::temp_dir())
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| n.starts_with("kestrel-bulk-rename-"))
+fn edit_files(script: &Path) -> Vec<PathBuf> {
+    let log = script.with_extension("paths");
+    let mut files: Vec<PathBuf> = fs::read_to_string(log)
+        .unwrap_or_default()
+        .lines()
+        .map(|l| PathBuf::from(l.trim()))
+        .filter(|p| !p.as_os_str().is_empty())
         .collect();
-    names.sort();
-    names
+    files.dedup();
+    files
 }
 
-/// No edit file beyond `before`. Files from `before` may still vanish (a discard from an
-/// earlier test can land late), so this is a subset check rather than equality.
+/// Every edit file the editor was given has been removed.
 #[cfg(windows)]
-fn assert_no_new_bulk_files(before: &[String], what: &str) {
-    let new: Vec<String> = bulk_temp_files()
+fn assert_edit_files_gone(script: &Path, what: &str) {
+    let left: Vec<PathBuf> = edit_files(script)
         .into_iter()
-        .filter(|f| !before.contains(f))
+        .filter(|p| p.exists())
         .collect();
-    assert!(new.is_empty(), "{what}: {new:?}");
+    assert!(left.is_empty(), "{what}: {left:?}");
 }
 
 /// A script that stands in for `$EDITOR`: prefixes every line of the file it is given.
@@ -647,7 +650,6 @@ async fn bulk_rename_through_an_editor_preview_confirm_and_undo() {
         fs::write(work.join(name), name).unwrap();
     }
     let _serial = BULK_LOCK.lock().await;
-    let before = bulk_temp_files();
     let editor = fake_editor(&root);
     let mut config = Config::default();
     config.editor.open = editor.display().to_string();
@@ -684,7 +686,7 @@ async fn bulk_rename_through_an_editor_preview_confirm_and_undo() {
     })
     .await;
     // The temp edit file is gone: nothing new is left in the temp dir.
-    assert_no_new_bulk_files(&before, "the edit file was not removed");
+    assert_edit_files_gone(&editor, "the edit file was not removed");
 }
 
 /// An editor that writes duplicate names the first time and sane ones when it is run again.
@@ -696,6 +698,7 @@ fn flaky_editor(dir: &Path) -> PathBuf {
         &script,
         format!(
             "@echo off
+echo %~1 >> \"%~dpn0.paths\"
 if exist \"{m}\" goto fixed
 echo x> \"{m}\"
 powershell -NoProfile -Command \"Set-Content -LiteralPath '%~1' -Value @('same.txt','same.txt')\"
@@ -721,9 +724,9 @@ async fn invalid_bulk_rename_is_reopened_with_the_file_kept() {
         fs::write(work.join(name), "x").unwrap();
     }
     let _serial = BULK_LOCK.lock().await;
-    let before = bulk_temp_files();
     let mut config = Config::default();
-    config.editor.open = flaky_editor(&root).display().to_string();
+    let editor = flaky_editor(&root);
+    config.editor.open = editor.display().to_string();
     let mut h = Harness::with_config(&work, config);
     h.start().await;
     h.keys("R");
@@ -734,7 +737,9 @@ async fn invalid_bulk_rename_is_reopened_with_the_file_kept() {
     let confirm = h.state.fileops.confirm.as_ref().unwrap();
     assert!(confirm.action.is_some(), "an invalid plan can be re-edited");
     assert!(confirm.title.contains("problem"), "{}", confirm.title);
-    assert_eq!(bulk_temp_files().len(), before.len() + 1, "file is kept");
+    let kept = edit_files(&editor);
+    assert_eq!(kept.len(), 1, "{kept:?}");
+    assert!(kept[0].exists(), "file is kept");
     assert_eq!(listing(&work), ["a.txt", "b.txt"]);
 
     // Enter reopens the editor on the same file; this time the names are fine.
@@ -746,7 +751,7 @@ async fn invalid_bulk_rename_is_reopened_with_the_file_kept() {
             .is_some_and(|c| c.title.starts_with("Rename"))
     })
     .await;
-    assert_no_new_bulk_files(&before, "the edit file was removed");
+    assert_edit_files_gone(&editor, "the edit file was removed");
     h.keys("enter");
     h.jobs_idle().await;
     assert_eq!(listing(&work), ["one.txt", "two.txt"]);
@@ -763,9 +768,9 @@ async fn abandoning_an_invalid_bulk_rename_removes_the_edit_file() {
         fs::write(work.join(name), "x").unwrap();
     }
     let _serial = BULK_LOCK.lock().await;
-    let before = bulk_temp_files();
     let mut config = Config::default();
-    config.editor.open = flaky_editor(&root).display().to_string();
+    let editor = flaky_editor(&root);
+    config.editor.open = editor.display().to_string();
     let mut h = Harness::with_config(&work, config);
     h.start().await;
     h.keys("R");
@@ -776,7 +781,7 @@ async fn abandoning_an_invalid_bulk_rename_removes_the_edit_file() {
     h.keys("esc");
     assert!(h.state.overlays.is_empty());
     h.settle_ms(500).await;
-    assert_no_new_bulk_files(&before, "the edit file was discarded");
+    assert_edit_files_gone(&editor, "the edit file was discarded");
     assert_eq!(listing(&work), ["a.txt", "b.txt"]);
 }
 

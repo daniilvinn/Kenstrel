@@ -55,11 +55,13 @@ pub fn truncate_start(s: &str, max: usize) -> String {
     kept.iter().rev().collect()
 }
 
-/// Replaces control characters (which could move the cursor or inject escape sequences)
-/// with `?` before a name is drawn.
+/// Replaces control characters (which could move the cursor or inject escape sequences) and
+/// invisible formatting characters (bidirectional overrides and isolates, which can make
+/// `invoice<U+202E>fdp.exe` read as `invoiceexe.pdf`; line separators; zero-width spaces) with
+/// `?` before a name is drawn. The set is shared with the content-search line sanitiser.
 pub fn sanitize(text: &str) -> String {
     text.chars()
-        .map(|c| if c.is_control() { '?' } else { c })
+        .map(|c| if ks_search::is_unsafe_char(c) { '?' } else { c })
         .collect()
 }
 
@@ -167,7 +169,8 @@ fn breadcrumb_segments(path: &Path, home: Option<&Path>) -> Vec<String> {
     if saw_root && !has_normal {
         segments.push(String::new());
     }
-    segments
+    // Directory names can carry control and bidi characters too.
+    segments.iter().map(|s| sanitize(s)).collect()
 }
 
 /// Formats a path for the header, shortened to at most `max` cells by eliding middle
@@ -200,6 +203,31 @@ mod tests {
     fn control_characters_are_replaced() {
         assert_eq!(super::sanitize("a\x1b[2Jb\rc\u{7}"), "a?[2Jb?c?");
         assert_eq!(super::sanitize("plain ünï.txt"), "plain ünï.txt");
+    }
+
+    #[test]
+    fn breadcrumbs_neutralise_bidi_overrides_in_directory_names() {
+        let b = breadcrumb(Path::new("/home/me/ev\u{202E}il"), None, 60);
+        assert_eq!(b, "/home/me/ev?il");
+    }
+
+    #[test]
+    fn bidi_and_invisible_formatting_characters_are_replaced() {
+        // The classic extension spoof: a right-to-left override inside a name.
+        assert_eq!(super::sanitize("invoice\u{202E}fdp.exe"), "invoice?fdp.exe");
+        for c in [
+            '\u{202A}', '\u{202D}', '\u{2066}', '\u{2069}', '\u{200E}', '\u{200F}', '\u{061C}',
+            '\u{2028}', '\u{2029}', '\u{200B}', '\u{FEFF}', '\u{85}',
+        ] {
+            assert_eq!(
+                super::sanitize(&format!("a{c}b")),
+                "a?b",
+                "U+{:04X}",
+                c as u32
+            );
+        }
+        // Joiners stay for emoji and Indic scripts.
+        assert_eq!(super::sanitize("👨\u{200D}👩"), "👨\u{200D}👩");
     }
 
     use std::path::PathBuf;

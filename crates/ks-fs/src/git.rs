@@ -50,8 +50,26 @@ fn git(dir: &Path) -> Command {
     let mut cmd = Command::new("git");
     // A background refresh must never take `index.lock` and fight the user's own git
     // commands over it.
-    cmd.arg("--no-optional-locks").arg("-C").arg(dir);
+    cmd.arg("--no-optional-locks");
+    // The directory may be an untrusted repository (an extracted archive, a download): its
+    // `.git/config` must not get a program executed just because it was browsed. The
+    // fsmonitor hook is the one executable key `status` consults; propagating `-c` also
+    // covers submodule status.
+    cmd.args([
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.untrackedCache=false",
+        "-c",
+        "protocol.ext.allow=never",
+        "-c",
+        "status.submoduleSummary=false",
+    ]);
+    cmd.arg("-C").arg(dir);
     cmd.env("GIT_OPTIONAL_LOCKS", "0");
+    // Never wait for a credential prompt on a background refresh.
+    cmd.env("GIT_TERMINAL_PROMPT", "0");
+    cmd.env("GCM_INTERACTIVE", "never");
     hide_console_window(&mut cmd);
     cmd
 }
@@ -421,7 +439,21 @@ mod tests {
             .get_args()
             .map(|a| a.to_string_lossy().into_owned())
             .collect();
-        assert_eq!(&args[..3], ["--no-optional-locks", "-C", "/some/dir"]);
+        assert_eq!(args[0], "--no-optional-locks");
+        assert!(args.windows(2).any(|w| w == ["-C", "/some/dir"]));
+        for key in ["core.fsmonitor=false", "core.untrackedCache=false"] {
+            assert!(args.contains(&key.to_owned()), "{key} must be forced");
+        }
+        // Config overrides come before the subcommand.
+        let sub = args.iter().position(|a| a == "status").unwrap();
+        assert!(args.iter().rposition(|a| a == "-c").unwrap() < sub);
+        let env = |name: &str| {
+            cmd.get_envs()
+                .find(|(k, _)| *k == name)
+                .and_then(|(_, v)| v)
+                .and_then(|v| v.to_str().map(str::to_owned))
+        };
+        assert_eq!(env("GIT_TERMINAL_PROMPT").as_deref(), Some("0"));
         assert!(args.contains(&"--porcelain=v2".to_owned()));
         assert!(args.contains(&"-z".to_owned()));
         assert!(args.contains(&"--branch".to_owned()));
@@ -495,5 +527,53 @@ mod tests {
         // Outside any repository there is simply no status.
         let outside = tempfile::tempdir().unwrap();
         assert!(read_status(outside.path()).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn repo_configured_fsmonitor_is_never_executed() {
+        if !git_available() {
+            eprintln!("git not installed; skipping");
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        std::fs::create_dir(&root).unwrap();
+        run_git(&root, &["init", "-q", "-b", "main"]);
+        std::fs::write(
+            root.join("a.txt"),
+            "a
+",
+        )
+        .unwrap();
+        let marker = dir.path().join("marker-ran");
+        let marker_text = marker.to_string_lossy().replace(char::from(92), "/");
+        // The fsmonitor value is run through the shell; it records that it ran.
+        let hook = format!("echo ran > \"{marker_text}\"; echo");
+        run_git(&root, &["config", "core.fsmonitor", &hook]);
+
+        // Control: plain `git status` does run the hook, so the assertion below means something.
+        let control = Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["status", "--porcelain"])
+            .output()
+            .unwrap();
+        let hook_fires = marker.exists();
+        eprintln!(
+            "control status ok={} hook fired={hook_fires}",
+            control.status.success()
+        );
+        let _ = std::fs::remove_file(&marker);
+
+        let snap = read_status(&root).await;
+        assert!(snap.is_some(), "status still works");
+        assert!(
+            !marker.exists(),
+            "browsing a repo must not run its fsmonitor"
+        );
+        assert!(
+            hook_fires,
+            "control: git did not run the hook, test is vacuous"
+        );
     }
 }

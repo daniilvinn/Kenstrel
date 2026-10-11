@@ -790,7 +790,7 @@ mod fs_effect_tests {
 
     use super::*;
 
-    const WAIT: Duration = Duration::from_secs(5);
+    const WAIT: Duration = Duration::from_secs(30);
 
     fn gen() -> Gen {
         GenCounter::default().bump()

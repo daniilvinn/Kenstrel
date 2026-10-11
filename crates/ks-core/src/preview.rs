@@ -285,9 +285,9 @@ impl AppState {
 }
 
 /// Content width (the pane minus its padding, see [`AppState::content_width`]) from which
-/// the hex view shows 16 bytes per row: 8 offset + 2 + 47 hex + 2 + 16 ascii = 75 cells.
+/// the hex view shows 16 bytes per row: 8 offset + 2 + 48 hex + 2 + 16 ascii = 76 cells.
 /// Narrower content shows 8. Core (scroll limits) and UI (rows drawn) must pass the same width.
-pub const HEX_WIDE_MIN_WIDTH: u16 = 75;
+pub const HEX_WIDE_MIN_WIDTH: u16 = 76;
 
 /// Bytes per row of the hex view for `pane_width` columns of content.
 pub const fn hex_bytes_per_row(pane_width: u16) -> usize {

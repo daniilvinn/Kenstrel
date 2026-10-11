@@ -78,15 +78,37 @@ impl WalkOptions {
     }
 }
 
+/// Splits the filter field into globs on whitespace or commas outside `{..}` alternations, so
+/// `*.{rs,toml}` stays one glob while `*.rs,*.toml` and `*.rs *.toml` are two.
+fn split_globs(globs: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let mut depth = 0usize;
+    let mut start = 0usize;
+    for (i, c) in globs.char_indices() {
+        match c {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            c if depth == 0 && (c.is_whitespace() || c == ',') => {
+                if start < i {
+                    out.push(&globs[start..i]);
+                }
+                start = i + c.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if start < globs.len() {
+        out.push(&globs[start..]);
+    }
+    out
+}
+
 /// Builds glob overrides from a user-typed filter field. Globs are separated by whitespace or
-/// commas; `*.rs` whitelists, `!target/**` excludes.
+/// commas (not inside braces); `*.rs` whitelists, `!target/**` excludes.
 pub fn build_overrides(root: &Path, globs: &str) -> Result<Option<Override>, ignore::Error> {
     let mut any = false;
     let mut b = ignore::overrides::OverrideBuilder::new(root);
-    for g in globs
-        .split(|c: char| c.is_whitespace() || c == ',')
-        .filter(|g| !g.is_empty())
-    {
+    for g in split_globs(globs) {
         b.add(g)?;
         any = true;
     }

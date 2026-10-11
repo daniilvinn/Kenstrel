@@ -189,7 +189,10 @@ fn build_body(
     // Read the head.
     let head = read_head(path, opts.limits.max_text_bytes.max(opts.limits.hex_bytes))?;
     check(cancel)?;
-    let truncated = meta.size > head.len() as u64;
+    // Text is decoded from at most `max_text_bytes` of the head (the head may be longer for
+    // the hex view), so "truncated" is relative to that slice.
+    let text_len = head.len().min(opts.limits.max_text_bytes);
+    let truncated = meta.size > text_len as u64;
 
     // Magic sniffing for files with missing / misleading extensions.
     if head.starts_with(b"PK\x03\x04") {
@@ -206,13 +209,10 @@ fn build_body(
         return archive(path, fmt, opts, cancel);
     }
 
-    match text::decode(
-        &head[..head.len().min(opts.limits.max_text_bytes)],
-        truncated,
-    ) {
+    match text::decode(&head[..text_len], truncated) {
         Decoded::Text { text: t, encoding } => {
             let is_md = matches!(ext.as_str(), "md" | "markdown" | "mdx" | "mkd");
-            let bytes_read = head.len().min(opts.limits.max_text_bytes) as u64;
+            let bytes_read = text_len as u64;
             if is_md {
                 match markdown::render(&t, encoding, bytes_read, truncated, opts, cancel) {
                     Some(p) => Ok(PreviewBody::Markdown(p)),

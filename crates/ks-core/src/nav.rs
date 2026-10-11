@@ -101,7 +101,11 @@ pub(crate) fn request(
     kind: NavKind,
     reveal: Option<OsString>,
 ) {
-    state.search.pending_marks = None;
+    // A refresh (watcher event, after a file operation) lists the same directory; it must not
+    // swallow marks that a find-file jump asked for while that directory was still loading.
+    if !matches!(kind, NavKind::Refresh) {
+        state.search.pending_marks = None;
+    }
     let reveal = match (&target, &kind) {
         (Location::Dir(path), NavKind::Visit) => {
             reveal.or_else(|| state.cursor_memory.get(path).cloned())
@@ -530,10 +534,25 @@ pub(crate) fn on_finished(
                 if !changes.is_empty() {
                     effects.push(Effect::WalkCacheChanges(changes));
                 }
-                state.view.replace_entries(pending.buffer, height);
+                let was_loading = state.view.loading;
+                let reveal = if was_loading {
+                    state.view.take_reveal()
+                } else {
+                    None
+                };
+                let stale = state.view.replace_entries(pending.buffer, height);
                 state.view.gen = gen;
+                if was_loading {
+                    // The refresh superseded the streamed listing, so it finishes the view:
+                    // the visit's reveal (remembered cursor) is honoured on the full listing.
+                    if let Some(name) = reveal {
+                        state.view.reveal_now(&name, height);
+                    }
+                    state.view.finish_loading();
+                    crate::search::apply_pending_marks(state);
+                }
                 state.dirty = true;
-                count_children(state, effects);
+                recount_children(state, effects, stale);
             }
             (NavKind::Refresh, Some(error)) => refresh_failed(state, effects, &error),
             (_, None) => {
@@ -564,6 +583,19 @@ fn finish_view(state: &mut AppState, effects: &mut Vec<Effect>) {
 
 fn count_children(state: &mut AppState, effects: &mut Vec<Effect>) {
     let names = state.view.dirs_to_count(CHILD_COUNT_LIMIT);
+    if names.is_empty() {
+        return;
+    }
+    effects.push(Effect::CountChildren {
+        gen: state.children_gen.bump(),
+        dir: state.cwd.clone(),
+        names,
+    });
+}
+
+/// Counts the directories whose carried-over count may be stale after a refresh.
+fn recount_children(state: &mut AppState, effects: &mut Vec<Effect>, mut names: Vec<OsString>) {
+    names.truncate(CHILD_COUNT_LIMIT);
     if names.is_empty() {
         return;
     }
@@ -636,6 +668,7 @@ fn refresh_failed(state: &mut AppState, effects: &mut Vec<Effect>, error: &FsErr
         return;
     }
     state.view.finish_loading();
+    state.search.pending_marks = None;
     let text = format!("Cannot refresh {}: {error}", state.cwd.display());
     set_status(state, Level::Error, text, effects);
 }
@@ -1278,6 +1311,126 @@ mod tests {
         assert_eq!(w.names(), ["a", "b"]);
         w.send(Msg::ListingFinished { gen, error: None });
         assert!(!w.state.view.loading);
+    }
+
+    #[test]
+    fn a_refresh_during_the_streamed_listing_keeps_pending_marks_and_finishes_the_view() {
+        let mut w = project_world();
+        w.key("j l");
+        let effects = update(&mut w.state, Msg::Key("~".parse().unwrap()));
+        let Effect::ListDir { gen, .. } = effects[0] else {
+            panic!("{effects:?}")
+        };
+        w.send(Msg::ListingChunk {
+            gen,
+            entries: vec![Entry::file("a", 1)],
+        });
+        assert!(w.state.view.loading);
+        w.state.search.pending_marks = Some((w.cwd().to_owned(), vec!["b".into()]));
+        w.state.view.set_reveal(Some("b".into()));
+
+        let watch = w.state.watch_gen.current();
+        let effects = update(&mut w.state, Msg::DirChanged { gen: watch });
+        let Some(Effect::ListDir { gen: g2, .. }) = effects
+            .iter()
+            .find(|e| matches!(e, Effect::ListDir { .. }))
+            .cloned()
+        else {
+            panic!("{effects:?}")
+        };
+        assert!(
+            w.state.search.pending_marks.is_some(),
+            "refresh keeps marks"
+        );
+        w.send(Msg::ListingChunk {
+            gen: g2,
+            entries: vec![Entry::file("a", 1), Entry::file("b", 1)],
+        });
+        w.send(Msg::ListingFinished {
+            gen: g2,
+            error: None,
+        });
+        assert!(!w.state.view.loading);
+        assert!(w.state.search.pending_marks.is_none());
+        assert_eq!(
+            w.cursor(),
+            "b",
+            "the visit's reveal is honoured by the refresh"
+        );
+        assert_eq!(w.state.view.marks_count(), 1, "b is marked");
+        let marked: Vec<_> = w.state.view.marked_names().cloned().collect();
+        assert_eq!(marked, [OsString::from("b")]);
+    }
+
+    #[test]
+    fn a_refresh_recounts_only_directories_whose_mtime_changed() {
+        let mut w = project_world();
+        let t = |secs| std::time::UNIX_EPOCH + Duration::from_secs(secs);
+        let mut same = Entry::dir("same").with_mtime(t(10));
+        same.children = Some(2);
+        let mut changed = Entry::dir("changed").with_mtime(t(10));
+        changed.children = Some(5);
+        let list = w.dirs.get_mut(Path::new("/home/me")).unwrap();
+        list.push(same);
+        list.push(changed);
+        w.send(Msg::DirChanged {
+            gen: w.state.watch_gen.current(),
+        });
+        let fresh = |w: &mut World| -> Vec<OsString> {
+            let watch = w.state.watch_gen.current();
+            let effects = update(&mut w.state, Msg::DirChanged { gen: watch });
+            let Some(Effect::ListDir { gen, .. }) = effects
+                .iter()
+                .find(|e| matches!(e, Effect::ListDir { .. }))
+                .cloned()
+            else {
+                panic!("{effects:?}")
+            };
+            let kept: Vec<Entry> = w.dirs[Path::new("/home/me")].clone();
+            w.send(Msg::ListingChunk { gen, entries: kept });
+            update(&mut w.state, Msg::ListingFinished { gen, error: None })
+                .iter()
+                .filter_map(|e| match e {
+                    Effect::CountChildren { names, .. } => Some(names.clone()),
+                    _ => None,
+                })
+                .flatten()
+                .collect()
+        };
+        // Give the view its counts (the world's listing carries them already).
+        let _ = fresh(&mut w);
+        for e in w.dirs.get_mut(Path::new("/home/me")).unwrap() {
+            if e.name == "changed" {
+                e.mtime = Some(t(99));
+            }
+        }
+        let counted = fresh(&mut w);
+        assert!(counted.contains(&OsString::from("changed")), "{counted:?}");
+        assert!(
+            !counted.contains(&OsString::from("same")),
+            "unchanged dirs keep their count: {counted:?}"
+        );
+    }
+
+    #[test]
+    fn a_failed_refresh_drops_stale_pending_marks() {
+        let mut w = project_world();
+        w.state.search.pending_marks = Some((w.cwd().to_owned(), vec!["b".into()]));
+        let watch = w.state.watch_gen.current();
+        let effects = update(&mut w.state, Msg::DirChanged { gen: watch });
+        let Some(Effect::ListDir { gen, .. }) = effects
+            .iter()
+            .find(|e| matches!(e, Effect::ListDir { .. }))
+            .cloned()
+        else {
+            panic!("{effects:?}")
+        };
+        let error = FsError::new(FsErrorKind::PermissionDenied, "denied");
+        w.send(Msg::ListingFinished {
+            gen,
+            error: Some(error),
+        });
+        assert!(w.state.search.pending_marks.is_none());
     }
 
     #[test]

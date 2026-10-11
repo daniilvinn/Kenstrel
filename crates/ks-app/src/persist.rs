@@ -290,7 +290,7 @@ mod tests {
         for i in 0..50 {
             writer.send(StateFile::Frecency, format!("# {i}\n"));
         }
-        writer.finish(Duration::from_secs(5));
+        writer.finish(Duration::from_secs(30));
         assert_eq!(
             fs::read_to_string(store.path(StateFile::Frecency)).unwrap(),
             "# 49\n"

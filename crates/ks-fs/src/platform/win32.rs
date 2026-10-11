@@ -48,15 +48,17 @@ const LONG_PATH_THRESHOLD: usize = 240;
 /// with the deep trees `std::fs::read_dir` already handles.
 fn long_path_safe(path: &Path) -> PathBuf {
     let text = path.as_os_str().to_string_lossy();
-    if text.len() < LONG_PATH_THRESHOLD || text.starts_with(r"\?\") {
+    // Already verbatim (`\\?\C:\..`) or a device path (`\\.\..`): leave it alone. This must
+    // come before the UNC branch, which would otherwise mistake it for `\\server\share`.
+    if text.len() < LONG_PATH_THRESHOLD || text.starts_with(r"\\?\") || text.starts_with(r"\\.\") {
         return path.to_owned();
     }
     if let Some(unc) = text.strip_prefix(r"\\") {
-        return PathBuf::from(format!(r"\?\UNC\{unc}"));
+        return PathBuf::from(format!(r"\\?\UNC\{unc}"));
     }
     let bytes = text.as_bytes();
     if bytes.len() > 2 && bytes[1] == b':' && bytes[2] == b'\\' {
-        return PathBuf::from(format!(r"\?\{text}"));
+        return PathBuf::from(format!(r"\\?\{text}"));
     }
     path.to_owned()
 }
@@ -360,6 +362,67 @@ pub fn copy_file_ex(
         Err(e) => Err(std::io::Error::from_raw_os_error(
             (e.code().0 as u32 & 0xFFFF) as i32,
         )),
+    }
+}
+
+#[cfg(test)]
+mod long_path_tests {
+    use super::*;
+
+    fn long(prefix: &str) -> String {
+        format!("{prefix}{}", "a\\".repeat(130))
+    }
+
+    #[test]
+    fn long_drive_and_unc_paths_get_a_two_backslash_verbatim_prefix() {
+        let drive = long("C:\\");
+        let out = long_path_safe(Path::new(&drive));
+        assert_eq!(out.to_string_lossy(), format!("\\\\?\\{drive}"));
+        let unc = long("\\\\srv\\share\\");
+        let out = long_path_safe(Path::new(&unc));
+        assert_eq!(out.to_string_lossy(), format!("\\\\?\\UNC\\{}", &unc[2..]));
+    }
+
+    #[test]
+    fn verbatim_short_and_relative_paths_are_unchanged() {
+        let verbatim = long("\\\\?\\C:\\");
+        assert_eq!(long_path_safe(Path::new(&verbatim)), Path::new(&verbatim));
+        assert_eq!(
+            long_path_safe(Path::new("C:\\short")),
+            Path::new("C:\\short")
+        );
+        let rel = "a\\".repeat(150);
+        assert_eq!(long_path_safe(Path::new(&rel)), Path::new(&rel));
+    }
+
+    #[test]
+    fn junction_in_a_250_char_path_is_detected() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut deep = dir.path().to_path_buf();
+        while deep.as_os_str().len() < 260 {
+            deep.push("segment_of_some_length_0123456789");
+        }
+        let verbatim = PathBuf::from(format!("\\\\?\\{}", deep.display()));
+        std::fs::create_dir_all(&verbatim).unwrap();
+        let target = verbatim.join("target");
+        std::fs::create_dir(&target).unwrap();
+        let link = verbatim.join("link");
+        // mklink /J needs no privileges; skip when cmd is unavailable.
+        let status = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&target)
+            .output();
+        if !status.is_ok_and(|o| o.status.success()) {
+            return;
+        }
+        let plain = deep.join("link");
+        assert!(plain.as_os_str().len() >= LONG_PATH_THRESHOLD);
+        assert_eq!(
+            reparse_tag(&plain),
+            Some(0xA000_0003),
+            "IO_REPARSE_TAG_MOUNT_POINT"
+        );
     }
 }
 

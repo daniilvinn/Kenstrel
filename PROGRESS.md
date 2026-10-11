@@ -504,3 +504,10 @@ Merged `fix/f2` (finder cache freshness with background re-walk, `Touched` cache
 - **Test fix**: `bookmarks_and_frecency_survive_a_restart` (ks-app `tabs_and_state`) failed deterministically on main too: it pressed `g h` with a harness that has no home, so the cwd stayed in `alpha` and the jump list (which skips the cwd) was empty. The test now goes up with `h`.
 - **Open issues**: `ks-fs ops_paths::trash_and_restore_deep_file` (real Recycle Bin) fails with `undo: Empty` when TEMP is on D: (also on 2208fef); it passes with the default C: TEMP. Environmental, not a code regression. Deferred a1 items: render-coupled conflict arming, results-list cursor/reveal after file ops.
 - **Gates**: fmt, clippy `-D warnings` clean; `cargo test --workspace --no-fail-fast` 1196 passed, the only failure being the D: TEMP Recycle Bin test above.
+
+## Integration: audit/a2
+
+- Merged with `--no-ff`; git auto-merged without textual conflicts (nav.rs, fileops tests, search/mod.rs). a1's results-list refresh and a2's streamed-refresh/recount changes coexist; both sets of regression tests pass. No `JobReport`/`JobDone` constructors were added by a2, so `consumed_sources` needed no changes.
+- No Action/binding changes: docs/keymap.md and README key tables unchanged. No snapshots changed.
+- Gates: fmt, clippy -D warnings, `cargo test --workspace` clean.
+- Open issues: `ks-fs watcher::tests::a_burst_of_changes_is_one_notification` failed once in a loaded full run and passed alone and on full rerun (timing flake). a2 recheck item: tab titles (a3 area) should go through `text::sanitize` / `ks_search::is_unsafe_char`; verify at the a3 merge.

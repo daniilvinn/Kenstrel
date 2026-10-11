@@ -160,6 +160,11 @@ impl DirView {
     }
 
     /// Ends a streamed listing.
+    /// Takes the pending reveal target (the listing is done or superseded).
+    pub fn take_reveal(&mut self) -> Option<OsString> {
+        self.reveal.take()
+    }
+
     pub fn finish_loading(&mut self) {
         self.loading = false;
         self.reveal = None;
@@ -167,22 +172,34 @@ impl DirView {
 
     /// Swaps in a complete fresh listing of the same directory (watcher refresh). The cursor
     /// stays on the same name, marks of vanished entries are dropped and known child counts
-    /// carry over.
-    pub fn replace_entries(&mut self, mut fresh: Vec<Entry>, height: usize) {
+    /// carry over for display. Returns the real directories whose count must be redone: new
+    /// ones and those whose modification time changed (or is unknown), since a directory's
+    /// mtime moves when entries are added to or removed from it.
+    pub fn replace_entries(&mut self, mut fresh: Vec<Entry>, height: usize) -> Vec<OsString> {
         sort_entries(&mut fresh, &self.sort);
-        let counts: HashMap<OsString, u32> = self
+        let old: HashMap<&OsStr, (Option<u32>, Option<std::time::SystemTime>)> = self
             .entries
             .iter()
-            .filter_map(|e| e.children.map(|c| (e.name.clone(), c)))
+            .filter(|e| e.is_dir)
+            .map(|e| (e.name.as_os_str(), (e.children, e.mtime)))
             .collect();
-        if !counts.is_empty() {
-            for entry in fresh
-                .iter_mut()
-                .filter(|e| e.is_dir && e.children.is_none())
+        let mut stale = Vec::new();
+        for entry in fresh.iter_mut().filter(|e| e.is_dir) {
+            let before = old.get(entry.name.as_os_str());
+            if entry.children.is_none() {
+                entry.children = before.and_then(|(count, _)| *count);
+            }
+            let unchanged = before.is_some_and(|(count, mtime)| {
+                count.is_some() && mtime.is_some() && *mtime == entry.mtime
+            });
+            if !unchanged
+                && entry.kind == crate::entry::EntryKind::Dir
+                && !entry.is_cloud_placeholder()
             {
-                entry.children = counts.get(&entry.name).copied();
+                stale.push(entry.name.clone());
             }
         }
+        drop(old);
         if !self.marks.is_empty() {
             let present: HashSet<&OsStr> = fresh.iter().map(|e| e.name.as_os_str()).collect();
             self.marks.retain(|name| present.contains(name.as_os_str()));
@@ -190,6 +207,7 @@ impl DirView {
         self.loading = false;
         self.follow = true;
         self.reposition(height, |view| view.entries = fresh);
+        stale
     }
 
     /// Drops the entries with these names (a results list after a file op removed them),
