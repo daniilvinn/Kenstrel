@@ -15,7 +15,12 @@ use ks_core::{
 };
 use tokio::sync::mpsc::{self, Receiver};
 
+/// How long a wait may see no message at all before it fails. A job that is slowly making
+/// progress (a 200 MB copy on a starved disk) keeps sending messages and so keeps waiting.
 const SLACK: Duration = Duration::from_secs(60);
+
+/// Upper bound for any single wait, progress or not.
+const HARD_LIMIT: Duration = Duration::from_secs(900);
 
 struct Harness {
     state: AppState,
@@ -79,10 +84,10 @@ impl Harness {
     async fn until(&mut self, what: &str, done: impl Fn(&AppState) -> bool) {
         let started = Instant::now();
         while !done(&self.state) {
-            let remaining = SLACK
-                .checked_sub(started.elapsed())
-                .unwrap_or_else(|| panic!("timed out waiting for {what}\n{}", self.describe()));
-            let msg = tokio::time::timeout(remaining, self.rx.recv())
+            if started.elapsed() > HARD_LIMIT {
+                panic!("timed out waiting for {what}\n{}", self.describe());
+            }
+            let msg = tokio::time::timeout(SLACK, self.rx.recv())
                 .await
                 .unwrap_or_else(|_| panic!("timed out waiting for {what}\n{}", self.describe()))
                 .expect("the runner keeps a sender alive");
@@ -1060,10 +1065,18 @@ async fn shutdown_cancels_a_running_copy_and_cleans_up() {
         h.runner.shutdown();
         let took = started.elapsed();
         assert!(took < Duration::from_secs(5), "shutdown took {took:?}");
-        if listing(&out).is_empty() {
+        // `shutdown` only waits a short grace; under I/O starvation the job thread may still
+        // be removing its temp file. Wait for it before judging the outcome.
+        assert!(
+            h.runner.jobs().wait_idle(Duration::from_secs(30)),
+            "the job did not finish after the cancel"
+        );
+        if !out.join(&name).exists() {
+            assert!(listing(&out).is_empty(), "{:?}", listing(&out));
             return;
         }
         // The copy completed before the cancel got through: retry with a bigger file.
+        assert_eq!(listing(&out), std::slice::from_ref(&name));
         fs::remove_file(out.join(&name)).unwrap();
         fs::remove_file(root.join(&name)).unwrap();
         size *= 2;

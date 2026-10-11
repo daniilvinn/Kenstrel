@@ -245,7 +245,9 @@ async fn external_changes_appear_quickly_and_the_cursor_stays_on_its_entry() {
     let latency = created.elapsed();
     eprintln!("create -> visible in the list: {latency:?} (waited {waited:?})");
     assert!(
-        latency < Duration::from_millis(1000),
+        // Debounce plus re-list take well under a second on an idle machine; the bound has
+        // headroom for a loaded one (the test run shares the box with other test binaries).
+        latency < Duration::from_millis(2500),
         "external change took {latency:?}"
     );
     assert_eq!(h.cursor().as_deref(), Some("notes.txt"));
