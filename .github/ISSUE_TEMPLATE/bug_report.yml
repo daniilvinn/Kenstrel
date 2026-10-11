@@ -1,0 +1,74 @@
+name: Bug report
+description: Something does not work as expected
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For security problems do not use this form, see the
+        [security policy](https://github.com/daniilvinn/Kestrel/security/policy).
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before you start
+      options:
+        - label: I searched the existing issues and this has not been reported yet.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Kestrel version
+      description: Output of `ks --version`.
+      placeholder: ks 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: For example "Windows 11 23H2 (build 22631)". Run `winver` to see it.
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and version
+      description: For example "Windows Terminal 1.22" or "conhost".
+    validations:
+      required: true
+  - type: input
+    id: font
+    attributes:
+      label: Terminal font
+      description: Especially for display problems, for example "JetBrainsMono Nerd Font".
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open `ks C:\some\dir`
+        2. Press ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Screenshots are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log excerpt
+      description: |
+        The newest file in `%LOCALAPPDATA%\kestrel\state\logs`. Run with `KESTREL_LOG=debug`
+        for more detail. Check the excerpt for private paths before pasting.
+      render: text
