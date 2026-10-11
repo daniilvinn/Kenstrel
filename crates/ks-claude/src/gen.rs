@@ -25,7 +25,7 @@ pub const HOOK_MATCHER: &str = "Edit|Write|MultiEdit|NotebookEdit";
 /// How the hook command is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HookCommandStyle {
-    /// `"command": "\"C:/path/ks.exe\" hook"` (works with the default Git Bash shell; the path
+    /// `"command": "'C:/path/ks.exe' hook"` (single-quoted for bash; works with the default Git Bash shell; the path
     /// uses forward slashes). This is the plan's form and works on every Claude Code version.
     #[default]
     ShellString,
@@ -36,6 +36,12 @@ pub enum HookCommandStyle {
 
 fn exe_str(p: &Path) -> String {
     p.to_string_lossy().into_owned()
+}
+
+/// `s` as one bash word: single quotes disable every expansion (`$`, backtick, `!`, `\`), and a
+/// literal `'` (legal in Windows paths) is written as `'\''`.
+fn sh_single_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
 }
 
 /// `--mcp-config` JSON: command = the `ks` executable, args `["mcp"]`, env `KESTREL_IPC`.
@@ -57,7 +63,7 @@ pub fn settings_json(ks_exe: &Path, style: HookCommandStyle) -> Value {
     let handler = match style {
         HookCommandStyle::ShellString => {
             let fwd = exe_str(ks_exe).replace('\\', "/");
-            json!({ "type": "command", "command": format!("\"{fwd}\" hook"), "timeout": 10 })
+            json!({ "type": "command", "command": format!("{} hook", sh_single_quote(&fwd)), "timeout": 10 })
         }
         HookCommandStyle::Exec => json!({
             "type": "command", "command": exe_str(ks_exe), "args": ["hook"], "timeout": 10
@@ -205,8 +211,28 @@ mod tests {
         assert_eq!(g["hooks"][0]["type"], "command");
         assert_eq!(
             g["hooks"][0]["command"],
-            "\"C:/Program Files/ks/ks.exe\" hook"
+            "'C:/Program Files/ks/ks.exe' hook"
         );
+    }
+
+    #[test]
+    fn shell_hook_command_neutralises_shell_metacharacters() {
+        let path = "C:/T$x/`k`/$(calc) it's/ks.exe";
+        let v = settings_json(Path::new(path), HookCommandStyle::ShellString);
+        let cmd = v["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
+            .as_str()
+            .unwrap();
+        assert_eq!(cmd, r"'C:/T$x/`k`/$(calc) it'\''s/ks.exe' hook");
+        // Where a POSIX shell exists, the command word must come back byte-for-byte.
+        let word = cmd.strip_suffix(" hook").unwrap();
+        if let Ok(out) = std::process::Command::new("sh")
+            .args(["-c", &format!("printf %s {word}")])
+            .output()
+        {
+            if out.status.success() {
+                assert_eq!(String::from_utf8_lossy(&out.stdout), path);
+            }
+        }
     }
 
     #[test]

@@ -46,11 +46,19 @@ pub fn prefix_command(dir: &Path) -> Command {
     cmd
 }
 
+/// The one hardened `git` builder every invocation in Kestrel goes through: no optional
+/// locks, no fsmonitor, no pager, no prompts, no console window. Callers add
+/// `--no-ext-diff --no-textconv` (diff) and their own arguments.
+pub fn git_command(dir: &Path) -> Command {
+    git(dir)
+}
+
 fn git(dir: &Path) -> Command {
     let mut cmd = Command::new("git");
     // A background refresh must never take `index.lock` and fight the user's own git
     // commands over it.
     cmd.arg("--no-optional-locks");
+    cmd.arg("--no-pager");
     // The directory may be an untrusted repository (an extracted archive, a download): its
     // `.git/config` must not get a program executed just because it was browsed. The
     // fsmonitor hook is the one executable key `status` consults; propagating `-c` also
@@ -70,6 +78,7 @@ fn git(dir: &Path) -> Command {
     // Never wait for a credential prompt on a background refresh.
     cmd.env("GIT_TERMINAL_PROMPT", "0");
     cmd.env("GCM_INTERACTIVE", "never");
+    cmd.env("GIT_PAGER", "cat");
     hide_console_window(&mut cmd);
     cmd
 }
@@ -249,6 +258,33 @@ mod tests {
     #![allow(clippy::print_stderr)]
 
     use super::*;
+
+    #[test]
+    fn the_shared_builder_is_hardened() {
+        let cmd = git_command(Path::new("somewhere"));
+        let args: Vec<_> = cmd
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        for want in ["--no-pager", "--no-optional-locks", "core.fsmonitor=false"] {
+            assert!(args.iter().any(|a| a == want), "missing {want}: {args:?}");
+        }
+        let envs: Vec<_> = cmd
+            .get_envs()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().into_owned(),
+                    v.map(|v| v.to_string_lossy().into_owned()),
+                )
+            })
+            .collect();
+        for (k, v) in [("GIT_TERMINAL_PROMPT", "0"), ("GIT_PAGER", "cat")] {
+            assert!(
+                envs.contains(&(k.into(), Some(v.into()))),
+                "missing {k}: {envs:?}"
+            );
+        }
+    }
 
     /// Joins records the way `git status -z` does.
     fn nul(records: &[&str]) -> Vec<u8> {

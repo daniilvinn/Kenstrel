@@ -3,14 +3,18 @@
 //! `notify` uses `ReadDirectoryChangesW` on Windows. The watch is non-recursive: only direct
 //! children of the directory are reported. Events are debounced, then collapsed into a
 //! single "something changed" callback, because the application re-lists the directory
-//! rather than applying individual events.
+//! rather than applying individual events. The callback is trailing-edge: a burst of changes
+//! produces one call after it has died down (capped at [`MAX_DELAY`] of continuous activity).
 //!
 //! `ReadDirectoryChangesW` never reports the removal or renaming of the watched directory
 //! itself (the handle just goes quiet), so the parent directory is watched as well and only
 //! events about the watched directory are let through from it.
 
-use std::path::Path;
-use std::time::Duration;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use notify::event::EventKind;
 use notify::{Config, RecommendedWatcher, RecursiveMode};
@@ -21,31 +25,116 @@ use notify_debouncer_full::{
 /// How long events are collected before they are reported (PLAN §7).
 pub const DEBOUNCE: Duration = Duration::from_millis(100);
 
+/// The debouncer releases events as each one matures, so a long burst arrives as a stream of
+/// batches. They are coalesced: the callback fires once the stream has been quiet this long...
+pub const QUIET: Duration = Duration::from_millis(50);
+
+/// ...or after this long of continuous activity, so a big copy keeps the view live.
+pub const MAX_DELAY: Duration = Duration::from_secs(1);
+
+/// What the debouncer handler tells the coalescer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Signal {
+    /// A batch with relevant events.
+    Changed,
+    /// The watch broke: report at once.
+    Broken,
+}
+
+/// Calls `on_change` once per burst: after `quiet` without a signal, after `max_delay` of
+/// continuous signals, or at once for [`Signal::Broken`]. Returns when the channel closes
+/// (pending changes are dropped: the watcher is gone) or `stopped` is set.
+fn coalesce(
+    rx: &mpsc::Receiver<Signal>,
+    quiet: Duration,
+    max_delay: Duration,
+    stopped: &AtomicBool,
+    on_change: impl Fn(),
+) {
+    while let Ok(first) = rx.recv() {
+        let started = Instant::now();
+        let mut broken = first == Signal::Broken;
+        while !broken {
+            let left = max_delay.saturating_sub(started.elapsed());
+            if left.is_zero() {
+                break;
+            }
+            match rx.recv_timeout(quiet.min(left)) {
+                Ok(Signal::Broken) => broken = true,
+                Ok(Signal::Changed) => {}
+                Err(RecvTimeoutError::Timeout) => break,
+                Err(RecvTimeoutError::Disconnected) => return,
+            }
+        }
+        if stopped.load(Ordering::Acquire) {
+            return;
+        }
+        on_change();
+    }
+}
+
 /// Keeps a directory watch alive; dropping it stops the watch.
 pub struct DirWatcher {
     debouncer: Option<Debouncer<RecommendedWatcher, NoCache>>,
+    stopped: Arc<AtomicBool>,
+}
+
+/// The form of `path` handed to the OS watch: `\?\`-prefixed when it is long (a plain path
+/// beyond MAX_PATH cannot be opened by `CreateFileW`), unchanged otherwise.
+fn watch_form(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        // Same rule as the listing code (`long_path_safe`). Absolutizing first also turns `/`
+        // into `\`, which a verbatim path would not.
+        crate::platform::long_path_safe(&crate::ops::paths::absolutize(path))
+    }
+    #[cfg(not(windows))]
+    {
+        path.to_path_buf()
+    }
+}
+
+/// `path` without a `\?\` / `\?\UNC\` prefix, so paths compare equal in either form.
+fn plain(path: &Path) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        PathBuf::from(format!(r"\\{rest}"))
+    } else if let Some(rest) = text.strip_prefix(r"\\?\") {
+        PathBuf::from(rest)
+    } else {
+        path.to_path_buf()
+    }
 }
 
 impl DirWatcher {
-    /// Watches `dir` and calls `on_change` (from a background thread) after each debounced
-    /// burst of changes to its direct children.
+    /// Watches `dir` and calls `on_change` (from a background thread) once after each burst of
+    /// changes to its direct children has died down.
     ///
     /// The file-id cache is disabled: the default one stats every file of the watched
     /// directory up front, which takes seconds in a directory with 100k entries, and the
     /// only thing it buys is rename correlation that re-listing makes unnecessary.
     pub fn new(dir: &Path, on_change: impl Fn() + Send + 'static) -> Result<Self, notify::Error> {
-        let watched = dir.to_path_buf();
+        let watched = plain(dir);
+        let (tx, rx) = mpsc::channel();
+        let stopped = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&stopped);
+        let spawned = std::thread::Builder::new()
+            .name("ks-watch-coalesce".into())
+            .spawn(move || coalesce(&rx, QUIET, MAX_DELAY, &flag, on_change));
+        if let Err(error) = spawned {
+            return Err(notify::Error::io(error));
+        }
         let handler = move |result: DebounceEventResult| match result {
             Ok(events) => {
                 if events.iter().any(|e| concerns(&watched, e)) {
-                    on_change();
+                    let _ = tx.send(Signal::Changed);
                 }
             }
             // The watch broke (for example the directory was deleted): the listing
             // refresh that follows reports the real reason.
             Err(errors) => {
                 tracing::warn!(?errors, "watcher error");
-                on_change();
+                let _ = tx.send(Signal::Broken);
             }
         };
         let mut debouncer = new_debouncer_opt::<_, RecommendedWatcher, NoCache>(
@@ -55,33 +144,35 @@ impl DirWatcher {
             NoCache::new(),
             Config::default(),
         )?;
-        debouncer.watch(dir, RecursiveMode::NonRecursive)?;
+        debouncer.watch(watch_form(dir), RecursiveMode::NonRecursive)?;
         if let Some(parent) = dir.parent().filter(|p| !p.as_os_str().is_empty()) {
             // Best effort: without it only the removal of `dir` itself goes unnoticed.
-            if let Err(error) = debouncer.watch(parent, RecursiveMode::NonRecursive) {
+            if let Err(error) = debouncer.watch(watch_form(parent), RecursiveMode::NonRecursive) {
                 tracing::warn!(%error, parent = %parent.display(), "cannot watch the parent");
             }
         }
         Ok(Self {
             debouncer: Some(debouncer),
+            stopped,
         })
     }
 }
 
-/// Whether `event` changes the listing of `dir`: something happened to one of its children
-/// or to `dir` itself. Opening or reading a file is not a change, and neither is anything
-/// that happens to the siblings of `dir` (reported through the parent watch).
+/// Whether `event` changes the listing of `dir` (given without a verbatim prefix): something
+/// happened to one of its children or to `dir` itself. Opening or reading a file is not a
+/// change, and neither is anything that happens to the siblings of `dir` (reported through the
+/// parent watch). Event paths carry a `\?\` prefix when the watch was made with one.
 fn concerns(dir: &Path, event: &DebouncedEvent) -> bool {
     !matches!(event.event.kind, EventKind::Access(_))
-        && event
-            .event
-            .paths
-            .iter()
-            .any(|path| path == dir || path.parent() == Some(dir))
+        && event.event.paths.iter().any(|path| {
+            let path = plain(path);
+            path == dir || path.parent() == Some(dir)
+        })
 }
 
 impl Drop for DirWatcher {
     fn drop(&mut self) {
+        self.stopped.store(true, Ordering::Release);
         if let Some(debouncer) = self.debouncer.take() {
             // Do not wait for the event thread: a drop must never stall the caller.
             debouncer.stop_nonblocking();
@@ -144,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn a_burst_of_changes_is_one_notification() {
+    fn a_burst_of_changes_is_few_notifications() {
         let dir = tempfile::tempdir().unwrap();
         let (_watcher, rx) = watch(dir.path());
         std::thread::sleep(Duration::from_millis(100));
@@ -157,19 +248,129 @@ mod tests {
         rx.recv_timeout(WAIT).expect("a notification");
         count += 1;
         // Collect until the watcher has been quiet for much longer than the debounce.
-        while rx.recv_timeout(Duration::from_millis(600)).is_ok() {
+        while rx.recv_timeout(Duration::from_millis(800)).is_ok() {
             count += 1;
         }
-        // On a quiet machine the burst lasts a few milliseconds and is one notification. A
-        // slow disk (antivirus scanning each new file) stretches the burst over several
-        // debounce windows, and each window may legitimately report once: what must hold is
-        // that 20 writes are far fewer notifications than writes, in proportion to the time
-        // the burst took.
-        let windows = (burst.as_millis() / DEBOUNCE.as_millis()) as usize;
+        // Exact bound of the mechanism: a further notification needs a quiet gap inside the
+        // burst or the continuous-activity cap, so it cannot exceed those (plus one for the
+        // events that mature after the last write). The exact "one" case is covered by
+        // `coalescing_*`, which has no disk timing in it.
+        let bound = 2
+            + (burst.as_millis() / QUIET.as_millis()) as usize
+            + (burst.as_millis() / MAX_DELAY.as_millis()) as usize;
         assert!(
-            count <= 2 + 2 * windows && count < 20,
-            "{count} notifications for one {burst:?} burst"
+            count <= bound && count < 20,
+            "{count} notifications (bound {bound}) for one {burst:?} burst"
         );
+    }
+
+    fn run_coalescer(
+        quiet: Duration,
+        cap: Duration,
+    ) -> (
+        mpsc::Sender<Signal>,
+        Arc<std::sync::atomic::AtomicUsize>,
+        Arc<AtomicBool>,
+    ) {
+        let (tx, rx) = mpsc::channel();
+        let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let stopped = Arc::new(AtomicBool::new(false));
+        let (c, s) = (Arc::clone(&count), Arc::clone(&stopped));
+        std::thread::spawn(move || {
+            coalesce(&rx, quiet, cap, &s, || {
+                c.fetch_add(1, Ordering::SeqCst);
+            });
+        });
+        (tx, count, stopped)
+    }
+
+    fn wait_for(count: &std::sync::atomic::AtomicUsize, at_least: usize) {
+        let deadline = Instant::now() + WAIT;
+        while count.load(Ordering::SeqCst) < at_least {
+            assert!(Instant::now() < deadline, "no notification");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn coalescing_a_burst_of_batches_gives_exactly_one_call() {
+        // Everything is queued before the coalescer starts, so no timing decides whether the
+        // signals land inside one quiet window; the thread is joined instead of slept on.
+        let (tx, rx) = mpsc::channel();
+        for _ in 0..500 {
+            tx.send(Signal::Changed).unwrap();
+        }
+        let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let stopped = Arc::new(AtomicBool::new(false));
+        let (c, s) = (Arc::clone(&count), Arc::clone(&stopped));
+        let worker = std::thread::spawn(move || {
+            coalesce(
+                &rx,
+                Duration::from_millis(100),
+                Duration::from_secs(60),
+                &s,
+                || {
+                    c.fetch_add(1, Ordering::SeqCst);
+                },
+            );
+        });
+        wait_for(&count, 1);
+        drop(tx); // disconnect: the worker returns without a further call
+        worker.join().unwrap();
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn continuous_activity_is_reported_after_the_cap() {
+        let (tx, count, _stopped) =
+            run_coalescer(Duration::from_secs(30), Duration::from_millis(200));
+        let deadline = Instant::now() + WAIT;
+        while count.load(Ordering::SeqCst) == 0 {
+            assert!(Instant::now() < deadline, "the cap never fired");
+            tx.send(Signal::Changed).unwrap();
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn a_broken_watch_is_reported_at_once_and_a_stopped_one_never() {
+        let (tx, count, stopped) = run_coalescer(Duration::from_secs(30), Duration::from_secs(60));
+        tx.send(Signal::Broken).unwrap();
+        wait_for(&count, 1);
+        stopped.store(true, Ordering::SeqCst);
+        tx.send(Signal::Broken).unwrap();
+        drop(tx);
+        std::thread::sleep(Duration::from_millis(200));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn verbatim_and_plain_paths_compare_equal() {
+        assert_eq!(plain(Path::new(r"\\?\C:\a\b")), PathBuf::from(r"C:\a\b"));
+        assert_eq!(
+            plain(Path::new(r"\\?\UNC\srv\sh")),
+            PathBuf::from(r"\\srv\sh")
+        );
+        assert_eq!(plain(Path::new("/a/b")), PathBuf::from("/a/b"));
+    }
+
+    /// `CreateFileW` rejects a plain path beyond MAX_PATH, so the watch needs the `\?\` form.
+    #[cfg(windows)]
+    #[test]
+    fn a_directory_beyond_max_path_can_be_watched() {
+        let base = tempfile::tempdir().unwrap();
+        let mut deep = base.path().to_path_buf();
+        while deep.as_os_str().len() < 320 {
+            deep.push("a_rather_long_directory_name_for_depth");
+        }
+        fs::create_dir_all(&deep).unwrap();
+        assert!(deep.as_os_str().len() > 300);
+        let (_watcher, rx) = watch(&deep);
+        std::thread::sleep(Duration::from_millis(200));
+        while rx.try_recv().is_ok() {}
+        fs::write(deep.join("new.txt"), "x").unwrap();
+        rx.recv_timeout(WAIT)
+            .expect("a change in the deep directory is reported");
     }
 
     #[test]

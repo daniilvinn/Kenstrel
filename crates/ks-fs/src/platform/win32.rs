@@ -46,7 +46,7 @@ const LONG_PATH_THRESHOLD: usize = 240;
 
 /// `path` with a verbatim prefix when it is long and absolute, so `FindFirstFileW` copes
 /// with the deep trees `std::fs::read_dir` already handles.
-fn long_path_safe(path: &Path) -> PathBuf {
+pub(crate) fn long_path_safe(path: &Path) -> PathBuf {
     let text = path.as_os_str().to_string_lossy();
     // Already verbatim (`\\?\C:\..`) or a device path (`\\.\..`): leave it alone. This must
     // come before the UNC branch, which would otherwise mistake it for `\\server\share`.
