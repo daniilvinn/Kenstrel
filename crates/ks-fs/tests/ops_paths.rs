@@ -88,6 +88,12 @@ fn trash_and_restore_deep_file() {
     // The Recycle Bin may refuse very long paths; either outcome must be clean.
     if run.assert_done_or_failed() {
         assert!(!file.exists());
+        // On some volumes the Recycle Bin cannot report where a long-path item went, so no undo
+        // entry is recorded; that is clean too (the item stays in the bin, `u` says nothing to undo).
+        if h.mgr.undo_depth() == 0 {
+            purge_trash_under(td.path());
+            return;
+        }
         // Windows' shell restore API rejects originals over MAX_PATH (E_INVALIDARG): the undo
         // must then fail cleanly, reporting the error and leaving the item in the bin.
         let undo = h.undo();
