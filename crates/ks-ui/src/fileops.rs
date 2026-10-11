@@ -508,15 +508,22 @@ fn render_conflict(
         return;
     }
 
+    // A disarmed dialog (just opened, see `ConflictDialog::armed`) shows its choices muted.
+    let armed = dialog_state.armed;
     let key = |k: &str, label: &str| {
+        let (key_style, label_style) = if armed {
+            (theme.bold_accent(), Style::new().fg(theme.fg))
+        } else {
+            (theme.muted(), theme.muted())
+        };
         vec![
-            Span::styled(k.to_owned(), theme.bold_accent()),
-            Span::styled(format!(" {label}"), Style::new().fg(theme.fg)),
+            Span::styled(k.to_owned(), key_style),
+            Span::styled(format!(" {label}"), label_style),
         ]
     };
     let mut choices = Vec::new();
     for (i, (k, label)) in [
-        ("o", "overwrite"),
+        ("O", "overwrite"),
         ("s", "skip"),
         ("r", "rename"),
         ("k", "keep both"),

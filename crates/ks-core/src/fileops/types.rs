@@ -142,6 +142,9 @@ pub struct JobDone {
     pub created: Vec<PathBuf>,
     /// Paths that are gone because of the job (trashed, deleted, move/rename sources).
     pub removed: Vec<PathBuf>,
+    /// Move sources that are gone, including ones whose destination was replaced or merged
+    /// (those appear in neither `created` nor `removed`). Consumes the cut register.
+    pub consumed_sources: Vec<PathBuf>,
     /// The job was started by `u` (it is not itself undoable).
     pub is_undo: bool,
     pub elapsed_ms: u64,
@@ -312,6 +315,10 @@ pub struct ConflictDialog {
     pub apply_to_all: bool,
     /// The inline name prompt of the "rename" choice, while it is open.
     pub rename: Option<PromptInput>,
+    /// Whether the dialog reacts to its hot keys. A dialog opens disarmed and is armed by a
+    /// short timer (`TimerKind::ConflictArm`), so keys typed before it was visible (a rename
+    /// prompt, a search query) are swallowed instead of answering the question.
+    pub armed: bool,
 }
 
 /// What a confirmed dialog does.
@@ -449,4 +456,5 @@ pub struct FileOps {
     pub(crate) next_shell: u64,
     pub(crate) next_fg: u64,
     pub(crate) fg: Option<FgPending>,
+    pub(crate) arm_gen: crate::generation::GenCounter,
 }

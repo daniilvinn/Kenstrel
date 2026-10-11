@@ -427,6 +427,7 @@ async fn a_finished_job_makes_the_pane_show_fresh_content() {
         errors: Vec::new(),
         created: vec![file.clone()],
         removed: Vec::new(),
+        consumed_sources: Vec::new(),
         is_undo: false,
         elapsed_ms: 1,
     })));

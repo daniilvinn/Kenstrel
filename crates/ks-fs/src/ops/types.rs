@@ -428,6 +428,9 @@ pub struct JobReport {
     pub errors: Vec<ItemError>,
     /// What changed, in execution order.
     pub outcomes: Vec<Outcome>,
+    /// Move sources that are gone because their content now lives at the destination,
+    /// including sources whose destination was replaced or merged (those record no outcome).
+    pub consumed_sources: Vec<PathBuf>,
     /// Wall time.
     pub elapsed: Duration,
 }

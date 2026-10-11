@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use crossterm::event::Event;
 use futures_util::{FutureExt, Stream, StreamExt};
 use ks_core::{update, AppState, Effect, Level, Msg, QuitKind};
@@ -131,7 +131,7 @@ fn dispatch<B: Backend>(
                 Effect::RunForeground { id, spec } => {
                     // Earlier effects of this batch start before the terminal is handed over.
                     runner.run(std::mem::take(&mut for_runner));
-                    queue.push_back(run_foreground(state, foreground, terminal, id, &spec));
+                    queue.extend(run_foreground(state, foreground, terminal, id, &spec));
                 }
                 other => for_runner.push(other),
             }
@@ -249,12 +249,11 @@ where
         );
     }
 
-    let outcome = loop {
+    let outcome: Result<QuitKind> = loop {
         if state.dirty && last_draw.is_none_or(|t| t.elapsed() >= FRAME_INTERVAL) {
-            terminal
-                .draw(|frame| ks_ui::render(frame, state, &theme))
-                .map_err(anyhow::Error::new)
-                .context("drawing a frame failed")?;
+            if let Err(e) = terminal.draw(|frame| ks_ui::render(frame, state, &theme)) {
+                break Err(anyhow::Error::new(e).context("drawing a frame failed"));
+            }
             state.dirty = false;
             last_draw = Some(Instant::now());
             if !first_frame_done {
@@ -271,10 +270,9 @@ where
             // Terminal graphics (Sixel) stay on screen until overpainted: when the image
             // moved or went away, wipe the screen and draw again.
             if ks_ui::images::finish_frame() {
-                terminal
-                    .clear()
-                    .map_err(anyhow::Error::new)
-                    .context("clearing the screen failed")?;
+                if let Err(e) = terminal.clear() {
+                    break Err(anyhow::Error::new(e).context("clearing the screen failed"));
+                }
                 state.dirty = true;
                 // Redraw at once: the throttle must not leave the wiped screen up.
                 last_draw = None;
@@ -284,7 +282,7 @@ where
             }
         }
         if let Some(kind) = state.quit {
-            break kind;
+            break Ok(kind);
         }
 
         // Wake for the next frame only when something is waiting to be drawn.
@@ -297,8 +295,8 @@ where
         let first = tokio::select! {
             event = events.next() => match event {
                 Some(Ok(event)) => translate_event(event),
-                Some(Err(e)) => return Err(anyhow!(e).context("reading terminal input failed")),
-                None => return Err(anyhow!("terminal input stream closed")),
+                Some(Err(e)) => break Err(anyhow!(e).context("reading terminal input failed")),
+                None => break Err(anyhow!("terminal input stream closed")),
             },
             Some(msg) = rx.recv() => Some(msg),
             Some(side) = side_rx.recv() => {
@@ -365,6 +363,8 @@ where
         }
     };
 
+    // Also on error exits: the last visits and bookmarks are still inside the save debounce,
+    // and jobs and watchers must be cancelled.
     // The last visits are still inside the save debounce: write them now.
     runner.run(ks_core::pending_writes(state));
     runner.shutdown();
@@ -372,7 +372,7 @@ where
         runner.finish_state_writes(STATE_FLUSH_TIMEOUT);
     });
     let _ = finish.await;
-    Ok(outcome)
+    outcome
 }
 
 /// Runs a program attached to the terminal: the TUI is suspended, the program runs, the TUI
@@ -383,7 +383,7 @@ fn run_foreground<B: Backend>(
     terminal: &mut Terminal<B>,
     id: u64,
     spec: &ks_core::fileops::ForegroundSpec,
-) -> Msg {
+) -> Vec<Msg> {
     let guard = ForegroundGuard::enter();
     let outcome = match foreground.as_mut() {
         Some(host) => host.run(spec),
@@ -400,7 +400,29 @@ fn run_foreground<B: Backend>(
         tracing::warn!(%error, "cannot clear the terminal after a foreground program");
     }
     state.dirty = true;
-    Msg::ForegroundDone { id, error }
+    // The window may have been resized while the program owned the console; those events
+    // were drained unseen. Re-sync before anything reacts to the program's result.
+    let mut msgs = Vec::new();
+    match terminal.size() {
+        Ok(size) => {
+            msgs.extend(resize_after_foreground(
+                state.size,
+                (size.width, size.height),
+            ));
+        }
+        Err(error) => {
+            tracing::warn!(%error, "cannot read the terminal size after a foreground program")
+        }
+    }
+    msgs.push(Msg::ForegroundDone { id, error });
+    msgs
+}
+
+/// The `Msg::Resize` owed when the terminal is `now` (columns, rows) but the state still has
+/// `known`.
+fn resize_after_foreground(known: ks_core::Size, now: (u16, u16)) -> Option<Msg> {
+    let size = ks_core::Size::new(now.0, now.1);
+    (size != known && size.width > 0 && size.height > 0).then_some(Msg::Resize(size))
 }
 
 /// Forwards process-level interrupts (ctrl-c outside raw mode, console control events) as a
@@ -699,6 +721,48 @@ mod tests {
             .collect();
         drop(dir);
         (state, programs)
+    }
+
+    #[test]
+    fn a_resize_during_a_foreground_program_is_resynced() {
+        let known = Size::new(80, 24);
+        assert_eq!(resize_after_foreground(known, (80, 24)), None);
+        assert_eq!(
+            resize_after_foreground(known, (120, 40)),
+            Some(Msg::Resize(Size::new(120, 40)))
+        );
+        assert_eq!(resize_after_foreground(known, (0, 0)), None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_state_size_follows_the_terminal_after_a_foreground_program() {
+        let mut state = state();
+        state.size = Size::new(80, 24);
+        // The window was resized while the editor ran: the backend reports the new size.
+        let mut terminal = Terminal::new(TestBackend::new(132, 43)).unwrap();
+        let mut runner = crate::effects::EffectRunner::new(tokio::sync::mpsc::channel(8).0);
+        let mut host: Option<Box<dyn Foreground>> = Some(Box::new(FakeHost {
+            runs: Default::default(),
+            outcome: Ok(Some(0)),
+        }));
+        let request = ks_core::fileops::ForegroundRequest {
+            spec: ks_core::fileops::ForegroundSpec {
+                program: "vim".into(),
+                args: vec![],
+            },
+            purpose: ks_core::fileops::ForegroundPurpose::Editor,
+        };
+        let (side, _side_rx) = mpsc::unbounded_channel::<Side>();
+        dispatch(
+            &mut state,
+            None,
+            &side,
+            &mut runner,
+            &mut host,
+            &mut terminal,
+            Msg::Foreground(request),
+        );
+        assert_eq!(state.size, Size::new(132, 43));
     }
 
     #[tokio::test]

@@ -678,3 +678,148 @@ mod links {
         assert_eq!(read(&outside.join("keep.txt")), "keep");
     }
 }
+
+/// A move whose rename fails (source locked) after the old destination was parked must put
+/// the old destination back under its own name.
+#[cfg(windows)]
+#[test]
+fn failed_overwrite_restores_the_previous_destination() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let h = Harness::new();
+    let td = tempfile::tempdir().unwrap();
+    let src = td.path().join("src");
+    let dst = td.path().join("dst");
+    write(&src.join("f.txt"), "new");
+    write(&dst.join("f.txt"), "old");
+    // Hold the source open without delete sharing: rename fails with a sharing violation.
+    let _lock = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1 | 2)
+        .open(src.join("f.txt"))
+        .unwrap();
+    let run = h.run_with(
+        JobSpec::move_into(&[src.join("f.txt")], &dst),
+        JobOptions::default(),
+        answer(ConflictChoice::Overwrite),
+    );
+    assert!(!run.report().errors.is_empty(), "the failure is reported");
+    assert_eq!(read(&dst.join("f.txt")), "old", "old destination restored");
+    assert_eq!(listing(&dst), vec!["f.txt"], "no parked leftovers");
+    assert_eq!(read(&src.join("f.txt")), "new");
+}
+
+/// Copies (and so cross-volume moves) keep alternate data streams and the creation time.
+#[cfg(windows)]
+#[test]
+fn copy_preserves_alternate_streams_and_creation_time() {
+    let h = Harness::new();
+    let td = tempfile::tempdir().unwrap();
+    let src = td.path().join("f.txt");
+    let dst = td.path().join("out");
+    write(&src, "main");
+    fs::write(td.path().join("f.txt:note"), "stream data").unwrap();
+    fs::create_dir_all(&dst).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    let created = fs::metadata(&src).unwrap().created().unwrap();
+    h.run(JobSpec::copy_into(std::slice::from_ref(&src), &dst))
+        .assert_done();
+    assert_eq!(read(&dst.join("f.txt")), "main");
+    assert_eq!(
+        fs::read_to_string(dst.join("f.txt:note")).unwrap(),
+        "stream data"
+    );
+    assert_eq!(
+        fs::metadata(dst.join("f.txt")).unwrap().created().unwrap(),
+        created
+    );
+}
+
+/// A cross-volume move cancelled part-way keeps the whole source and leaves no partial or
+/// temporary file behind (the data-loss guard of copy-then-delete).
+#[cfg(windows)]
+#[test]
+fn cancelled_cross_volume_move_keeps_the_source() {
+    let a = tempfile::tempdir().unwrap();
+    let b = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
+    let root = |p: &std::path::Path| {
+        p.components()
+            .next()
+            .map(|c| c.as_os_str().to_ascii_lowercase())
+    };
+    if root(a.path()) == root(b.path()) {
+        return; // single-volume machine: nothing to test
+    }
+    let src = a.path().join("big.bin");
+    {
+        let mut f = fs::File::create(&src).unwrap();
+        let chunk = vec![7u8; 1024 * 1024];
+        for _ in 0..200 {
+            f.write_all(&chunk).unwrap();
+        }
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    let cell: Arc<OnceLock<Weak<JobManager>>> = Arc::new(OnceLock::new());
+    let cell2 = Arc::clone(&cell);
+    let mgr = Arc::new(JobManager::new(move |ev: JobEvent| {
+        if let JobEvent::Progress(p) = &ev {
+            if p.bytes_done > 0 {
+                if let Some(m) = cell2.get().and_then(Weak::upgrade) {
+                    m.cancel(p.job);
+                }
+            }
+        }
+        let _ = tx.send(ev);
+    }));
+    let _ = cell.set(Arc::downgrade(&mgr));
+    mgr.submit(
+        JobSpec::move_into(std::slice::from_ref(&src), b.path()),
+        Generation(1),
+    );
+    let mut last = None;
+    while let Ok(ev) = rx.recv_timeout(std::time::Duration::from_secs(60)) {
+        if ev.is_final() {
+            last = Some(ev);
+            break;
+        }
+    }
+    match last.expect("job did not finish") {
+        JobEvent::Cancelled(rep) => assert!(rep.consumed_sources.is_empty()),
+        other => panic!("expected Cancelled, got {other:?}"),
+    }
+    assert_eq!(fs::metadata(&src).unwrap().len(), 200 * 1024 * 1024);
+    assert_eq!(
+        fs::read_dir(b.path()).unwrap().count(),
+        0,
+        "no partial or .tmp"
+    );
+}
+
+/// Moves that replace or merge record no outcome for the top-level source, but the report
+/// still lists it as consumed (so a cut register can drop it).
+#[test]
+fn move_reports_replaced_and_merged_sources_as_consumed() {
+    let h = Harness::new();
+    let td = tempfile::tempdir().unwrap();
+    let src = td.path().join("src");
+    let dst = td.path().join("dst");
+    write(&src.join("f.txt"), "new");
+    write(&dst.join("f.txt"), "old");
+    let run = h.run_with(
+        JobSpec::move_into(&[src.join("f.txt")], &dst),
+        JobOptions::default(),
+        answer(ConflictChoice::Overwrite),
+    );
+    let rep = run.assert_done();
+    assert!(rep.outcomes.is_empty(), "replacement records no outcome");
+    assert_eq!(rep.consumed_sources, vec![src.join("f.txt")]);
+
+    write(&src.join("d").join("x.txt"), "x");
+    write(&dst.join("d").join("y.txt"), "y");
+    let run = h.run(JobSpec::move_into(&[src.join("d")], &dst));
+    let rep = run.assert_done();
+    assert!(
+        rep.consumed_sources.contains(&src.join("d")),
+        "{:?}",
+        rep.consumed_sources
+    );
+}

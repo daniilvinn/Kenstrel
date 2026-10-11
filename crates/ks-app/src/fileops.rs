@@ -250,6 +250,7 @@ fn done(report: &JobReport, status: JobStatus, is_undo: bool) -> JobDone {
         errors: report.errors.iter().map(error_line).collect(),
         created,
         removed,
+        consumed_sources: report.consumed_sources.iter().map(|p| plain(p)).collect(),
         is_undo,
         elapsed_ms: u64::try_from(report.elapsed.as_millis()).unwrap_or(u64::MAX),
     }
@@ -903,6 +904,7 @@ mod tests {
                 src: PathBuf::from("a/x"),
                 dst: PathBuf::from("b/x"),
             }],
+            consumed_sources: Vec::new(),
             elapsed: Duration::from_millis(12),
         };
         let Msg::Job(JobMsg::Finished(finished)) = map_job_event(JobEvent::Failed(report), true)

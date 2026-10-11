@@ -15,7 +15,7 @@ expression: "draw(&state, &theme(theme_name))"
   │ existing    1.0 MB   2025-03-05                                          │
   │ incoming    2.3 MB   3h ago                                              │
   │                                                                          │
- ▌│ o overwrite   s skip   r rename   k keep both                            │M
+ ▌│ O overwrite   s skip   r rename   k keep both                            │M
   │                                                                          │
   │ a apply to all remaining conflicts [x] on                                │
   │ ‹enter› keep both  ‹c/esc› cancel the job                                │

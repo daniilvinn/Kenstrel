@@ -289,10 +289,13 @@ pub(crate) fn refresh_if_idle(state: &mut AppState, effects: &mut Vec<Effect>) {
 
 /// Whether [`refresh_if_idle`] would issue a listing.
 pub(crate) fn can_refresh(state: &AppState) -> bool {
-    state
-        .nav
-        .as_ref()
-        .is_none_or(|p| matches!(p.kind, NavKind::Refresh))
+    // A results list (find/grep, `view.label`) is not the directory listing: re-listing the
+    // search root would silently replace it.
+    state.view.label.is_none()
+        && state
+            .nav
+            .as_ref()
+            .is_none_or(|p| matches!(p.kind, NavKind::Refresh))
 }
 
 // ----- search integration (P3 + P4) -----

@@ -17,6 +17,6 @@ pub use logic::{
 pub use types::*;
 
 pub(crate) use logic::{
-    handle_action, intercept_key, on_bulk_planned, on_foreground_done, on_foreground_request,
-    on_job, on_open_handlers, on_shell, request_quit,
+    handle_action, intercept_key, on_arm_timer, on_bulk_planned, on_foreground_done,
+    on_foreground_request, on_job, on_open_handlers, on_shell, request_quit,
 };
