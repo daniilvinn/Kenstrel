@@ -714,6 +714,7 @@ pub(crate) fn on_preflight(
     state.status = None;
     state.status_gen.bump();
     effects.push(Effect::CancelTimer(crate::msg::TimerKind::StatusExpiry));
+    crate::fileops::discard_reedit_if_any(state, effects);
     show_dialog(state, dialog);
 }
 
@@ -1458,6 +1459,26 @@ mod tests {
     fn preflight(s: &mut AppState, result: ClaudePreflight) -> Vec<Effect> {
         let generation = s.claude.generation;
         update(s, Msg::ClaudePreflight { generation, result })
+    }
+
+    #[test]
+    fn a_failed_preflight_dialog_discards_a_kept_bulk_rename_file() {
+        let mut s = state();
+        key(&mut s, "c");
+        let file = PathBuf::from("/tmp/kestrel-bulk-rename-7.txt");
+        update(
+            &mut s,
+            Msg::BulkPlanned(crate::fileops::BulkPlanResult::Invalid {
+                problems: vec!["line 1: empty name".into()],
+                retry: Some(crate::fileops::BulkRetry {
+                    dir: cwd(),
+                    names: vec!["a.txt".into()],
+                    file: file.clone(),
+                }),
+            }),
+        );
+        let effects = preflight(&mut s, ClaudePreflight::NotLoggedIn);
+        assert!(effects.contains(&Effect::BulkRenameDiscard { file }));
     }
 
     fn launch(effects: &[Effect]) -> Option<&Effect> {

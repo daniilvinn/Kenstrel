@@ -229,7 +229,8 @@ fn file_action(state: &mut AppState, action: Action, effects: &mut Vec<Effect>) 
 /// Quits, or asks first when jobs are still running (quitting cancels them, which can leave a
 /// move or delete half done) or a Claude session is open (quitting kills its process). A
 /// process-level interrupt (`Msg::Interrupt`) still quits at once.
-pub(crate) fn request_quit(state: &mut AppState, kind: QuitKind) {
+pub(crate) fn request_quit(state: &mut AppState, kind: QuitKind, effects: &mut Vec<Effect>) {
+    discard_reedit_if_any(state, effects);
     let claude = state.claude.is_running();
     if state.jobs.is_empty() && !claude {
         state.quit = Some(kind);
@@ -365,6 +366,7 @@ fn ask_delete(state: &mut AppState, effects: &mut Vec<Effect>) {
         warn(state, effects, "Nothing to delete here");
         return;
     }
+    discard_reedit_if_any(state, effects);
     let count = paths.len();
     let token = confirmation_token(count);
     let lines: Vec<String> = paths
@@ -706,24 +708,45 @@ fn scroll_to(pager: &mut Pager, target: usize, max: usize) {
 
 fn confirm_action(state: &mut AppState, action: Action, effects: &mut Vec<Effect>) -> bool {
     match action {
-        Action::Cancel => {
-            // Abandoning an invalid bulk rename discards its kept edit file.
-            if let Some(ConfirmAction::BulkReedit(retry)) = state
-                .fileops
-                .confirm
-                .as_ref()
-                .and_then(|c| c.action.clone())
-            {
-                effects.push(Effect::BulkRenameDiscard { file: retry.file });
-                set_status(state, Level::Info, "Bulk rename discarded".into(), effects);
-            }
-            close_confirm(state);
-        }
+        Action::Cancel => cancel_confirm(state, effects),
         Action::Accept => accept_confirm(state, effects),
         _ => {}
     }
     state.dirty = true;
     true
+}
+
+/// Discards the kept edit file of an open `BulkReedit` confirm (no-op for other dialogs).
+/// Not part of `close_confirm`: accepting closes first and then reopens the same file.
+pub(crate) fn discard_reedit_if_any(state: &mut AppState, effects: &mut Vec<Effect>) {
+    discard_reedit_except(state, None, effects);
+}
+
+/// Like [`discard_reedit_if_any`], but keeps the file when the dialog replacing the open one
+/// still points at it (`keep`), so a retry reusing the same path is not deleted under it.
+fn discard_reedit_except(
+    state: &mut AppState,
+    keep: Option<&std::path::Path>,
+    effects: &mut Vec<Effect>,
+) {
+    if let Some(ConfirmAction::BulkReedit(retry)) = state
+        .fileops
+        .confirm
+        .as_ref()
+        .and_then(|c| c.action.clone())
+    {
+        if keep == Some(retry.file.as_path()) {
+            return;
+        }
+        effects.push(Effect::BulkRenameDiscard { file: retry.file });
+        set_status(state, Level::Info, "Bulk rename discarded".into(), effects);
+    }
+}
+
+/// Declines the open confirm (esc / `n`): discards any kept bulk-rename file, then closes.
+fn cancel_confirm(state: &mut AppState, effects: &mut Vec<Effect>) {
+    discard_reedit_if_any(state, effects);
+    close_confirm(state);
 }
 
 fn close_confirm(state: &mut AppState) {
@@ -985,7 +1008,7 @@ fn confirm_key(state: &mut AppState, key: KeyChord, effects: &mut Vec<Effect>) -
             true
         }
         Key::Char('n') if is_plain(key) => {
-            close_confirm(state);
+            cancel_confirm(state, effects);
             true
         }
         _ => false,
@@ -1454,6 +1477,7 @@ pub(crate) fn on_bulk_planned(
             );
         }
         BulkPlanResult::Planned { preview, steps } => {
+            discard_reedit_if_any(state, effects);
             let count = preview.len();
             let more = count.saturating_sub(CONFIRM_LINES);
             state.fileops.confirm = Some(ConfirmDialog {
@@ -1470,6 +1494,7 @@ pub(crate) fn on_bulk_planned(
             push_overlay(state, Overlay::Confirm);
         }
         BulkPlanResult::Invalid { problems, retry } => {
+            discard_reedit_except(state, retry.as_ref().map(|r| r.file.as_path()), effects);
             let count = problems.len();
             let more = count.saturating_sub(CONFIRM_LINES);
             let mut lines: Vec<String> = problems.into_iter().take(CONFIRM_LINES).collect();

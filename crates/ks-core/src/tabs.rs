@@ -176,49 +176,59 @@ pub(crate) fn on_parked_dir_changed(
     effects: &mut Vec<Effect>,
     path: &std::path::Path,
 ) {
+    // One listing per distinct path (the runner keeps a single cancellable re-list per path):
+    // the first matching slot's ticket tags it, and every other slot showing the path shares
+    // that ticket in its `bg`, so the chunks and the end fan out to all of them.
+    let mut shared: Option<Gen> = None;
     for slot in state.tabs.slots.iter_mut().flatten() {
         if slot.view.label.is_none() && !slot.show_drives && same_path(&slot.cwd, path) {
             slot.stale = true;
-            let gen = slot.list_gen.bump();
-            slot.bg = Some((gen, Vec::new()));
-            effects.push(Effect::ListParked {
-                gen,
-                path: slot.cwd.clone(),
+            let own = slot.list_gen.bump();
+            let gen = *shared.get_or_insert_with(|| {
+                effects.push(Effect::ListParked {
+                    gen: own,
+                    path: slot.cwd.clone(),
+                });
+                own
             });
+            slot.bg = Some((gen, Vec::new()));
             state.dirty = true;
         }
     }
 }
 
-fn bg_slot(state: &mut AppState, gen: Gen) -> Option<&mut TabSlot> {
+fn bg_slots(state: &mut AppState, gen: Gen) -> impl Iterator<Item = &mut TabSlot> {
     state
         .tabs
         .slots
         .iter_mut()
         .flatten()
-        .find(|slot| slot.list_gen.is_current(gen) && slot.bg.as_ref().is_some_and(|b| b.0 == gen))
+        .filter(move |slot| slot.bg.as_ref().is_some_and(|b| b.0 == gen))
 }
 
-/// A listing chunk: taken when it belongs to the background re-list of a parked tab,
+/// A listing chunk: taken when it belongs to the background re-list of parked tabs,
 /// otherwise handed back for the active tab.
 pub(crate) fn parked_chunk(
     state: &mut AppState,
     gen: Gen,
     entries: Vec<Entry>,
 ) -> Option<Vec<Entry>> {
-    match bg_slot(state, gen) {
-        Some(slot) => {
-            if let Some((_, buffer)) = slot.bg.as_mut() {
-                buffer.extend(entries);
-            }
-            None
+    let mut taken = false;
+    for slot in bg_slots(state, gen) {
+        if let Some((_, buffer)) = slot.bg.as_mut() {
+            buffer.extend(entries.iter().cloned());
         }
-        None => Some(entries),
+        taken = true;
+    }
+    if taken {
+        None
+    } else {
+        Some(entries)
     }
 }
 
-/// End of a listing: applies the background re-list of a parked tab. Returns false when
-/// `gen` is not one (the active tab handles it).
+/// End of a listing: applies the background re-list to the parked tabs it was for. Returns
+/// false when `gen` is not one (the active tab handles it).
 pub(crate) fn parked_finished(
     state: &mut AppState,
     effects: &mut Vec<Effect>,
@@ -226,24 +236,32 @@ pub(crate) fn parked_finished(
     failed: bool,
 ) -> bool {
     let height = state.viewport_height();
-    let Some(slot) = bg_slot(state, gen) else {
-        return false;
-    };
-    let Some((_, buffer)) = slot.bg.take() else {
-        return true;
-    };
-    if failed {
-        // Stays marked; the re-list on activation reports the problem.
-        return true;
+    let mut any = false;
+    let mut walk_fed = false;
+    for slot in bg_slots(state, gen) {
+        any = true;
+        let Some((_, buffer)) = slot.bg.take() else {
+            continue;
+        };
+        if failed {
+            // Stays marked; the re-list on activation reports the problem.
+            continue;
+        }
+        if !walk_fed {
+            // Slots on one path hold the same listing: feed the walk cache once.
+            let changes = crate::search::diff_listing(&slot.cwd, slot.view.entries(), &buffer);
+            if !changes.is_empty() {
+                effects.push(Effect::WalkCacheChanges(changes));
+            }
+            walk_fed = true;
+        }
+        slot.view.replace_entries(buffer, height);
+        slot.stale = false;
     }
-    let changes = crate::search::diff_listing(&slot.cwd, slot.view.entries(), &buffer);
-    if !changes.is_empty() {
-        effects.push(Effect::WalkCacheChanges(changes));
+    if any {
+        state.dirty = true;
     }
-    slot.view.replace_entries(buffer, height);
-    slot.stale = false;
-    state.dirty = true;
-    true
+    any
 }
 
 /// Compile-time guard: every [`AppState`] field is listed here, so adding one breaks the
@@ -311,6 +329,7 @@ fn classify_state_fields(state: &AppState) {
 fn prepare_to_leave(state: &mut AppState, effects: &mut Vec<Effect>) {
     nav::abandon_history_nav(state);
     state.nav = None;
+    state.search.pending_unhide = None;
     // Late chunks of an unfinished listing must not extend the view; it is re-listed on
     // return anyway.
     state.view.gen = state.list_gen.bump();
@@ -575,6 +594,31 @@ mod tests {
             last_parked_watch(&w),
             vec![PathBuf::from("/home/me/projects")]
         );
+    }
+
+    #[test]
+    fn two_parked_tabs_on_one_directory_are_both_refreshed_by_one_listing() {
+        let mut w = project_world();
+        // Tabs 1 and 2 both show /home/me; tab 3 (active) is elsewhere.
+        w.key("t");
+        w.key("t j l");
+        let mut entries = w.dirs[&PathBuf::from("/home/me")].clone();
+        entries.push(Entry::dir("fresh"));
+        w.dir("/home/me", entries);
+        w.log.clear();
+        w.send(Msg::ParkedDirChanged {
+            path: PathBuf::from("/home/me"),
+        });
+        let lists = w
+            .log
+            .iter()
+            .filter(|e| matches!(e, Effect::ListParked { .. }))
+            .count();
+        assert_eq!(lists, 1, "one ListParked per distinct path");
+        for i in 0..2 {
+            assert!(!w.state.tabs.is_stale(i), "tab {i} still stale");
+            assert!(w.state.tabs.parked_names(i).contains(&"fresh".to_string()));
+        }
     }
 
     #[test]

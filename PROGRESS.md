@@ -533,3 +533,10 @@ Merged `fix/f2` (finder cache freshness with background re-walk, `Touched` cache
 - No Actions or default keys changed, so `docs/keymap.md` and the README key tables need no update.
 - Gates: fmt, clippy `-D warnings` and `cargo test --workspace` (1260 passed, 0 failed) are clean.
 - Open: the Claude pane cwd on resume is the directory the session was created in (see `docs/progress/p10.md`). Any new git call must go through `ks_fs::git::git_command`.
+
+## Integration: r2/b1
+
+- Merged cleanly after b4 and b3 (no conflicts; only effects.rs auto-merged). tabs.rs field guard untouched and still exhaustive.
+- No keys or Actions changed, so docs/keymap.md and README tables are unchanged.
+- Gates: fmt, clippy -D warnings clean; workspace 1279 tests passed, 0 failed, no flakes this run, no .snap.new files.
+- Open: markdown and UTF-16/32 grep hits beyond head limits still show the head preview with a beyond-limit status; windowed read scans sequentially to the window start (no line index); hidden-match reveal message appears when the listing completes.

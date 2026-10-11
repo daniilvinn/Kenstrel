@@ -213,13 +213,28 @@ fn build_body(
         Decoded::Text { text: t, encoding } => {
             let is_md = matches!(ext.as_str(), "md" | "markdown" | "mdx" | "mkd");
             let bytes_read = text_len as u64;
+            if !is_md && truncated && encoding == Encoding::Utf8 {
+                if let Some(focus) = opts.limits.focus_line {
+                    if let Some(win) = focus_window(path, meta.size, focus, opts, cancel)? {
+                        return Ok(PreviewBody::Text(win));
+                    }
+                }
+            }
             if is_md {
                 match markdown::render(&t, encoding, bytes_read, truncated, opts, cancel) {
                     Some(p) => Ok(PreviewBody::Markdown(p)),
                     None => Err(BuildError::Cancelled),
                 }
             } else {
-                match text::render_text(path, &t, encoding, bytes_read, truncated, opts, cancel) {
+                match text::render_text(
+                    path,
+                    &t,
+                    encoding,
+                    bytes_read,
+                    (truncated, 0),
+                    opts,
+                    cancel,
+                ) {
                     Some(p) => Ok(PreviewBody::Text(p)),
                     None => Err(BuildError::Cancelled),
                 }
@@ -232,6 +247,97 @@ fn build_body(
             None,
         ))),
     }
+}
+
+/// Reads a window of a big UTF-8 file centred on 1-based line `focus` (a content-search hit
+/// past the head limits). `None` when the window would start at the top anyway or the file
+/// is not plain UTF-8 there (the head preview is used then). Lines are counted by `\n`.
+fn focus_window(
+    path: &Path,
+    size: u64,
+    focus: u64,
+    opts: &PreviewOptions,
+    cancel: &CancellationToken,
+) -> Result<Option<TextPreview>, BuildError> {
+    use std::io::{Seek, SeekFrom};
+    let half = (opts.limits.max_text_lines / 2).max(1) as u64;
+    let start_line = focus.saturating_sub(half).max(1);
+    if start_line <= 1 {
+        return Ok(None);
+    }
+    let mut file = File::open(path)?;
+    // Byte offset of the start of `start_line`. Lines end at `\n`, `\r\n` or a lone `\r`,
+    // exactly as `text::split_lines` splits them, so `first_line` matches the rendering.
+    let to_skip = start_line - 1;
+    let mut seen = 0u64;
+    let mut pos = 0u64;
+    let mut prev_cr = false;
+    let mut offset = 0u64;
+    let mut found = false;
+    let mut buf = vec![0u8; 1 << 20];
+    'scan: loop {
+        check(cancel)?;
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        for &b in &buf[..n] {
+            if prev_cr {
+                prev_cr = false;
+                seen += 1;
+                // A CRLF pair ends after the LF; a lone CR ends before this byte.
+                let start = if b == b'\n' { pos + 1 } else { pos };
+                if seen == to_skip {
+                    offset = start;
+                    found = true;
+                    break 'scan;
+                }
+                if b == b'\n' {
+                    pos += 1;
+                    continue;
+                }
+            }
+            if b == b'\n' {
+                seen += 1;
+                if seen == to_skip {
+                    offset = pos + 1;
+                    found = true;
+                    break 'scan;
+                }
+            } else if b == b'\r' {
+                prev_cr = true;
+            }
+            pos += 1;
+        }
+    }
+    if !found || offset >= size {
+        return Ok(None);
+    }
+    file.seek(SeekFrom::Start(offset))?;
+    let mut bytes = Vec::new();
+    file.take(opts.limits.max_text_bytes as u64)
+        .read_to_end(&mut bytes)?;
+    check(cancel)?;
+    let more_file = offset + (bytes.len() as u64) < size;
+    let Decoded::Text {
+        text,
+        encoding: Encoding::Utf8,
+    } = text::decode(&bytes, more_file)
+    else {
+        return Ok(None);
+    };
+    let first_line = usize::try_from(start_line - 1).unwrap_or(usize::MAX);
+    text::render_text(
+        path,
+        &text,
+        Encoding::Utf8,
+        bytes.len() as u64,
+        (more_file, first_line),
+        opts,
+        cancel,
+    )
+    .map(Some)
+    .ok_or(BuildError::Cancelled)
 }
 
 fn too_large(size: u64, limit: u64) -> PreviewBody {

@@ -149,6 +149,17 @@ impl DirView {
         true
     }
 
+    /// When `name` exists in the listing but is hidden from the view, turns hidden entries on
+    /// and puts the cursor on it. Returns whether it did.
+    pub fn unhide_for(&mut self, name: &OsStr, height: usize) -> bool {
+        if self.show_hidden || !self.entries.iter().any(|e| e.name == name && e.is_hidden()) {
+            return false;
+        }
+        self.toggle_hidden(height);
+        self.reveal_now(name, height);
+        true
+    }
+
     /// Adds a streamed chunk of a fresh listing.
     pub fn push_chunk(&mut self, mut chunk: Vec<Entry>, height: usize) {
         sort_entries(&mut chunk, &self.sort);

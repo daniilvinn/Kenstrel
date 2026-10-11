@@ -59,7 +59,10 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
             state.jobs.remove(&id);
             state.dirty = true;
         }
-        Msg::Interrupt => state.quit = Some(QuitKind::Exit),
+        Msg::Interrupt => {
+            crate::fileops::discard_reedit_if_any(state, &mut effects);
+            state.quit = Some(QuitKind::Exit);
+        }
         Msg::Start => {
             nav::start(state, &mut effects);
             effects.push(Effect::LoadNavData);
@@ -303,8 +306,8 @@ pub(crate) fn run_action(state: &mut AppState, invocation: Invocation, effects: 
         Action::ThemeSwitch => palette::open_page(state, palette::Page::Themes),
         Action::IconsSwitch => palette::open_page(state, palette::Page::Icons),
         Action::ConfigReload => effects.push(Effect::ReloadConfig),
-        Action::Quit => fileops::request_quit(state, QuitKind::Exit),
-        Action::QuitCd => fileops::request_quit(state, QuitKind::ChangeDir),
+        Action::Quit => fileops::request_quit(state, QuitKind::Exit, effects),
+        Action::QuitCd => fileops::request_quit(state, QuitKind::ChangeDir, effects),
         Action::Cancel => cancel(state, effects),
         Action::CursorDown if aids::owns_overlay(state) => aids::move_selection(state, 1),
         Action::CursorUp if aids::owns_overlay(state) => aids::move_selection(state, -1),

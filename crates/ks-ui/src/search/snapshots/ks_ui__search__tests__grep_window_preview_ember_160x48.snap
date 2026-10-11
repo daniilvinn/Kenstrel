@@ -1,0 +1,332 @@
+---
+source: crates/ks-ui/src/search/tests.rs
+expression: "draw(&s, &theme(name))"
+---
+ ~/projects/omniforce/src/renderer                                                                                                             main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ╭ Search contents · ~/projects/omniforce/src/renderer ─────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │ › handle                                                                                                                        regex   word  smart-case │M
+  │ › glob *.rs !target/**                                                                                                                                   │!
+  │──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────│
+  │ vulkan_device.rs  2                                                                │ vulkan_device.rs                                            line 88 │
+  │    14│     pub fn handle(&self) -> vk::Device {                                    │─────────────────────────────────────────────────────────────────────│+
+  │ ▌  88│         let handle = self.logical.handle();                                 │  76     let value_35 = compute(35);                                 │
+  │ passes/pass_a.rs  1                                                                │  77     let value_36 = compute(36);                                 │?
+  │     3│ … the handle is far to the right of the viewport                            │  78     let value_37 = compute(37);                                 │
+  │ 日本語のメモ.txt  1                                                                │  79     let value_38 = compute(38);                                 │
+  │     1│ ハンドル handle メモ                                                        │  80     let value_39 = compute(39);                                 │
+ ▌│                                                                                    │  81     let value_40 = compute(40);                                 │M
+  │                                                                                    │  82     let value_41 = compute(41);                                 │
+  │                                                                                    │  83     let value_42 = compute(42);                                 │
+  │                                                                                    │  84     let value_43 = compute(43);                                 │
+  │                                                                                    │  85     let value_44 = compute(44);                                 │
+  │                                                                                    │  86     let value_45 = compute(45);                                 │
+  │                                                                                    │  87     let value_46 = compute(46);                                 │
+  │                                                                                    │  88     let value_47 = compute(47);                                 │
+  │                                                                                    │  89     let value_48 = compute(48);                                 │
+  │                                                                                    │  90     let value_49 = compute(49);                                 │
+  │                                                                                    │  91     let value_50 = compute(50);                                 │
+  │                                                                                    │  92     let value_51 = compute(51);                                 │
+  │                                                                                    │  93     let value_52 = compute(52);                                 │
+  │                                                                                    │  94     let value_53 = compute(53);                                 │
+  │                                                                                    │  95     let value_54 = compute(54);                                 │
+  │                                                                                    │  96     let value_55 = compute(55);                                 │
+  │                                                                                    │  97     let value_56 = compute(56);                                 │
+  │                                                                                    │  98     let value_57 = compute(57);                                 │
+  │                                                                                    │  99     let value_58 = compute(58);                                 │
+  │                                                                                    │ 100     let value_59 = compute(59);                                 │
+  │                                                                                    │ 101     let value_60 = compute(60);                                 │
+  │                                                                                    │ 102     let value_61 = compute(61);                                 │
+  │                                                                                    │ 103     let value_62 = compute(62);                                 │
+  │                                                                                    │ 104     let value_63 = compute(63);                                 │
+  │                                                                                    │ 105     let value_64 = compute(64);                                 │
+  │                                                                                    │ 106     let value_65 = compute(65);                                 │
+  │                                                                                    │ 107     let value_66 = compute(66);                                 │
+  │                                                                                    │ 108     let value_67 = compute(67);                                 │
+  │                                                                                    │ 109     let value_68 = compute(68);                                 │
+  │                                                                                    │ 110     let value_69 = compute(69);                                 │
+  │                                                                                    │ 111     let value_70 = compute(70);                                 │
+  │ ⠹ 4 matches in 3 files · searched 1,203 · skipped 2 cloud, 1 denied, 5 binary                                                                            │
+──╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯──
+ ›                                                                                                                                           12/13 · 1 selected
+   ‹enter› edit  ‹tab› field  ‹ctrl-r› regex  ‹ctrl-w› word  ‹ctrl-l› list  ‹alt-m› mark  ‹alt-c› claude  ‹esc› close
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..143 fg=#e8e3dc bg=reset bold
+  0 143..148 fg=#a9a29a bg=reset bold
+  0 148..151 fg=#a9a29a bg=reset
+  0 151..154 fg=#92c07f bg=reset
+  0 154..157 fg=#e5b567 bg=reset
+  0 157..160 fg=#c9a27f bg=reset
+  1   0..160 fg=#403a35 bg=reset
+  2   2..4   fg=#8f5c47 bg=reset
+  2   4..20  fg=#e8e3dc bg=reset bold
+  2  20..56  fg=#a9a29a bg=reset
+  2  56..160 fg=#8f5c47 bg=reset
+  3   2..4   fg=#8f5c47 bg=reset
+  3   4..6   fg=#d97757 bg=reset bold
+  3   6..132 fg=#e8e3dc bg=reset
+  3 132..139 fg=#716b64 bg=reset
+  3 139..146 fg=#1f1b18 bg=#d97757 bold
+  3 146..157 fg=#716b64 bg=reset
+  3 157..158 fg=#8f5c47 bg=reset
+  3 158..160 fg=#e5b567 bg=reset
+  4   2..4   fg=#8f5c47 bg=reset
+  4   4..6   fg=#716b64 bg=reset
+  4   6..11  fg=#a9a29a bg=reset
+  4  11..157 fg=#716b64 bg=reset
+  4 157..158 fg=#8f5c47 bg=reset
+  4 158..160 fg=#625c56 bg=reset
+  5   2..3   fg=#8f5c47 bg=reset
+  5   3..157 fg=#403a35 bg=reset
+  5 157..160 fg=#8f5c47 bg=reset
+  6   2..4   fg=#8f5c47 bg=reset
+  6   4..22  fg=#7fa8c9 bg=reset bold
+  6  22..87  fg=#716b64 bg=reset
+  6  87..89  fg=#403a35 bg=reset
+  6  89..149 fg=#e8e3dc bg=reset bold
+  6 149..157 fg=#a9a29a bg=reset
+  6 157..160 fg=#8f5c47 bg=reset
+  7   2..7   fg=#8f5c47 bg=reset
+  7   7..9   fg=#a9a29a bg=reset
+  7   9..15  fg=#403a35 bg=reset
+  7  15..22  fg=#e8e3dc bg=reset
+  7  22..28  fg=#d97757 bg=reset bold
+  7  28..87  fg=#e8e3dc bg=reset
+  7  87..157 fg=#403a35 bg=reset
+  7 157..158 fg=#8f5c47 bg=reset
+  7 158..160 fg=#92c07f bg=reset
+  8   2..3   fg=#8f5c47 bg=reset
+  8   3..5   fg=#d97757 bg=#2f2a26
+  8   5..9   fg=#a9a29a bg=#2f2a26
+  8   9..11  fg=#403a35 bg=#2f2a26
+  8  11..23  fg=#e8e3dc bg=#2f2a26
+  8  23..29  fg=#d97757 bg=#2f2a26 bold
+  8  29..44  fg=#e8e3dc bg=#2f2a26
+  8  44..50  fg=#d97757 bg=#2f2a26 bold
+  8  50..87  fg=#e8e3dc bg=#2f2a26
+  8  87..90  fg=#403a35 bg=reset
+  8  90..97  fg=#716b64 bg=reset
+  8  97..157 fg=#e8e3dc bg=reset
+  8 157..160 fg=#8f5c47 bg=reset
+  9   2..4   fg=#8f5c47 bg=reset
+  9   4..22  fg=#7fa8c9 bg=reset bold
+  9  22..87  fg=#716b64 bg=reset
+  9  87..90  fg=#403a35 bg=reset
+  9  90..97  fg=#716b64 bg=reset
+  9  97..157 fg=#e8e3dc bg=reset
+  9 157..158 fg=#8f5c47 bg=reset
+  9 158..160 fg=#c9a27f bg=reset
+ 10   2..8   fg=#8f5c47 bg=reset
+ 10   8..9   fg=#a9a29a bg=reset
+ 10   9..11  fg=#403a35 bg=reset
+ 10  11..13  fg=#716b64 bg=reset
+ 10  13..18  fg=#e8e3dc bg=reset
+ 10  18..24  fg=#d97757 bg=reset bold
+ 10  24..87  fg=#e8e3dc bg=reset
+ 10  87..90  fg=#403a35 bg=reset
+ 10  90..97  fg=#716b64 bg=reset
+ 10  97..157 fg=#e8e3dc bg=reset
+ 10 157..160 fg=#8f5c47 bg=reset
+ 11   2..4   fg=#8f5c47 bg=reset
+ 11   4..22  fg=#7fa8c9 bg=reset bold
+ 11  22..87  fg=#716b64 bg=reset
+ 11  87..90  fg=#403a35 bg=reset
+ 11  90..97  fg=#716b64 bg=reset
+ 11  97..157 fg=#e8e3dc bg=reset
+ 11 157..160 fg=#8f5c47 bg=reset
+ 12   2..8   fg=#8f5c47 bg=reset
+ 12   8..9   fg=#a9a29a bg=reset
+ 12   9..11  fg=#403a35 bg=reset
+ 12  11..20  fg=#e8e3dc bg=reset
+ 12  20..27  fg=#d97757 bg=reset bold
+ 12  27..87  fg=#e8e3dc bg=reset
+ 12  87..90  fg=#403a35 bg=reset
+ 12  90..97  fg=#716b64 bg=reset
+ 12  97..157 fg=#e8e3dc bg=reset
+ 12 157..160 fg=#8f5c47 bg=reset
+ 13   0..1   fg=#e8e3dc bg=#2f2a26
+ 13   1..2   fg=#d97757 bg=#2f2a26
+ 13   2..87  fg=#8f5c47 bg=reset
+ 13  87..90  fg=#403a35 bg=reset
+ 13  90..97  fg=#716b64 bg=reset
+ 13  97..157 fg=#e8e3dc bg=reset
+ 13 157..158 fg=#8f5c47 bg=reset
+ 13 158..159 fg=#e5b567 bg=#2f2a26
+ 13 159..160 fg=#e8e3dc bg=#2f2a26
+ 14   2..87  fg=#8f5c47 bg=reset
+ 14  87..90  fg=#403a35 bg=reset
+ 14  90..97  fg=#716b64 bg=reset
+ 14  97..157 fg=#e8e3dc bg=reset
+ 14 157..160 fg=#8f5c47 bg=reset
+ 15   2..87  fg=#8f5c47 bg=reset
+ 15  87..90  fg=#403a35 bg=reset
+ 15  90..97  fg=#716b64 bg=reset
+ 15  97..157 fg=#e8e3dc bg=reset
+ 15 157..160 fg=#8f5c47 bg=reset
+ 16   2..87  fg=#8f5c47 bg=reset
+ 16  87..90  fg=#403a35 bg=reset
+ 16  90..97  fg=#716b64 bg=reset
+ 16  97..157 fg=#e8e3dc bg=reset
+ 16 157..160 fg=#8f5c47 bg=reset
+ 17   2..87  fg=#8f5c47 bg=reset
+ 17  87..90  fg=#403a35 bg=reset
+ 17  90..97  fg=#716b64 bg=reset
+ 17  97..157 fg=#e8e3dc bg=reset
+ 17 157..160 fg=#8f5c47 bg=reset
+ 18   2..87  fg=#8f5c47 bg=reset
+ 18  87..90  fg=#403a35 bg=reset
+ 18  90..97  fg=#716b64 bg=reset
+ 18  97..157 fg=#e8e3dc bg=reset
+ 18 157..160 fg=#8f5c47 bg=reset
+ 19   2..87  fg=#8f5c47 bg=reset
+ 19  87..90  fg=#403a35 bg=reset
+ 19  90..97  fg=#716b64 bg=reset
+ 19  97..157 fg=#e8e3dc bg=reset
+ 19 157..160 fg=#8f5c47 bg=reset
+ 20   2..87  fg=#8f5c47 bg=reset
+ 20  87..89  fg=#403a35 bg=reset
+ 20  89..93  fg=#716b64 bg=#2f2a26
+ 20  93..157 fg=#e8e3dc bg=#2f2a26
+ 20 157..160 fg=#8f5c47 bg=reset
+ 21   2..87  fg=#8f5c47 bg=reset
+ 21  87..90  fg=#403a35 bg=reset
+ 21  90..97  fg=#716b64 bg=reset
+ 21  97..157 fg=#e8e3dc bg=reset
+ 21 157..160 fg=#8f5c47 bg=reset
+ 22   2..87  fg=#8f5c47 bg=reset
+ 22  87..90  fg=#403a35 bg=reset
+ 22  90..97  fg=#716b64 bg=reset
+ 22  97..157 fg=#e8e3dc bg=reset
+ 22 157..160 fg=#8f5c47 bg=reset
+ 23   2..87  fg=#8f5c47 bg=reset
+ 23  87..90  fg=#403a35 bg=reset
+ 23  90..97  fg=#716b64 bg=reset
+ 23  97..157 fg=#e8e3dc bg=reset
+ 23 157..160 fg=#8f5c47 bg=reset
+ 24   2..87  fg=#8f5c47 bg=reset
+ 24  87..90  fg=#403a35 bg=reset
+ 24  90..97  fg=#716b64 bg=reset
+ 24  97..157 fg=#e8e3dc bg=reset
+ 24 157..160 fg=#8f5c47 bg=reset
+ 25   2..87  fg=#8f5c47 bg=reset
+ 25  87..90  fg=#403a35 bg=reset
+ 25  90..97  fg=#716b64 bg=reset
+ 25  97..157 fg=#e8e3dc bg=reset
+ 25 157..160 fg=#8f5c47 bg=reset
+ 26   2..87  fg=#8f5c47 bg=reset
+ 26  87..90  fg=#403a35 bg=reset
+ 26  90..97  fg=#716b64 bg=reset
+ 26  97..157 fg=#e8e3dc bg=reset
+ 26 157..160 fg=#8f5c47 bg=reset
+ 27   2..87  fg=#8f5c47 bg=reset
+ 27  87..90  fg=#403a35 bg=reset
+ 27  90..97  fg=#716b64 bg=reset
+ 27  97..157 fg=#e8e3dc bg=reset
+ 27 157..160 fg=#8f5c47 bg=reset
+ 28   2..87  fg=#8f5c47 bg=reset
+ 28  87..90  fg=#403a35 bg=reset
+ 28  90..97  fg=#716b64 bg=reset
+ 28  97..157 fg=#e8e3dc bg=reset
+ 28 157..160 fg=#8f5c47 bg=reset
+ 29   2..87  fg=#8f5c47 bg=reset
+ 29  87..90  fg=#403a35 bg=reset
+ 29  90..97  fg=#716b64 bg=reset
+ 29  97..157 fg=#e8e3dc bg=reset
+ 29 157..160 fg=#8f5c47 bg=reset
+ 30   2..87  fg=#8f5c47 bg=reset
+ 30  87..90  fg=#403a35 bg=reset
+ 30  90..97  fg=#716b64 bg=reset
+ 30  97..157 fg=#e8e3dc bg=reset
+ 30 157..160 fg=#8f5c47 bg=reset
+ 31   2..87  fg=#8f5c47 bg=reset
+ 31  87..90  fg=#403a35 bg=reset
+ 31  90..97  fg=#716b64 bg=reset
+ 31  97..157 fg=#e8e3dc bg=reset
+ 31 157..160 fg=#8f5c47 bg=reset
+ 32   2..87  fg=#8f5c47 bg=reset
+ 32  87..89  fg=#403a35 bg=reset
+ 32  89..97  fg=#716b64 bg=reset
+ 32  97..157 fg=#e8e3dc bg=reset
+ 32 157..160 fg=#8f5c47 bg=reset
+ 33   2..87  fg=#8f5c47 bg=reset
+ 33  87..89  fg=#403a35 bg=reset
+ 33  89..97  fg=#716b64 bg=reset
+ 33  97..157 fg=#e8e3dc bg=reset
+ 33 157..160 fg=#8f5c47 bg=reset
+ 34   2..87  fg=#8f5c47 bg=reset
+ 34  87..89  fg=#403a35 bg=reset
+ 34  89..97  fg=#716b64 bg=reset
+ 34  97..157 fg=#e8e3dc bg=reset
+ 34 157..160 fg=#8f5c47 bg=reset
+ 35   2..87  fg=#8f5c47 bg=reset
+ 35  87..89  fg=#403a35 bg=reset
+ 35  89..97  fg=#716b64 bg=reset
+ 35  97..157 fg=#e8e3dc bg=reset
+ 35 157..160 fg=#8f5c47 bg=reset
+ 36   2..87  fg=#8f5c47 bg=reset
+ 36  87..89  fg=#403a35 bg=reset
+ 36  89..97  fg=#716b64 bg=reset
+ 36  97..157 fg=#e8e3dc bg=reset
+ 36 157..160 fg=#8f5c47 bg=reset
+ 37   2..87  fg=#8f5c47 bg=reset
+ 37  87..89  fg=#403a35 bg=reset
+ 37  89..97  fg=#716b64 bg=reset
+ 37  97..157 fg=#e8e3dc bg=reset
+ 37 157..160 fg=#8f5c47 bg=reset
+ 38   2..87  fg=#8f5c47 bg=reset
+ 38  87..89  fg=#403a35 bg=reset
+ 38  89..97  fg=#716b64 bg=reset
+ 38  97..157 fg=#e8e3dc bg=reset
+ 38 157..160 fg=#8f5c47 bg=reset
+ 39   2..87  fg=#8f5c47 bg=reset
+ 39  87..89  fg=#403a35 bg=reset
+ 39  89..97  fg=#716b64 bg=reset
+ 39  97..157 fg=#e8e3dc bg=reset
+ 39 157..160 fg=#8f5c47 bg=reset
+ 40   2..87  fg=#8f5c47 bg=reset
+ 40  87..89  fg=#403a35 bg=reset
+ 40  89..97  fg=#716b64 bg=reset
+ 40  97..157 fg=#e8e3dc bg=reset
+ 40 157..160 fg=#8f5c47 bg=reset
+ 41   2..87  fg=#8f5c47 bg=reset
+ 41  87..89  fg=#403a35 bg=reset
+ 41  89..97  fg=#716b64 bg=reset
+ 41  97..157 fg=#e8e3dc bg=reset
+ 41 157..160 fg=#8f5c47 bg=reset
+ 42   2..87  fg=#8f5c47 bg=reset
+ 42  87..89  fg=#403a35 bg=reset
+ 42  89..97  fg=#716b64 bg=reset
+ 42  97..157 fg=#e8e3dc bg=reset
+ 42 157..160 fg=#8f5c47 bg=reset
+ 43   2..87  fg=#8f5c47 bg=reset
+ 43  87..89  fg=#403a35 bg=reset
+ 43  89..97  fg=#716b64 bg=reset
+ 43  97..157 fg=#e8e3dc bg=reset
+ 43 157..160 fg=#8f5c47 bg=reset
+ 44   2..4   fg=#8f5c47 bg=reset
+ 44   4..6   fg=#d97757 bg=reset
+ 44   6..157 fg=#a9a29a bg=reset
+ 44 157..160 fg=#8f5c47 bg=reset
+ 45   0..2   fg=#403a35 bg=reset
+ 45   2..158 fg=#8f5c47 bg=reset
+ 45 158..160 fg=#403a35 bg=reset
+ 46   1..141 fg=#d97757 bg=reset bold
+ 46 141..160 fg=#a9a29a bg=reset
+ 47   3..4   fg=#716b64 bg=reset
+ 47   4..9   fg=#a9a29a bg=reset
+ 47   9..18  fg=#716b64 bg=reset
+ 47  18..21  fg=#a9a29a bg=reset
+ 47  21..31  fg=#716b64 bg=reset
+ 47  31..37  fg=#a9a29a bg=reset
+ 47  37..47  fg=#716b64 bg=reset
+ 47  47..53  fg=#a9a29a bg=reset
+ 47  53..62  fg=#716b64 bg=reset
+ 47  62..68  fg=#a9a29a bg=reset
+ 47  68..77  fg=#716b64 bg=reset
+ 47  77..82  fg=#a9a29a bg=reset
+ 47  82..91  fg=#716b64 bg=reset
+ 47  91..96  fg=#a9a29a bg=reset
+ 47  96..107 fg=#716b64 bg=reset
+ 47 107..110 fg=#a9a29a bg=reset
+ 47 110..160 fg=#716b64 bg=reset

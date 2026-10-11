@@ -1291,6 +1291,7 @@ fn text_result(path: &std::path::Path, lines: usize) -> std::sync::Arc<ks_previe
             lines: (0..lines)
                 .map(|i| StyledLine::plain(format!("line {i}")))
                 .collect(),
+            first_line: 0,
             line_count: lines,
             total_lines: Some(lines),
             truncated: false,
@@ -1400,6 +1401,187 @@ fn a_grep_hit_scrolls_the_preview_to_its_line() {
         "line 80 is inside the visible rows ({scroll}+{})",
         s.preview_rows()
     );
+}
+
+fn grep_hit_request(line: u64) -> (AppState, crate::PreviewRequest) {
+    let mut s = state_with(&["a"]);
+    wide(&mut s);
+    open_grep(&mut s);
+    let effects = type_text(&mut s, "todo");
+    let (gen, _) = fire_debounce(&mut s, &effects);
+    let effects = update(
+        &mut s,
+        Msg::Grep(GrepEvent::Matches {
+            generation: gen,
+            files: vec![file_matches("big.rs", &[(line, "todo")])],
+        }),
+    );
+    let request = effects
+        .iter()
+        .find_map(|e| match e {
+            Effect::RequestPreview { request, .. } => Some(request.clone()),
+            _ => None,
+        })
+        .expect("a preview request");
+    (s, request)
+}
+
+#[test]
+fn a_grep_hit_beyond_the_preview_cap_requests_a_window_around_it() {
+    let cfg = crate::config::Config::default().preview;
+    let (_, near) = grep_hit_request(80);
+    assert_eq!(
+        (near.max_lines, near.max_bytes, near.focus_line),
+        (cfg.max_lines, cfg.max_bytes, None)
+    );
+
+    let (_, far) = grep_hit_request(50_000);
+    assert_eq!(
+        far.max_lines, cfg.max_lines,
+        "the window is as big as the head"
+    );
+    let focus = far.focus_line.expect("a focus line");
+    assert!(focus.abs_diff(50_000) <= 500, "{focus}");
+
+    // A neighbouring hit in the same bucket asks for the same window.
+    let (_, next) = grep_hit_request(50_300);
+    assert_eq!(next.focus_line, far.focus_line);
+
+    // Far hits are reachable too (no hard ceiling any more).
+    let (_, huge) = grep_hit_request(5_000_000);
+    assert!(huge.focus_line.is_some());
+}
+
+#[test]
+fn a_small_preview_limit_keeps_every_hit_inside_the_window() {
+    // With max_lines = 200 the window is +-100 lines; a fixed 1000-line bucket would centre a
+    // hit at line 999 on 500 and miss it.
+    for line in [201_u64, 999, 1_000, 1_499, 50_000, 50_099] {
+        let mut s = state_with(&["a"]);
+        s.config.preview.max_lines = 200;
+        wide(&mut s);
+        open_grep(&mut s);
+        let effects = type_text(&mut s, "todo");
+        let (gen, _) = fire_debounce(&mut s, &effects);
+        let effects = update(
+            &mut s,
+            Msg::Grep(GrepEvent::Matches {
+                generation: gen,
+                files: vec![file_matches("big.rs", &[(line, "todo")])],
+            }),
+        );
+        let request = effects
+            .iter()
+            .find_map(|e| match e {
+                Effect::RequestPreview { request, .. } => Some(request.clone()),
+                _ => None,
+            })
+            .expect("a preview request");
+        let focus = request.focus_line.expect("a focus line");
+        let half = request.max_lines as u64 / 2;
+        assert!(
+            focus.abs_diff(line) + 1 < half,
+            "line {line} is outside the window centred on {focus} (half {half})"
+        );
+    }
+}
+
+#[test]
+fn moving_between_hits_in_one_window_bucket_requests_nothing_new() {
+    let mut s = state_with(&["a"]);
+    wide(&mut s);
+    open_grep(&mut s);
+    let effects = type_text(&mut s, "todo");
+    let (gen, _) = fire_debounce(&mut s, &effects);
+    let effects = update(
+        &mut s,
+        Msg::Grep(GrepEvent::Matches {
+            generation: gen,
+            files: vec![file_matches(
+                "big.rs",
+                &[(50_000, "todo"), (50_100, "todo"), (50_200, "todo")],
+            )],
+        }),
+    );
+    assert_eq!(preview_requests(&effects).len(), 1);
+    let effects = key(&mut s, "down");
+    assert!(
+        preview_requests(&effects).is_empty(),
+        "same bucket, same window: {effects:?}"
+    );
+}
+
+#[test]
+fn a_window_preview_numbers_lines_from_its_offset_and_scrolls_to_the_hit() {
+    let (mut s, request) = grep_hit_request(50_000);
+    let path = cwd().join("big.rs");
+    let first_line = request.focus_line.unwrap() as usize - 1000;
+    let window = {
+        let ks_preview::Preview { path, meta, body } = (*text_result(&path, 2000)).clone();
+        let ks_preview::PreviewBody::Text(mut t) = body else {
+            unreachable!()
+        };
+        t.first_line = first_line;
+        t.truncated = true;
+        t.total_lines = None;
+        std::sync::Arc::new(ks_preview::Preview {
+            path,
+            meta,
+            body: ks_preview::PreviewBody::Text(t),
+        })
+    };
+    let gen = s.preview.generation();
+    update(
+        &mut s,
+        Msg::Preview(crate::PreviewMsg(ks_preview::PreviewEvent {
+            generation: gen.raw(),
+            path,
+            result: window,
+            from_cache: false,
+        })),
+    );
+    assert!(
+        s.status.is_none(),
+        "the hit is inside the window: {:?}",
+        s.status
+    );
+    let rows = s.preview_rows();
+    let want = (49_999 - first_line).saturating_sub(rows / 3);
+    assert_eq!(s.preview.scroll, want);
+}
+
+#[test]
+fn a_grep_hit_the_preview_still_cannot_reach_says_so() {
+    let (mut s, _) = grep_hit_request(50_000);
+    let path = cwd().join("big.rs");
+    // The engine returned only the head (truncated): the hit is not in it.
+    let truncated = {
+        let ks_preview::Preview { path, meta, body } = (*text_result(&path, 100)).clone();
+        let ks_preview::PreviewBody::Text(mut t) = body else {
+            unreachable!()
+        };
+        t.truncated = true;
+        t.total_lines = None;
+        std::sync::Arc::new(ks_preview::Preview {
+            path,
+            meta,
+            body: ks_preview::PreviewBody::Text(t),
+        })
+    };
+    let gen = s.preview.generation();
+    update(
+        &mut s,
+        Msg::Preview(crate::PreviewMsg(ks_preview::PreviewEvent {
+            generation: gen.raw(),
+            path,
+            result: truncated,
+            from_cache: false,
+        })),
+    );
+    assert!(s
+        .status
+        .as_ref()
+        .is_some_and(|st| st.text.contains("beyond the preview limit")));
 }
 
 // ----- sending a hit to Claude (PLAN 10c) -----

@@ -105,6 +105,7 @@ pub(crate) fn request(
     // swallow marks that a find-file jump asked for while that directory was still loading.
     if !matches!(kind, NavKind::Refresh) {
         state.search.pending_marks = None;
+        state.search.pending_unhide = None;
     }
     let reveal = match (&target, &kind) {
         (Location::Dir(path), NavKind::Visit) => {
@@ -316,44 +317,40 @@ pub(crate) fn go_to_file(
         return;
     };
     let dir = dir.to_owned();
-    // The finder has its own hidden toggle: a hidden target must be listed, or the cursor
-    // could not land on it.
-    if !state.view.show_hidden && is_hidden_path(path) {
-        state.view.show_hidden = true;
-        set_status(
-            state,
-            Level::Info,
-            "Showing hidden files to reveal the match".into(),
-            effects,
-        );
-    }
     visit(
         state,
         effects,
         Location::Dir(dir.clone()),
         Some(name.to_owned()),
     );
+    // The finder has its own hidden toggle: a hidden target must be listed, or the cursor
+    // could not land on it. The listing knows the attributes, so the decision is made when
+    // it completes ([`apply_pending_unhide`]); `update` itself stays free of file I/O.
+    state.search.pending_unhide = Some(name.to_owned());
     if !marks.is_empty() {
         state.search.pending_marks = Some((dir, marks));
     }
 }
 
-/// Dot-prefixed, or carrying the Windows hidden attribute.
-fn is_hidden_path(path: &std::path::Path) -> bool {
-    if path
-        .file_name()
-        .is_some_and(|n| n.to_string_lossy().starts_with('.'))
-    {
-        return true;
+/// End of the listing started by [`go_to_file`]: when the wanted entry exists but is hidden
+/// from the view, shows hidden entries so the cursor can land on it.
+fn apply_pending_unhide(state: &mut AppState, effects: &mut Vec<Effect>) {
+    let Some(name) = state.search.pending_unhide.take() else {
+        return;
+    };
+    if state.show_drives {
+        return;
     }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        const HIDDEN: u32 = 0x2;
-        std::fs::metadata(path).is_ok_and(|m| m.file_attributes() & HIDDEN != 0)
+    let height = state.viewport_height();
+    if state.view.unhide_for(&name, height) {
+        set_status(
+            state,
+            Level::Info,
+            "Showing hidden files to reveal the match".into(),
+            effects,
+        );
+        state.dirty = true;
     }
-    #[cfg(not(windows))]
-    false
 }
 
 /// Shows `entries` (names relative to `root`) as a virtual listing in a NEW TAB (the single
@@ -543,6 +540,7 @@ pub(crate) fn on_finished(
                 let stale = state.view.replace_entries(pending.buffer, height);
                 state.view.gen = gen;
                 if was_loading {
+                    apply_pending_unhide(state, effects);
                     // The refresh superseded the streamed listing, so it finishes the view:
                     // the visit's reveal (remembered cursor) is honoured on the full listing.
                     if let Some(name) = reveal {
@@ -575,6 +573,7 @@ pub(crate) fn on_finished(
 
 /// The listing of the displayed directory is complete.
 fn finish_view(state: &mut AppState, effects: &mut Vec<Effect>) {
+    apply_pending_unhide(state, effects);
     state.view.finish_loading();
     crate::search::apply_pending_marks(state);
     state.dirty = true;
@@ -620,6 +619,8 @@ fn navigation_failed(
     error: &FsError,
 ) {
     let PendingNav { target, kind, .. } = pending;
+    // The visit that wanted a hidden match revealed is over.
+    state.search.pending_unhide = None;
     let climbing = matches!(kind, NavKind::Climb);
     match kind {
         NavKind::Back(entry) => state.history.back.push(entry),
@@ -1360,6 +1361,71 @@ mod tests {
         assert_eq!(w.state.view.marks_count(), 1, "b is marked");
         let marked: Vec<_> = w.state.view.marked_names().cloned().collect();
         assert_eq!(marked, [OsString::from("b")]);
+    }
+
+    #[test]
+    fn find_file_on_an_attribute_hidden_file_unhides_from_the_listing_without_a_stat() {
+        let mut w = project_world();
+        let mut secret = Entry::file("secret.txt", 1);
+        secret.attrs = crate::entry::Attrs::HIDDEN;
+        w.dir(
+            "/home/me/projects",
+            vec![Entry::file("a.txt", 1), secret, Entry::file("z.txt", 1)],
+        );
+        assert!(!w.state.view.show_hidden);
+        let mut effects = Vec::new();
+        go_to_file(
+            &mut w.state,
+            &mut effects,
+            Path::new("/home/me/projects/secret.txt"),
+            Vec::new(),
+        );
+        // No hidden decision before the listing arrives: update() does no file I/O.
+        assert!(!w.state.view.show_hidden);
+        for e in &effects {
+            for m in w.run(e).into_iter().rev() {
+                w.send(m);
+            }
+        }
+        assert!(w.state.view.show_hidden);
+        assert_eq!(w.cursor(), "secret.txt");
+        assert!(w.state.search.pending_unhide.is_none());
+    }
+
+    #[test]
+    fn a_failed_visit_clears_the_pending_unhide() {
+        let mut w = project_world();
+        w.dir("/home/me/projects", vec![Entry::file("a.txt", 1)]);
+        let mut effects = Vec::new();
+        go_to_file(
+            &mut w.state,
+            &mut effects,
+            Path::new("/home/me/projects/secret.txt"),
+            Vec::new(),
+        );
+        assert!(w.state.search.pending_unhide.is_some());
+        let Some(Effect::ListDir { gen, .. }) = effects
+            .iter()
+            .find(|e| matches!(e, Effect::ListDir { .. }))
+            .cloned()
+        else {
+            panic!("{effects:?}")
+        };
+        w.send(Msg::ListingFinished {
+            gen,
+            error: Some(FsError::new(FsErrorKind::Other, "boom")),
+        });
+        assert!(w.state.search.pending_unhide.is_none());
+        assert!(!w.state.view.show_hidden);
+    }
+
+    #[test]
+    fn leaving_the_tab_clears_the_pending_unhide() {
+        let mut w = project_world();
+        w.state.search.pending_unhide = Some(OsString::from(".env"));
+        let mut effects = Vec::new();
+        crate::tabs::new_tab(&mut w.state, &mut effects);
+        assert!(w.state.search.pending_unhide.is_none());
     }
 
     #[test]

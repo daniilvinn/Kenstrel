@@ -218,7 +218,7 @@ pub(crate) fn render_text(
     text: &str,
     encoding: Encoding,
     bytes_read: u64,
-    truncated_file: bool,
+    (truncated_file, first_line): (bool, usize),
     opts: &PreviewOptions,
     cancel: &CancellationToken,
 ) -> Option<TextPreview> {
@@ -247,8 +247,9 @@ pub(crate) fn render_text(
             lines.push(plain_line(l, opts.tab_width));
         }
     }
-    let truncated = more || truncated_file;
+    let truncated = more || truncated_file || first_line > 0;
     Some(TextPreview {
+        first_line,
         line_count: lines.len(),
         total_lines: (!truncated).then_some(lines.len()),
         lines,

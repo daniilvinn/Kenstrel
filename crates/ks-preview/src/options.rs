@@ -67,6 +67,9 @@ pub struct Limits {
     pub max_text_bytes: usize,
     /// Lines rendered for text / markdown (2,000).
     pub max_text_lines: usize,
+    /// 1-based line to centre the text window on when it lies beyond the head limits (a
+    /// content-search hit deep in a big file). `None` reads from the start.
+    pub focus_line: Option<u64>,
     /// Text, markdown and binary files larger than this are `Unavailable::TooLarge`
     /// (only the head is ever read, but multi-GB files are usually not worth previewing).
     pub max_file_size: u64,
@@ -95,6 +98,7 @@ impl Default for Limits {
         Self {
             max_text_bytes: 256 * 1024,
             max_text_lines: 2_000,
+            focus_line: None,
             max_file_size: 100 * 1024 * 1024,
             max_dir_entries: 500,
             dir_scan_limit: 20_000,
