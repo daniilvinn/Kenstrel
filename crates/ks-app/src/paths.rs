@@ -1,4 +1,4 @@
-//! Where Kestrel keeps its files (PLAN §9). Injectable so tests never touch the real
+//! Where Kestrel keeps its files. Injectable so tests never touch the real
 //! `%APPDATA%`.
 
 use std::path::{Path, PathBuf};
@@ -7,6 +7,10 @@ use anyhow::{anyhow, Result};
 use directories::BaseDirs;
 
 const APP_DIR: &str = "kestrel";
+/// Overrides the configuration directory.
+pub const CONFIG_DIR_ENV: &str = "KESTREL_CONFIG_DIR";
+/// Overrides the state directory (bookmarks, frecency, logs).
+pub const STATE_DIR_ENV: &str = "KESTREL_STATE_DIR";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppPaths {
@@ -19,11 +23,27 @@ pub struct AppPaths {
 impl AppPaths {
     /// The platform locations. On Windows these are `%APPDATA%\kestrel` and
     /// `%LOCALAPPDATA%\kestrel\state`.
+    ///
+    /// `KESTREL_CONFIG_DIR` and `KESTREL_STATE_DIR` replace them (a portable install, or a
+    /// throwaway profile for demos and tests).
     pub fn discover() -> Result<Self> {
+        Self::discover_with(|name| std::env::var_os(name).filter(|v| !v.is_empty()))
+    }
+
+    fn discover_with(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<Self> {
+        let config_dir = var(CONFIG_DIR_ENV).map(PathBuf::from);
+        let state_dir = var(STATE_DIR_ENV).map(PathBuf::from);
+        if let (Some(config_dir), Some(state_dir)) = (&config_dir, &state_dir) {
+            return Ok(Self {
+                config_dir: config_dir.clone(),
+                state_dir: state_dir.clone(),
+            });
+        }
         let base = BaseDirs::new().ok_or_else(|| anyhow!("cannot determine the home directory"))?;
         Ok(Self {
-            config_dir: base.config_dir().join(APP_DIR),
-            state_dir: base.data_local_dir().join(APP_DIR).join("state"),
+            config_dir: config_dir.unwrap_or_else(|| base.config_dir().join(APP_DIR)),
+            state_dir: state_dir
+                .unwrap_or_else(|| base.data_local_dir().join(APP_DIR).join("state")),
         })
     }
 
@@ -72,6 +92,24 @@ mod tests {
         assert_eq!(paths.config_file(), Path::new("root/config/config.toml"));
         assert_eq!(paths.themes_dir(), Path::new("root/config/themes"));
         assert_eq!(paths.log_dir(), Path::new("root/state/logs"));
+    }
+
+    #[test]
+    fn environment_variables_override_each_directory() {
+        let both = AppPaths::discover_with(|name| match name {
+            CONFIG_DIR_ENV => Some("C:/portable/config".into()),
+            STATE_DIR_ENV => Some("C:/portable/state".into()),
+            _ => None,
+        })
+        .unwrap();
+        assert_eq!(both.config_dir(), Path::new("C:/portable/config"));
+        assert_eq!(both.log_dir(), Path::new("C:/portable/state/logs"));
+        let one = AppPaths::discover_with(|name| {
+            (name == STATE_DIR_ENV).then(|| "C:/portable/state".into())
+        })
+        .unwrap();
+        assert!(one.config_dir().ends_with("kestrel"));
+        assert_eq!(one.log_dir(), Path::new("C:/portable/state/logs"));
     }
 
     #[test]
