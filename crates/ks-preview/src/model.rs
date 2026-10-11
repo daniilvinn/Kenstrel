@@ -175,6 +175,9 @@ impl Encoding {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextPreview {
     pub lines: Vec<StyledLine>,
+    /// Lines of the file before `lines[0]` (0 unless the preview is a window read around
+    /// `Limits::focus_line`); the gutter shows `first_line + index + 1`.
+    pub first_line: usize,
     /// Number of lines in `lines` (the renderer sizes the line-number gutter from this).
     /// When `truncated` is true the real file has more lines (see `total_lines`).
     pub line_count: usize,

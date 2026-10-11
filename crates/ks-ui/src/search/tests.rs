@@ -591,7 +591,13 @@ fn long_paths_keep_the_file_name() {
 
 /// Makes a 150-line text file the engine result for the highlighted result of the open
 /// overlay and scrolls like `ks_core::preview` does for a content-search hit.
-fn with_overlay_preview(mut s: AppState) -> AppState {
+fn with_overlay_preview(s: AppState) -> AppState {
+    with_overlay_window(s, 0)
+}
+
+/// Like [`with_overlay_preview`], but the engine returned a window that starts after the first
+/// `first_line` lines of the file (a hit beyond the head limits).
+fn with_overlay_window(mut s: AppState, first_line: usize) -> AppState {
     use ks_preview::{Encoding, Preview, PreviewBody, StyledLine, TextPreview};
     let target = ks_core::preview_target(&s).expect("a highlighted result");
     let lines = 150;
@@ -603,9 +609,10 @@ fn with_overlay_preview(mut s: AppState) -> AppState {
             lines: (0..lines)
                 .map(|i| StyledLine::plain(format!("    let value_{i} = compute({i});")))
                 .collect(),
+            first_line,
             line_count: lines,
-            total_lines: Some(lines),
-            truncated: false,
+            total_lines: if first_line > 0 { None } else { Some(lines) },
+            truncated: first_line > 0,
             encoding: Encoding::Utf8,
             syntax: None,
             bytes_read: 0,
@@ -614,7 +621,9 @@ fn with_overlay_preview(mut s: AppState) -> AppState {
     s.preview.loading = false;
     if let Some(line) = target.line {
         let first = usize::try_from(line - 1).unwrap();
-        s.preview.scroll = first.saturating_sub(s.preview_rows() / 3);
+        s.preview.scroll = first
+            .saturating_sub(first_line)
+            .saturating_sub(s.preview_rows() / 3);
     }
     s
 }
@@ -630,6 +639,17 @@ fn overlay_preview_snapshots() {
         let s = with_overlay_preview(grep_state(160, 48, false));
         insta::assert_snapshot!(
             format!("grep_preview_{name}_160x48"),
+            draw(&s, &theme(name))
+        );
+    }
+}
+
+#[test]
+fn window_preview_snapshots() {
+    for name in THEMES {
+        let s = with_overlay_window(grep_state(160, 48, false), 40);
+        insta::assert_snapshot!(
+            format!("grep_window_preview_{name}_160x48"),
             draw(&s, &theme(name))
         );
     }

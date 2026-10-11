@@ -126,6 +126,7 @@ pub fn rust_text(palette: &Palette) -> TextPreview {
     let count = lines.len();
     TextPreview {
         lines,
+        first_line: 0,
         line_count: count,
         total_lines: Some(count),
         truncated: false,
@@ -153,6 +154,7 @@ pub fn markdown_text() -> TextPreview {
     let count = lines.len();
     TextPreview {
         lines,
+        first_line: 0,
         line_count: count,
         total_lines: Some(count),
         truncated: false,

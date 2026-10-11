@@ -858,3 +858,46 @@ fn a_stuck_owner_lookup_does_not_hold_the_worker() {
     assert!(started.elapsed() < std::time::Duration::from_secs(5));
     assert_eq!(pv.meta.unwrap().owner, None);
 }
+
+#[test]
+fn focus_line_reads_a_window_around_a_deep_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("deep.log");
+    let body: String = (1..=60_000).map(|i| format!("row {i}\n")).collect();
+    fs::write(&p, body).unwrap();
+    let mut opts = PreviewOptions::default();
+    opts.limits.focus_line = Some(50_000);
+    let PreviewBody::Text(t) = build(&p, &opts).body else {
+        panic!("not text")
+    };
+    assert_eq!(t.first_line, 48_999);
+    assert_eq!(t.lines.len(), 2000);
+    assert!(t.truncated);
+    assert_eq!(t.lines[0].text(), "row 49000");
+    assert_eq!(t.lines[1000].text(), "row 50000");
+    // A focus inside the head limits changes nothing.
+    opts.limits.focus_line = Some(100);
+    let PreviewBody::Text(t) = build(&p, &opts).body else {
+        panic!("not text")
+    };
+    assert_eq!(t.first_line, 0);
+    assert_eq!(t.lines[0].text(), "row 1");
+}
+
+#[test]
+fn focus_window_counts_lone_cr_and_crlf_like_the_renderer() {
+    for (name, eol) in [("mac.txt", "\r"), ("win.txt", "\r\n"), ("unix.txt", "\n")] {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join(name);
+        let body: String = (1..=60_000).map(|i| format!("row {i}{eol}")).collect();
+        fs::write(&p, body).unwrap();
+        let mut opts = PreviewOptions::default();
+        opts.limits.focus_line = Some(50_000);
+        let PreviewBody::Text(t) = build(&p, &opts).body else {
+            panic!("not text")
+        };
+        assert_eq!(t.first_line, 48_999, "{name}");
+        assert_eq!(t.lines[0].text(), "row 49000", "{name}");
+        assert_eq!(t.lines[1000].text(), "row 50000", "{name}");
+    }
+}

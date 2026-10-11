@@ -352,6 +352,7 @@ pub(crate) fn render(
     }
 
     Some(TextPreview {
+        first_line: 0,
         line_count: lines.len(),
         total_lines: (!(more || truncated_file)).then_some(lines.len()),
         lines,

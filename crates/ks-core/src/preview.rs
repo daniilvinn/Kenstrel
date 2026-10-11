@@ -54,6 +54,9 @@ pub struct PreviewRequest {
     pub max_bytes: u64,
     /// `[preview] max_lines`.
     pub max_lines: usize,
+    /// Centre a text window on this 1-based line instead of reading from the top (a
+    /// content-search hit deep in a big file).
+    pub focus_line: Option<u64>,
 }
 
 /// A finished engine request on its way into `update`. `PartialEq` compares the generation,
@@ -152,6 +155,10 @@ struct TargetKey {
     metadata: bool,
     show_hidden: bool,
     epoch: u32,
+    /// Line the window read is centred on so a content-search hit past the head limits is
+    /// inside the preview (0 = the head). Bucketed, so moving between hits of one file does
+    /// not request it again.
+    focus: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -188,6 +195,8 @@ pub struct PreviewState {
     /// Bumped when the theme changes: syntax colours are baked into text results, so the
     /// current file is requested again with the new palette.
     pub(crate) theme_epoch: u32,
+    /// The "hit is past the preview limit" notice was shown for this (file, line).
+    beyond_noted: Option<(PathBuf, u64)>,
     /// Visual-lines selection in the text preview (`V`), see [`crate::preview_lines`].
     pub select: Option<crate::preview_lines::LineSelect>,
     key: Option<TargetKey>,
@@ -209,6 +218,7 @@ impl PreviewState {
             image_id: 0,
             parent: None,
             theme_epoch: 0,
+            beyond_noted: None,
             select: None,
             key: None,
             gen: GenCounter::default(),
@@ -337,12 +347,13 @@ fn wanted_key(state: &AppState) -> Option<TargetKey> {
         // The overlay preview is independent of the `w` toggle and of the list's cursor.
         let target = crate::search::preview_target(state)?;
         return Some(TargetKey {
-            path: target.path,
+            path: target.path.clone(),
             mtime: None,
             size: 0,
             metadata: false,
             show_hidden: state.view.show_hidden,
             epoch: state.preview.theme_epoch,
+            focus: target.line.map_or(0, |line| focus_for(&state.config, line)),
         });
     }
     if !state.preview_visible() || state.show_drives {
@@ -356,10 +367,40 @@ fn wanted_key(state: &AppState) -> Option<TargetKey> {
         metadata: state.preview.metadata,
         show_hidden: state.view.show_hidden,
         epoch: state.preview.theme_epoch,
+        focus: 0,
     })
 }
 
+/// Lines kept below a hit so it shows with context.
+const FOCUS_MARGIN: u64 = 100;
+/// Hits within one bucket share a window, so moving between them does not read the file again.
+const FOCUS_BUCKET: u64 = 1_000;
+/// Assumed bytes per line when deciding whether the head reaches a hit.
+const FOCUS_BYTES_PER_LINE: u64 = 256;
+/// Byte cap of a focused window read (the head cap, but at least this).
+const FOCUS_MIN_BYTES: u64 = 1024 * 1024;
+
+/// Centre line of the window to read for a content-search hit on `line`, or 0 when the head
+/// preview within the configured limits already reaches it.
+fn focus_for(config: &Config, line: u64) -> u64 {
+    let lines_ok = line.saturating_add(FOCUS_MARGIN) <= config.preview.max_lines as u64;
+    let bytes_ok = line.saturating_mul(FOCUS_BYTES_PER_LINE) <= config.preview.max_bytes;
+    if lines_ok && bytes_ok {
+        return 0;
+    }
+    let bucket = focus_bucket(config);
+    (line / bucket) * bucket + bucket / 2
+}
+
+/// Bucket size: at most [`FOCUS_BUCKET`], and at most half the window (`max_lines`), so a hit
+/// (up to half a bucket from its centre) always falls inside the window, even for a small
+/// `preview.max_lines`.
+fn focus_bucket(config: &Config) -> u64 {
+    (config.preview.max_lines as u64 / 2).clamp(2, FOCUS_BUCKET)
+}
+
 fn request_for(state: &AppState, key: &TargetKey) -> PreviewRequest {
+    let cfg = &state.config.preview;
     PreviewRequest {
         path: key.path.clone(),
         kind: if key.metadata {
@@ -368,8 +409,13 @@ fn request_for(state: &AppState, key: &TargetKey) -> PreviewRequest {
             PreviewKind::Auto
         },
         show_hidden: key.show_hidden,
-        max_bytes: state.config.preview.max_bytes,
-        max_lines: state.config.preview.max_lines,
+        max_bytes: if key.focus > 0 {
+            cfg.max_bytes.max(FOCUS_MIN_BYTES)
+        } else {
+            cfg.max_bytes
+        },
+        max_lines: cfg.max_lines,
+        focus_line: (key.focus > 0).then_some(key.focus),
     }
 }
 
@@ -378,14 +424,14 @@ pub(crate) fn sync(state: &mut AppState, effects: &mut Vec<Effect>) {
     sync_main(state, effects);
     sync_parent(state, effects);
     crate::preview_lines::validate(state);
-    follow_overlay_line(state);
+    follow_overlay_line(state, effects);
     // A resize changes the visible rows and the hex row width: keep the scroll in range.
     clamp_scroll(state);
 }
 
 /// A content-search hit shows its line: scrolls the overlay's preview so the line sits a third
 /// of the way down, once the file's result is in.
-fn follow_overlay_line(state: &mut AppState) {
+fn follow_overlay_line(state: &mut AppState, effects: &mut Vec<Effect>) {
     let Some(target) = overlay_target(state) else {
         return;
     };
@@ -400,8 +446,37 @@ fn follow_overlay_line(state: &mut AppState) {
     if !ready {
         return;
     }
+    let beyond = state
+        .preview
+        .current
+        .as_deref()
+        .is_some_and(|p| match &p.body {
+            PreviewBody::Text(t) => usize::try_from(line).map_or(true, |l| {
+                t.truncated && (l <= t.first_line || l > t.first_line + t.line_count)
+            }),
+            _ => false,
+        });
+    if beyond && state.preview.beyond_noted.as_ref() != Some(&(target.path.clone(), line)) {
+        state.preview.beyond_noted = Some((target.path.clone(), line));
+        crate::update::set_status(
+            state,
+            crate::state::Level::Info,
+            format!("Line {line} is beyond the preview limit"),
+            effects,
+        );
+    }
     let rows = state.preview_rows();
-    let first = usize::try_from(line.saturating_sub(1)).unwrap_or(usize::MAX);
+    let offset = state
+        .preview
+        .current
+        .as_deref()
+        .map_or(0, |p| match &p.body {
+            PreviewBody::Text(t) => t.first_line,
+            _ => 0,
+        });
+    let first = usize::try_from(line.saturating_sub(1))
+        .unwrap_or(usize::MAX)
+        .saturating_sub(offset);
     let wanted = first.saturating_sub(rows / 3).min(max_scroll(state));
     if state.preview.scroll != wanted {
         state.preview.scroll = wanted;
@@ -536,6 +611,7 @@ fn sync_parent(state: &mut AppState, effects: &mut Vec<Effect>) {
                 show_hidden: key.show_hidden,
                 max_bytes: state.config.preview.max_bytes,
                 max_lines: state.config.preview.max_lines,
+                focus_line: None,
             };
             // The old listing stays until the new one arrives unless the directory changed.
             let same_dir = state
@@ -738,6 +814,7 @@ mod tests {
                 lines: (0..lines)
                     .map(|i| StyledLine::plain(format!("line {i}")))
                     .collect(),
+                first_line: 0,
                 line_count: lines,
                 total_lines: Some(lines),
                 truncated: false,

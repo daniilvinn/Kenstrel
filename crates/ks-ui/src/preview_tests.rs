@@ -610,3 +610,39 @@ fn bidi_overrides_in_names_never_reach_the_buffer() {
         assert!(text.contains("results ?evil"), "header label at {w}x{h}");
     }
 }
+
+#[test]
+fn a_window_preview_numbers_its_gutter_from_the_offset() {
+    use crate::preview::text_lines;
+    let mut text = rust_text(&ks_preview::Palette::dark());
+    text.first_line = 48_999;
+    text.truncated = true;
+    let n = text.lines.len();
+    let theme = theme("ember");
+    // The hit (file line 49,002) is the third row of the window.
+    let out = text_lines(
+        &text,
+        true,
+        (0, Some((49_001, 49_001)), None),
+        40,
+        80,
+        &theme,
+    );
+    let rows: Vec<String> = out
+        .iter()
+        .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect())
+        .collect();
+    assert!(rows[0].starts_with("49000 "), "{:?}", rows[0]);
+    assert!(rows[2].starts_with("49002 "), "{:?}", rows[2]);
+    assert_eq!(
+        out[2].style.bg,
+        Some(theme.selection_bg),
+        "the hit row is marked by its file line"
+    );
+    assert_ne!(out[1].style.bg, Some(theme.selection_bg));
+    let last = rows.last().unwrap();
+    assert!(
+        last.contains(&format!("showing lines 49000-{}", 48_999 + n)),
+        "{last:?}"
+    );
+}

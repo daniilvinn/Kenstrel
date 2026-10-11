@@ -196,8 +196,14 @@ fn send(state: &mut AppState, effects: &mut Vec<Effect>) {
         return;
     };
     if !state.claude.is_running() {
-        // Keep the selection so the user can start Claude and come back.
-        crate::claude::not_running(state, effects);
+        // This context has no `c` binding and opening Claude drops the selection anyway, so
+        // say what actually works instead of promising a way back.
+        set_status(
+            state,
+            Level::Info,
+            "Claude is not running: esc, c to open it, then V again".to_owned(),
+            effects,
+        );
         return;
     }
     let (start, end) = select.file_lines();
@@ -250,6 +256,7 @@ mod tests {
         let path = s.cwd.join("notes.txt");
         let lines: Vec<StyledLine> = (0..50).map(|_| StyledLine::default()).collect();
         let text = TextPreview {
+            first_line: 0,
             line_count: lines.len(),
             total_lines: Some(lines.len()),
             lines,
@@ -361,7 +368,7 @@ mod tests {
             .as_ref()
             .unwrap()
             .text
-            .contains("Claude is not running"));
+            .contains("Claude is not running: esc, c to open it, then V again"));
         assert!(s.preview.select.is_some());
 
         key(&mut s, "V");
@@ -383,6 +390,7 @@ mod tests {
             path,
             meta: None,
             body: PreviewBody::Text(TextPreview {
+                first_line: 0,
                 line_count: lines.len(),
                 total_lines: if truncated { None } else { Some(lines.len()) },
                 lines,

@@ -1307,6 +1307,107 @@ fn invalid_bulk_rename_with_a_kept_file_reopens_or_discards_it() {
 }
 
 #[test]
+fn n_on_the_bulk_reedit_dialog_discards_the_kept_file() {
+    let retry = BulkRetry {
+        dir: PathBuf::from("/work/proj"),
+        names: vec!["a.txt".into()],
+        file: PathBuf::from("/tmp/kestrel-bulk-rename-2.txt"),
+    };
+    let mut s = state();
+    update(
+        &mut s,
+        Msg::BulkPlanned(BulkPlanResult::Invalid {
+            problems: vec!["line 1: empty name".into()],
+            retry: Some(retry.clone()),
+        }),
+    );
+    let effects = keys(&mut s, "n");
+    assert!(effects.contains(&Effect::BulkRenameDiscard { file: retry.file }));
+    assert!(s.overlays.is_empty());
+    assert_eq!(status(&s), "Bulk rename discarded");
+}
+
+#[test]
+fn quitting_over_the_bulk_reedit_dialog_discards_the_kept_file() {
+    let retry = BulkRetry {
+        dir: PathBuf::from("/work/proj"),
+        names: vec!["a.txt".into()],
+        file: PathBuf::from("/tmp/kestrel-bulk-rename-3.txt"),
+    };
+    let mut s = state();
+    update(
+        &mut s,
+        Msg::BulkPlanned(BulkPlanResult::Invalid {
+            problems: vec!["line 1: empty name".into()],
+            retry: Some(retry.clone()),
+        }),
+    );
+    let mut effects = Vec::new();
+    crate::fileops::request_quit(&mut s, crate::state::QuitKind::Exit, &mut effects);
+    assert!(effects.contains(&Effect::BulkRenameDiscard { file: retry.file }));
+}
+
+fn open_reedit(s: &mut AppState, file: &str) -> BulkRetry {
+    let retry = BulkRetry {
+        dir: PathBuf::from("/work/proj"),
+        names: vec!["a.txt".into()],
+        file: PathBuf::from(file),
+    };
+    update(
+        s,
+        Msg::BulkPlanned(BulkPlanResult::Invalid {
+            problems: vec!["line 1: empty name".into()],
+            retry: Some(retry.clone()),
+        }),
+    );
+    retry
+}
+
+#[test]
+fn interrupt_over_the_bulk_reedit_dialog_discards_the_kept_file() {
+    let mut s = state();
+    let retry = open_reedit(&mut s, "/tmp/kestrel-bulk-rename-4.txt");
+    let effects = update(&mut s, Msg::Interrupt);
+    assert!(effects.contains(&Effect::BulkRenameDiscard { file: retry.file }));
+    assert!(s.quit.is_some());
+}
+
+#[test]
+fn asking_to_delete_over_the_bulk_reedit_dialog_discards_the_kept_file() {
+    let mut s = state();
+    cursor_to(&mut s, "a.txt");
+    let retry = open_reedit(&mut s, "/tmp/kestrel-bulk-rename-5.txt");
+    let mut effects = Vec::new();
+    ask_delete(&mut s, &mut effects);
+    assert!(effects.contains(&Effect::BulkRenameDiscard { file: retry.file }));
+    assert!(!matches!(
+        s.fileops.confirm.as_ref().and_then(|c| c.action.as_ref()),
+        Some(ConfirmAction::BulkReedit(_))
+    ));
+}
+
+#[test]
+fn a_retry_reusing_the_same_edit_file_does_not_discard_it() {
+    let mut s = state();
+    let retry = open_reedit(&mut s, "/tmp/kestrel-bulk-rename-6.txt");
+    let effects = update(
+        &mut s,
+        Msg::BulkPlanned(BulkPlanResult::Invalid {
+            problems: vec!["line 2: duplicate".into()],
+            retry: Some(retry.clone()),
+        }),
+    );
+    assert!(
+        !effects.contains(&Effect::BulkRenameDiscard { file: retry.file }),
+        "the new dialog still points at the file"
+    );
+    assert!(matches!(
+        s.fileops.confirm.as_ref().and_then(|c| c.action.as_ref()),
+        Some(ConfirmAction::BulkReedit(_))
+    ));
+}
+
+#[test]
 fn a_fresh_conflict_dialog_swallows_keys_typed_before_it_appeared() {
     let mut s = state();
     update(&mut s, started(1));

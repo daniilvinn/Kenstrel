@@ -56,6 +56,10 @@ pub struct SearchState {
     pub(crate) grep_timer: GenCounter,
     /// Entries to mark once the listing of the directory has finished loading.
     pub(crate) pending_marks: Option<(PathBuf, Vec<OsString>)>,
+    /// The entry a find-file jump wants shown: when the finished listing hides it (dotfile or
+    /// hidden attribute), hidden entries are switched on. Decided on the listing, not by a
+    /// stat in `update`.
+    pub(crate) pending_unhide: Option<OsString>,
 }
 
 impl Default for SearchState {
@@ -74,6 +78,7 @@ impl Default for SearchState {
             grep_gen: 0,
             grep_timer: GenCounter::default(),
             pending_marks: None,
+            pending_unhide: None,
         }
     }
 }

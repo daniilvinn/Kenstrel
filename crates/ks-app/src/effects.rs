@@ -594,6 +594,7 @@ impl EffectRunner {
         let limits = Limits {
             max_text_bytes: usize::try_from(request.max_bytes).unwrap_or(usize::MAX),
             max_text_lines: request.max_lines,
+            focus_line: request.focus_line,
             ..Limits::default()
         };
         PreviewOptions {
@@ -922,6 +923,7 @@ mod fs_effect_tests {
             show_hidden: false,
             max_bytes: 1 << 20,
             max_lines: 1000,
+            focus_line: None,
         };
         let ask = |runner: &mut EffectRunner| {
             runner.run([Effect::RequestPreview {

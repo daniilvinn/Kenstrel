@@ -649,7 +649,7 @@ pub(crate) fn push_clipped(
     }
 }
 
-fn text_lines(
+pub(crate) fn text_lines(
     text: &TextPreview,
     numbered: bool,
     (scroll, mark, cursor): (usize, Option<(usize, usize)>, Option<usize>),
@@ -658,7 +658,7 @@ fn text_lines(
     theme: &Theme,
 ) -> Vec<Line<'static>> {
     let gutter = if numbered {
-        digits(text.line_count) + 1
+        digits(text.first_line + text.line_count) + 1
     } else {
         0
     };
@@ -673,13 +673,13 @@ fn text_lines(
             let mut spans = Vec::new();
             if numbered {
                 spans.push(Span::styled(
-                    format!("{:>w$} ", index + 1, w = gutter - 1),
+                    format!("{:>w$} ", text.first_line + index + 1, w = gutter - 1),
                     theme.muted(),
                 ));
             }
             push_clipped(&mut spans, line, body, theme);
             let line = Line::from(spans);
-            if mark.is_some_and(|(a, b)| (a..=b).contains(&index)) {
+            if mark.is_some_and(|(a, b)| (a..=b).contains(&(text.first_line + index))) {
                 // The content-search hit or the selected range: whole rows on the selection
                 // background; the moving end of a selection is bold.
                 let pad = (gutter + body).saturating_sub(line.width());
@@ -698,7 +698,15 @@ fn text_lines(
     if text.truncated && out.len() < rows && scroll + out.len() >= text.lines.len() {
         out.push(Line::from(Span::styled(
             truncate_end(
-                &format!("… truncated, showing the first {} lines", text.lines.len()),
+                &if text.first_line > 0 {
+                    format!(
+                        "… truncated, showing lines {}-{}",
+                        text.first_line + 1,
+                        text.first_line + text.lines.len()
+                    )
+                } else {
+                    format!("… truncated, showing the first {} lines", text.lines.len())
+                },
                 cells,
             ),
             theme.muted(),
