@@ -456,11 +456,45 @@ async fn move_undo() {
     assert!(!root.join("dest/m.txt").exists());
 }
 
+/// Whether the machine's trash accepts a file and lists it back (undo needs both). A CI runner
+/// or container may accept deletions yet list nothing; such a machine skips `trash_undo`.
+fn recycle_bin_round_trips() -> bool {
+    let dir = tempfile::tempdir().unwrap();
+    let probe = dir.path().join("kestrel-trash-probe.txt");
+    fs::write(&probe, "probe").unwrap();
+    if trash::delete(&probe).is_err() || probe.exists() {
+        return false;
+    }
+    #[cfg(any(windows, all(unix, not(target_os = "macos"))))]
+    {
+        let key = |p: &Path| p.to_string_lossy().to_lowercase();
+        let want = key(dunce::simplified(dir.path()));
+        let Ok(items) = trash::os_limited::list() else {
+            return false;
+        };
+        let mine: Vec<_> = items
+            .into_iter()
+            .filter(|i| key(&i.original_parent).starts_with(&want))
+            .collect();
+        let found = !mine.is_empty();
+        let _ = trash::os_limited::purge_all(mine);
+        found
+    }
+    #[cfg(not(any(windows, all(unix, not(target_os = "macos")))))]
+    {
+        false
+    }
+}
+
 /// Trash and restore through the machine's real Recycle Bin. Deterministic: every step waits
 /// for the job to finish (the undo entry exists only then) rather than for a fixed time, and
 /// the restore looks the item up by its original path, so other bin contents do not matter.
 #[tokio::test]
 async fn trash_undo() {
+    if !recycle_bin_round_trips() {
+        eprintln!("SKIP: this machine has no Recycle Bin / trash that lists what it received");
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let root = canonical(&dir);
     fs::write(root.join("t.txt"), "trash me").unwrap();
