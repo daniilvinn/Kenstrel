@@ -3,3 +3,7 @@
 *.pending-snap
 .idea/
 .vscode/
+
+# Screenshot tooling (tools/screenshots)
+/tools/screenshots/target/
+/tools/screenshots/fonts-dl/
