@@ -597,6 +597,24 @@ mod tests {
     }
 
     #[test]
+    fn a_change_report_for_a_path_that_is_no_longer_parked_is_ignored() {
+        let mut w = project_world();
+        w.key("t j l");
+        // Tab 2 (active) shows /home/me/projects; only /home/me is parked.
+        w.log.clear();
+        for gone in ["/home/me/projects", "/elsewhere"] {
+            w.send(Msg::ParkedDirChanged {
+                path: PathBuf::from(gone),
+            });
+        }
+        assert!(
+            !w.log.iter().any(|e| matches!(e, Effect::ListParked { .. })),
+            "a stale report must not start a re-list"
+        );
+        assert!(!w.state.tabs.is_stale(0));
+    }
+
+    #[test]
     fn two_parked_tabs_on_one_directory_are_both_refreshed_by_one_listing() {
         let mut w = project_world();
         // Tabs 1 and 2 both show /home/me; tab 3 (active) is elsewhere.

@@ -151,6 +151,19 @@ pub fn search_files(
     cache: &Arc<WalkCache>,
     cancel: &CancellationToken,
 ) -> Outcome {
+    search_files_with_budget(root, query, limit, ctx, cache, cancel, FILE_SEARCH_BUDGET)
+}
+
+/// [`search_files`] with an explicit wall-clock budget (tests widen or shrink it).
+fn search_files_with_budget(
+    root: &Path,
+    query: &str,
+    limit: usize,
+    ctx: &IpcContext,
+    cache: &Arc<WalkCache>,
+    cancel: &CancellationToken,
+    budget: Duration,
+) -> Outcome {
     if !root.is_dir() {
         return Outcome::error(format!("{} is not a directory", root.display()));
     }
@@ -172,7 +185,7 @@ pub fn search_files(
         token.clone(),
     );
     session.set_query(query);
-    let deadline = Instant::now() + FILE_SEARCH_BUDGET;
+    let deadline = Instant::now() + budget;
     let mut timed_out = false;
     // Settled = two ticks in a row with nothing left to do: the first may have run before the
     // walker injected its last paths, the second runs after the walk was seen to be over.
@@ -218,6 +231,30 @@ pub fn search_contents(
     ctx: &IpcContext,
     cancel: &CancellationToken,
 ) -> Outcome {
+    search_contents_with_budget(
+        root,
+        pattern,
+        glob,
+        regex,
+        limit,
+        ctx,
+        cancel,
+        CONTENT_SEARCH_BUDGET,
+    )
+}
+
+/// [`search_contents`] with an explicit wall-clock budget (tests widen or shrink it).
+#[allow(clippy::too_many_arguments)]
+fn search_contents_with_budget(
+    root: &Path,
+    pattern: &str,
+    glob: Option<&str>,
+    regex: bool,
+    limit: usize,
+    ctx: &IpcContext,
+    cancel: &CancellationToken,
+    budget: Duration,
+) -> Outcome {
     if pattern.is_empty() {
         return Outcome::error("empty pattern".to_owned());
     }
@@ -242,7 +279,7 @@ pub fn search_contents(
         Err(e) => return Outcome::error(format!("cannot start the search: {e}")),
     };
 
-    let deadline = Instant::now() + CONTENT_SEARCH_BUDGET;
+    let deadline = Instant::now() + budget;
     let mut files = Vec::new();
     let mut truncated = false;
     loop {
@@ -294,6 +331,62 @@ mod tests {
     use std::fs;
 
     use super::*;
+
+    /// Generous budget: only an upper bound (a search ends as soon as it settles), so a
+    /// starved machine cannot turn a tiny tree into a "timed out" answer.
+    const TEST_BUDGET: Duration = Duration::from_secs(120);
+
+    fn search_files(
+        root: &Path,
+        query: &str,
+        limit: usize,
+        ctx: &IpcContext,
+        cache: &Arc<WalkCache>,
+        cancel: &CancellationToken,
+    ) -> Outcome {
+        search_files_with_budget(root, query, limit, ctx, cache, cancel, TEST_BUDGET)
+    }
+
+    fn search_contents(
+        root: &Path,
+        pattern: &str,
+        glob: Option<&str>,
+        regex: bool,
+        limit: usize,
+        ctx: &IpcContext,
+        cancel: &CancellationToken,
+    ) -> Outcome {
+        search_contents_with_budget(root, pattern, glob, regex, limit, ctx, cancel, TEST_BUDGET)
+    }
+
+    #[test]
+    fn an_exhausted_budget_reports_truncation() {
+        let dir = tree();
+        let c = ctx(dir.path());
+        let out = search_files_with_budget(
+            dir.path(),
+            "",
+            50,
+            &c,
+            &Arc::new(WalkCache::new()),
+            &CancellationToken::new(),
+            Duration::ZERO,
+        );
+        let (_, truncated) = files_of(out);
+        assert!(truncated);
+        let out = search_contents_with_budget(
+            dir.path(),
+            "hello",
+            None,
+            false,
+            50,
+            &c,
+            &CancellationToken::new(),
+            Duration::ZERO,
+        );
+        let (_, truncated) = matches_of(out);
+        assert!(truncated);
+    }
 
     fn ctx(root: &Path) -> IpcContext {
         IpcContext {

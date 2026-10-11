@@ -41,6 +41,21 @@ enum Slot {
 /// own watch).
 const PARKED_WATCH_LIMIT: usize = ks_core::tabs::MAX_TABS - 1;
 
+/// Arming slower than this triggers one catch-up event (a change may have slipped in
+/// between the listing and the watch going live).
+const ARMING_CATCH_UP: std::time::Duration = std::time::Duration::from_millis(30);
+
+/// Whether a watch that took `arming` to go live (directory mtime `before` and `after`)
+/// may have missed a change made since the listing: the mtime moved, or arming was slow
+/// enough that a coarse timestamp could hide a write.
+fn needs_catch_up(
+    before: Option<std::time::SystemTime>,
+    after: Option<std::time::SystemTime>,
+    arming: std::time::Duration,
+) -> bool {
+    before != after || arming > ARMING_CATCH_UP
+}
+
 /// Starts a directory watch that lives until `token` is cancelled; every debounced change
 /// sends `make()`. A watch that cannot be set up warns the user when `warn` is set.
 fn spawn_watch(
@@ -50,18 +65,51 @@ fn spawn_watch(
     make: impl Fn() -> Msg + Send + 'static,
     warn: bool,
 ) {
+    spawn_watch_with(tx, token, path, make, warn, || {});
+}
+
+/// `spawn_watch` with a hook that runs on the blocking pool between the two directory
+/// mtime reads (tests change the directory there, deterministically).
+fn spawn_watch_with(
+    tx: Sender<Msg>,
+    token: CancellationToken,
+    path: PathBuf,
+    make: impl Fn() -> Msg + Send + 'static,
+    warn: bool,
+    window: impl FnOnce() + Send + 'static,
+) {
     tokio::spawn(async move {
         let notify_tx = tx.clone();
         let watch_path = path.clone();
-        // Setting up a watch touches the file system, so it stays off the loop.
+        // Cancellation silences the callback at once, whatever the OS handle or the blocking
+        // pool is doing: a watch that is still being set up (or torn down) under load must
+        // not deliver a stale event after the stop.
+        let gate = token.clone();
+        // Setting up a watch touches the file system, so it stays off the loop. The
+        // directory's mtime before and after arming tells whether anything changed in the
+        // window between the listing and the watch going live.
         let created = tokio::task::spawn_blocking(move || {
-            DirWatcher::new(&watch_path, move || {
-                let _ = notify_tx.blocking_send(make());
-            })
+            let started = std::time::Instant::now();
+            let first = make();
+            let before = std::fs::metadata(&watch_path)
+                .and_then(|m| m.modified())
+                .ok();
+            window();
+            let armed = DirWatcher::new(&watch_path, move || {
+                if !gate.is_cancelled() {
+                    let _ = notify_tx.blocking_send(make());
+                }
+            });
+            let after = std::fs::metadata(&watch_path)
+                .and_then(|m| m.modified())
+                .ok();
+            // Coarse timestamps can hide a write, so a slow arming also counts.
+            let missed = needs_catch_up(before, after, started.elapsed());
+            armed.map(|watcher| (watcher, missed.then_some(first)))
         })
         .await;
-        let watcher = match created {
-            Ok(Ok(watcher)) => watcher,
+        let (watcher, catch_up) = match created {
+            Ok(Ok(armed)) => armed,
             Ok(Err(error)) => {
                 tracing::warn!(path = %path.display(), %error, "cannot watch directory");
                 if warn && !token.is_cancelled() {
@@ -80,6 +128,15 @@ fn spawn_watch(
                 return;
             }
         };
+        // A watch that finished setting up after the cancel skips the catch-up and is torn
+        // down right below. The send races the cancel, so a full channel cannot keep the OS
+        // watch alive.
+        if let Some(msg) = catch_up.filter(|_| !token.is_cancelled()) {
+            tokio::select! {
+                _ = tx.send(msg) => {}
+                _ = token.cancelled() => {}
+            }
+        }
         token.cancelled().await;
         // Dropping stops the OS watch; do it where blocking is allowed.
         let _ = tokio::task::spawn_blocking(move || drop(watcher)).await;
@@ -1022,6 +1079,108 @@ mod fs_effect_tests {
             .is_err());
     }
 
+    #[test]
+    fn a_catch_up_is_due_when_the_mtime_moved_or_arming_was_slow() {
+        use std::time::{Duration as D, SystemTime};
+        let t = SystemTime::UNIX_EPOCH + D::from_secs(1000);
+        let fast = D::from_millis(1);
+        assert!(!needs_catch_up(Some(t), Some(t), fast));
+        assert!(!needs_catch_up(None, None, fast));
+        assert!(needs_catch_up(Some(t), Some(t + D::from_secs(1)), fast));
+        assert!(needs_catch_up(None, Some(t), fast));
+        assert!(needs_catch_up(Some(t), Some(t), ARMING_CATCH_UP + fast));
+        assert!(!needs_catch_up(Some(t), Some(t), ARMING_CATCH_UP));
+    }
+
+    #[cfg(windows)]
+    /// Opens a directory with the right to set its timestamps (Windows).
+    fn open_dir_for_times(path: &std::path::Path) -> std::fs::File {
+        use std::os::windows::fs::OpenOptionsExt;
+        std::fs::OpenOptions::new()
+            .access_mode(0x100) // FILE_WRITE_ATTRIBUTES
+            .custom_flags(0x0200_0000) // FILE_FLAG_BACKUP_SEMANTICS
+            .open(path)
+            .unwrap()
+    }
+
+    #[cfg(windows)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_change_between_listing_and_arming_is_caught_up() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let token = CancellationToken::new();
+        let g = gen();
+        let moved = dir.path().to_owned();
+        spawn_watch_with(
+            tx,
+            token.clone(),
+            dir.path().to_owned(),
+            move || Msg::DirChanged { gen: g },
+            false,
+            // The directory changes after the first mtime read, before the watch is live.
+            move || {
+                let f = open_dir_for_times(&moved);
+                f.set_modified(std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(86_400))
+                    .unwrap();
+            },
+        );
+        let got = timeout(WAIT, rx.recv()).await.expect("catch-up delivered");
+        assert_eq!(got, Some(Msg::DirChanged { gen: g }));
+        token.cancel();
+    }
+
+    #[cfg(windows)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_catch_up_is_not_delivered_after_the_cancel() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let token = CancellationToken::new();
+        let g = gen();
+        let moved = dir.path().to_owned();
+        let gate = token.clone();
+        spawn_watch_with(
+            tx,
+            token.clone(),
+            dir.path().to_owned(),
+            move || Msg::DirChanged { gen: g },
+            false,
+            move || {
+                // Cancelled while arming: the catch-up must be dropped.
+                gate.cancel();
+                let f = open_dir_for_times(&moved);
+                f.set_modified(std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(86_400))
+                    .unwrap();
+            },
+        );
+        // The task ends and drops its sender: `None` (closed) is fine, a message is not.
+        assert!(!matches!(
+            timeout(Duration::from_millis(600), rx.recv()).await,
+            Ok(Some(_))
+        ));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_watch_cancelled_before_it_is_armed_never_reports() {
+        let dir = tempfile::tempdir().unwrap();
+        let (tx, mut rx) = mpsc::channel(16);
+        let mut runner = EffectRunner::new(tx);
+        runner.run([Effect::WatchDir {
+            gen: gen(),
+            path: dir.path().to_owned(),
+        }]);
+        // Cancelled at once, while the OS watch is (or will soon be) live: whatever the
+        // blocking pool does, nothing may be delivered afterwards.
+        runner.run([Effect::StopWatching]);
+        let until = tokio::time::Instant::now() + Duration::from_millis(1200);
+        let mut i = 0;
+        while tokio::time::Instant::now() < until {
+            std::fs::write(dir.path().join(format!("f{i}.txt")), "x").unwrap();
+            i += 1;
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert!(rx.try_recv().is_err());
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn parked_directories_are_watched_as_a_set() {
         let a = tempfile::tempdir().unwrap();
@@ -1042,6 +1201,10 @@ mod fs_effect_tests {
         // Wait for the new set to be live (a change in `b` arrives), then write `a` and `b`
         // in turn: once the `b` sentinel is seen, any event for `a` would have come first.
         change_until(&mut rx, b.path(), &changed(b.path())).await;
+        // Let the dropped watch of `a` finish (its pending coalesce and the asynchronous
+        // drop), then discard whatever it queued before the cancel.
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        while rx.try_recv().is_ok() {}
         std::fs::write(a.path().join("later.txt"), "x").unwrap();
         let mut seen = Vec::new();
         let deadline = tokio::time::Instant::now() + WAIT;
@@ -1215,6 +1378,8 @@ mod fs_effect_tests {
         tokio::time::sleep(Duration::from_millis(300)).await;
         runner.shutdown();
         tokio::time::sleep(Duration::from_millis(300)).await;
+        // A catch-up event of the arming (sent before the shutdown) may be queued.
+        while rx.try_recv().is_ok() {}
         std::fs::write(dir.path().join("x"), "x").unwrap();
         assert!(timeout(Duration::from_millis(700), rx.recv())
             .await

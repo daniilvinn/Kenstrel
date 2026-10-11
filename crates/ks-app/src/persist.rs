@@ -54,9 +54,11 @@ fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
     let mut attempt = 0;
     loop {
         match fs::rename(from, to) {
-            Err(_) if attempt < 4 => {
+            // About 2.4 s in all: a scanner or a starved disk can hold the target longer than
+            // a quarter of a second, and a dropped save is worse than a short wait.
+            Err(_) if attempt < 14 => {
                 attempt += 1;
-                std::thread::sleep(Duration::from_millis(25 * attempt));
+                std::thread::sleep(Duration::from_millis((25 * attempt).min(250)));
             }
             result => return result,
         }
@@ -72,6 +74,8 @@ pub struct StateStore {
     bases: Arc<Mutex<HashMap<StateFile, String>>>,
     /// How long a write waits for the file lock before proceeding without it.
     lock_wait: Duration,
+    /// Age after which a lock file counts as abandoned.
+    lock_stale: Duration,
 }
 
 /// Exclusive access to one state file among cooperating Kestrel instances: a `<file>.lock`
@@ -84,7 +88,7 @@ struct FileLock {
 impl FileLock {
     const STALE: Duration = Duration::from_secs(30);
 
-    fn acquire(path: PathBuf, wait: Duration) -> FileLock {
+    fn acquire(path: PathBuf, wait: Duration, stale_after: Duration) -> FileLock {
         let start = Instant::now();
         loop {
             match fs::OpenOptions::new()
@@ -103,7 +107,7 @@ impl FileLock {
                         .and_then(|m| m.modified())
                         .ok()
                         .and_then(|t| t.elapsed().ok())
-                        .is_some_and(|age| age > Self::STALE);
+                        .is_some_and(|age| age > stale_after);
                     if stale {
                         let _ = fs::remove_file(&path);
                     } else if start.elapsed() > wait {
@@ -154,6 +158,7 @@ impl StateStore {
             dir,
             bases: Arc::default(),
             lock_wait: Duration::from_secs(8),
+            lock_stale: FileLock::STALE,
         }
     }
 
@@ -162,6 +167,14 @@ impl StateStore {
     #[cfg(test)]
     fn with_lock_wait(mut self, wait: Duration) -> Self {
         self.lock_wait = wait;
+        self
+    }
+
+    /// A store that treats a lock as abandoned only after `stale`: tests on a starved machine
+    /// can hold the lock for longer than the production threshold without being robbed of it.
+    #[cfg(test)]
+    fn with_lock_stale(mut self, stale: Duration) -> Self {
+        self.lock_stale = stale;
         self
     }
 
@@ -260,7 +273,11 @@ impl StateStore {
     pub fn write(&self, file: StateFile, contents: &str) -> io::Result<()> {
         let path = self.path(file);
         fs::create_dir_all(&self.dir)?;
-        let _lock = FileLock::acquire(path.with_extension("toml.lock"), self.lock_wait);
+        let _lock = FileLock::acquire(
+            path.with_extension("toml.lock"),
+            self.lock_wait,
+            self.lock_stale,
+        );
         // A file that cannot be read (after retries) is not overwritten with this instance's
         // view: that would drop what another instance wrote. The next save tries again.
         let merged = self.merged(file, contents, &path)?;
@@ -555,7 +572,9 @@ mod tests {
                     let state = state.clone();
                     let barrier = barrier.clone();
                     std::thread::spawn(move || {
-                        let store = StateStore::new(state).with_lock_wait(Duration::from_secs(60));
+                        let store = StateStore::new(state)
+                            .with_lock_wait(Duration::from_secs(900))
+                            .with_lock_stale(Duration::from_secs(900));
                         let mut bm = store.load().bookmarks;
                         if loaded_first {
                             // Every instance loaded before any wrote: a pure three-way merge.
@@ -614,7 +633,7 @@ mod tests {
         file.set_modified(std::time::SystemTime::now() - FileLock::STALE - Duration::from_secs(5))
             .unwrap();
         drop(file);
-        let taken = FileLock::acquire(lock.clone(), Duration::from_secs(30));
+        let taken = FileLock::acquire(lock.clone(), Duration::from_secs(30), FileLock::STALE);
         assert!(taken.path.is_some(), "the stale lock was replaced");
         drop(taken);
         assert!(!lock.exists());
