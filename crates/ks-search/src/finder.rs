@@ -694,12 +694,17 @@ impl FinderSession {
     /// Drives the matcher, waiting at most `timeout_ms` (10 is a good value) for it.
     pub fn tick(&mut self, timeout_ms: u64) -> FinderStatus {
         let applied = self.apply_refresh();
+        // Read the feeders' state before the matcher takes its snapshot: a feed that finishes
+        // in between would otherwise report "not walking" while its last items are not in the
+        // snapshot yet, and the caller would stop ticking on stale results.
+        let walking = self.walking();
+        let refreshing = self.refreshing();
         let st = self.nucleo.tick(timeout_ms);
         FinderStatus {
             changed: st.changed || applied,
             matching: st.running,
-            walking: self.walking(),
-            refreshing: self.refreshing(),
+            walking,
+            refreshing,
         }
     }
 
