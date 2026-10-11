@@ -358,7 +358,14 @@ fn diff_lines(
     room: usize,
     width_cells: usize,
 ) -> Vec<Line<'static>> {
-    let Some(diff) = &state.claude.diff else {
+    // Only ever the diff of the highlighted file; anything else is stale.
+    let selected = ks_core::claude::selected_change(state);
+    let Some(diff) = state
+        .claude
+        .diff
+        .as_ref()
+        .filter(|d| selected.as_deref() == Some(d.path.as_path()))
+    else {
         return vec![Line::styled("Loading diff…", theme.muted())];
     };
     diff.text
@@ -757,6 +764,43 @@ Then run claude once and log in with /login. More text follows to make the body 
                 assert!(rendered.contains("+    new();"), "{rendered}");
                 insta::assert_snapshot!(format!("changes_diff_{name}_{w}x{h}"), rendered);
             }
+        }
+    }
+
+    #[test]
+    fn a_diff_for_another_file_is_never_drawn() {
+        for (name, (w, h)) in THEMES
+            .into_iter()
+            .flat_map(|t| [(t, (160, 48)), (t, (80, 24))])
+        {
+            let mut s = listing_state(w, h);
+            edit(&mut s, "Edit", "vulkan_device.rs");
+            edit(&mut s, "Write", "new_pass.rs");
+            update(&mut s, Msg::Key("g".parse::<KeyChord>().unwrap()));
+            update(&mut s, Msg::Key("a".parse::<KeyChord>().unwrap()));
+            let effects = update(&mut s, Msg::Key("d".parse::<KeyChord>().unwrap()));
+            let Some(Effect::ClaudeDiff { path }) = effects
+                .iter()
+                .find(|e| matches!(e, Effect::ClaudeDiff { .. }))
+            else {
+                panic!("no diff request: {effects:?}");
+            };
+            let path = path.clone();
+            update(
+                &mut s,
+                Msg::ClaudeDiff {
+                    path,
+                    text: "+only_for_the_first_file();".to_owned(),
+                },
+            );
+            if w >= 160 {
+                assert!(draw(&s, &theme(name)).contains("only_for_the_first_file"));
+            }
+            // Highlight the other file: its diff is not loaded, so the first one must not show.
+            update(&mut s, Msg::Key("j".parse::<KeyChord>().unwrap()));
+            let rendered = draw(&s, &theme(name));
+            assert!(!rendered.contains("only_for_the_first_file"), "{rendered}");
+            insta::assert_snapshot!(format!("diff_guard_{name}_{w}x{h}"), rendered);
         }
     }
 

@@ -1,14 +1,17 @@
 //! Reading and writing Kestrel's state files (bookmarks, frecency; PLAN §9).
 //!
 //! Writes are atomic (temporary file in the same directory, then rename), so a crash or a
-//! second instance never leaves a half-written file. A file that cannot be parsed is moved
+//! second instance never leaves a half-written file. Concurrent instances do not lose each
+//! other's updates either: each write takes a lock file, re-reads the file and three-way merges
+//! (what this instance last synced, what it wants now, what is on disk) before replacing it. A file that cannot be parsed is moved
 //! aside to `<name>.bad` instead of being overwritten, and the app starts with empty data.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
-use std::time::Duration;
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use ks_core::{Bookmarks, Frecency, LoadedNavData, StateFile};
 
@@ -57,11 +60,106 @@ fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
 #[derive(Clone, Debug)]
 pub struct StateStore {
     dir: PathBuf,
+    /// Per file, the text this instance last synced with the disk (read at load, or the
+    /// contents it last wrote): the common ancestor of the three-way merge on write.
+    bases: Arc<Mutex<HashMap<StateFile, String>>>,
+}
+
+/// Exclusive access to one state file among cooperating Kestrel instances: a `<file>.lock`
+/// created with `create_new` and removed on drop. Best effort: after a timeout (or for a
+/// stale lock) the writer proceeds, since a lost update is better than a stuck save.
+struct FileLock {
+    path: Option<PathBuf>,
+}
+
+impl FileLock {
+    const WAIT: Duration = Duration::from_secs(3);
+    const STALE: Duration = Duration::from_secs(10);
+
+    fn acquire(path: PathBuf) -> FileLock {
+        let start = Instant::now();
+        loop {
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
+                Ok(_) => return FileLock { path: Some(path) },
+                Err(e)
+                    if matches!(
+                        e.kind(),
+                        io::ErrorKind::AlreadyExists | io::ErrorKind::PermissionDenied
+                    ) =>
+                {
+                    let stale = fs::metadata(&path)
+                        .and_then(|m| m.modified())
+                        .ok()
+                        .and_then(|t| t.elapsed().ok())
+                        .is_some_and(|age| age > Self::STALE);
+                    if stale {
+                        let _ = fs::remove_file(&path);
+                    } else if start.elapsed() > Self::WAIT {
+                        return FileLock { path: None };
+                    } else {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                }
+                Err(_) => return FileLock { path: None },
+            }
+        }
+    }
+}
+
+impl Drop for FileLock {
+    fn drop(&mut self) {
+        if let Some(path) = &self.path {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
+/// Tries to read the state file this often (25 ms apart) before giving up.
+const DISK_READ_ATTEMPTS: u32 = 40;
+
+/// Reads `path`; `None` when it does not exist. A sharing violation (an antivirus scanner or
+/// another instance's rename in flight) is retried before it becomes an error.
+fn read_disk(path: &Path, attempts: u32) -> io::Result<Option<String>> {
+    let mut attempt = 0;
+    loop {
+        match fs::read_to_string(path) {
+            Ok(text) => return Ok(Some(text)),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => {
+                attempt += 1;
+                if attempt >= attempts {
+                    return Err(e);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+        }
+    }
 }
 
 impl StateStore {
     pub fn new(dir: PathBuf) -> Self {
-        Self { dir }
+        Self {
+            dir,
+            bases: Arc::default(),
+        }
+    }
+
+    fn set_base(&self, file: StateFile, text: &str) {
+        if let Ok(mut bases) = self.bases.lock() {
+            bases.insert(file, text.to_owned());
+        }
+    }
+
+    fn base(&self, file: StateFile) -> String {
+        self.bases
+            .lock()
+            .ok()
+            .and_then(|b| b.get(&file).cloned())
+            .unwrap_or_default()
     }
 
     pub fn path(&self, file: StateFile) -> PathBuf {
@@ -108,7 +206,10 @@ impl StateStore {
         let name = file.file_name();
         let text = match fs::read_to_string(&path) {
             Ok(text) => text,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return None,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                self.set_base(file, "");
+                return None;
+            }
             Err(e) => {
                 tracing::warn!(path = %path.display(), error = %e, "cannot read state file");
                 // The file is there but unreadable: it must not be overwritten by a save.
@@ -118,11 +219,15 @@ impl StateStore {
             }
         };
         match parse(&text) {
-            Ok(value) => Some(value),
+            Ok(value) => {
+                self.set_base(file, &text);
+                Some(value)
+            }
             Err(error) => {
                 tracing::warn!(path = %path.display(), %error, "damaged state file");
                 let aside = path.with_file_name(format!("{name}.bad"));
                 let moved = fs::rename(&path, &aside).is_ok();
+                self.set_base(file, "");
                 problems.push(if moved {
                     format!("{name} was damaged and starts afresh (old copy: {name}.bad)")
                 } else {
@@ -133,8 +238,69 @@ impl StateStore {
         }
     }
 
+    /// Saves `contents` (this instance's view of `file`), first folding in whatever other
+    /// instances wrote since this one last synced (see the module docs).
     pub fn write(&self, file: StateFile, contents: &str) -> io::Result<()> {
-        atomic_write(&self.path(file), contents)
+        let path = self.path(file);
+        fs::create_dir_all(&self.dir)?;
+        let _lock = FileLock::acquire(path.with_extension("toml.lock"));
+        // A file that cannot be read (after retries) is not overwritten with this instance's
+        // view: that would drop what another instance wrote. The next save tries again.
+        let merged = self.merged(file, contents, &path)?;
+        atomic_write(&path, &merged)?;
+        self.set_base(file, contents);
+        Ok(())
+    }
+
+    /// `contents` merged with the file on disk; `contents` itself when there is nothing to merge
+    /// (no file, an unreadable or unparsable one, or no foreign changes).
+    fn merged(&self, file: StateFile, contents: &str, path: &Path) -> io::Result<String> {
+        let Some(disk_text) = read_disk(path, DISK_READ_ATTEMPTS)? else {
+            return Ok(contents.to_owned());
+        };
+        Ok(self.merge_with_disk(file, contents, &disk_text))
+    }
+
+    fn merge_with_disk(&self, file: StateFile, contents: &str, disk_text: &str) -> String {
+        let base_text = self.base(file);
+        if disk_text == base_text || disk_text == contents {
+            return contents.to_owned();
+        }
+        let merged = match file {
+            StateFile::Bookmarks => {
+                let (Ok(ours), Ok(disk)) = (
+                    Bookmarks::from_toml(contents),
+                    Bookmarks::from_toml(disk_text),
+                ) else {
+                    return contents.to_owned();
+                };
+                let base = Bookmarks::from_toml(&base_text).unwrap_or_default();
+                let merged = Bookmarks::merge_three_way(&base, &ours, disk);
+                if merged == ours {
+                    return contents.to_owned();
+                }
+                merged.to_toml()
+            }
+            StateFile::Frecency => {
+                let (Ok(ours), Ok(disk)) = (
+                    Frecency::from_toml(contents),
+                    Frecency::from_toml(disk_text),
+                ) else {
+                    return contents.to_owned();
+                };
+                let base = Frecency::from_toml(&base_text).unwrap_or_default();
+                let merged = Frecency::merge_three_way(&base, &ours, disk);
+                if merged.to_toml() == ours.to_toml() {
+                    return contents.to_owned();
+                }
+                merged.to_toml()
+            }
+        };
+        tracing::debug!(
+            file = file.file_name(),
+            "merged with changes from another instance"
+        );
+        merged
     }
 }
 
@@ -188,6 +354,17 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = StateStore::new(dir.path().join("state"));
         (dir, store)
+    }
+
+    #[test]
+    fn an_unreadable_state_file_is_an_error_not_a_reason_to_overwrite() {
+        let dir = tempfile::tempdir().unwrap();
+        // A directory cannot be read as a file: not "missing", so it must surface.
+        assert!(read_disk(dir.path(), 2).is_err());
+        assert_eq!(read_disk(&dir.path().join("none.toml"), 2).unwrap(), None);
+        let file = dir.path().join("f.toml");
+        fs::write(&file, "x").unwrap();
+        assert_eq!(read_disk(&file, 2).unwrap().as_deref(), Some("x"));
     }
 
     #[test]
@@ -281,6 +458,79 @@ mod tests {
         assert_eq!(loaded.unreadable, [StateFile::Bookmarks]);
         assert!(loaded.problems[0].contains("left untouched"));
         assert!(store.path(StateFile::Bookmarks).is_dir());
+    }
+
+    #[test]
+    fn a_second_instance_does_not_wipe_the_first_ones_bookmarks() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = StateStore::new(dir.path().join("state"));
+        let b = StateStore::new(dir.path().join("state"));
+        // Both start from an empty directory.
+        a.load();
+        b.load();
+        let mut bm_a = Bookmarks::default();
+        bm_a.set('a', PathBuf::from("/from/a"));
+        a.write(StateFile::Bookmarks, &bm_a.to_toml()).unwrap();
+        // B never saw 'a'; its table only holds 'b'.
+        let mut bm_b = Bookmarks::default();
+        bm_b.set('b', PathBuf::from("/from/b"));
+        b.write(StateFile::Bookmarks, &bm_b.to_toml()).unwrap();
+        let on_disk = StateStore::new(dir.path().join("state")).load().bookmarks;
+        assert_eq!(on_disk.len(), 2, "{on_disk:?}");
+        // A deletes its own bookmark: it goes, B's stays.
+        a.write(StateFile::Bookmarks, &Bookmarks::default().to_toml())
+            .unwrap();
+        let on_disk = StateStore::new(dir.path().join("state")).load().bookmarks;
+        assert!(on_disk.get('a').is_none() && on_disk.get('b').is_some());
+        assert!(!a
+            .path(StateFile::Bookmarks)
+            .with_extension("toml.lock")
+            .exists());
+    }
+
+    #[test]
+    fn concurrent_instances_add_up_their_frecency_visits() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = StateStore::new(dir.path().join("state"));
+        let b = StateStore::new(dir.path().join("state"));
+        a.load();
+        b.load();
+        let mut fa = Frecency::default();
+        fa.visit(Path::new("/shared"), 10);
+        fa.visit(Path::new("/shared"), 11);
+        a.write(StateFile::Frecency, &fa.to_toml()).unwrap();
+        let mut fb = Frecency::default();
+        fb.visit(Path::new("/shared"), 20);
+        fb.visit(Path::new("/only-b"), 21);
+        b.write(StateFile::Frecency, &fb.to_toml()).unwrap();
+        // A visits once more and saves again: its delta (1) is added, nothing is lost.
+        fa.visit(Path::new("/shared"), 30);
+        a.write(StateFile::Frecency, &fa.to_toml()).unwrap();
+        let merged = StateStore::new(dir.path().join("state")).load().frecency;
+        assert_eq!(merged.get(Path::new("/shared")).unwrap().rank, 4.0);
+        assert!(merged.get(Path::new("/only-b")).is_some());
+    }
+
+    #[test]
+    fn many_threads_writing_at_once_lose_no_bookmark() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        let handles: Vec<_> = (0..8u8)
+            .map(|i| {
+                let state = state.clone();
+                std::thread::spawn(move || {
+                    let store = StateStore::new(state);
+                    store.load();
+                    let mut bm = Bookmarks::default();
+                    bm.set((b'a' + i) as char, PathBuf::from(format!("/p{i}")));
+                    store.write(StateFile::Bookmarks, &bm.to_toml()).unwrap();
+                })
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert_eq!(StateStore::new(state).load().bookmarks.len(), 8);
     }
 
     #[test]

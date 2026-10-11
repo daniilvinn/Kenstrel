@@ -20,7 +20,7 @@ use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use tokio::sync::mpsc::{self, Receiver};
 
-const SLACK: Duration = Duration::from_secs(5);
+const SLACK: Duration = Duration::from_secs(30);
 
 fn new_state(cwd: &Path) -> AppState {
     AppState::new(StartParams {

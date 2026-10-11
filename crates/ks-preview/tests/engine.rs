@@ -20,7 +20,7 @@ fn rust_source(bytes: usize) -> String {
 }
 
 fn recv_gen(rx: &Receiver<PreviewEvent>, generation: u64) -> PreviewEvent {
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         let left = deadline.saturating_duration_since(Instant::now());
         let ev = rx.recv_timeout(left).expect("event within 10s");

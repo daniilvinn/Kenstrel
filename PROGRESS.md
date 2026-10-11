@@ -511,3 +511,11 @@ Merged `fix/f2` (finder cache freshness with background re-walk, `Touched` cache
 - No Action/binding changes: docs/keymap.md and README key tables unchanged. No snapshots changed.
 - Gates: fmt, clippy -D warnings, `cargo test --workspace` clean.
 - Open issues: `ks-fs watcher::tests::a_burst_of_changes_is_one_notification` failed once in a loaded full run and passed alone and on full rerun (timing flake). a2 recheck item: tab titles (a3 area) should go through `text::sanitize` / `ks_search::is_unsafe_char`; verify at the a3 merge.
+
+## Integration: audit/a3
+
+- **Conflicts**: only `ks-app/tests/fileops.rs`. Main already had a log-based bulk-rename isolation (`BULK_LOCK` plus the fake editor's edit-file log), so a3's `bulk_serial()`/private TEMP and `bulk_temp_files()` were dropped in favour of it; a3's longer `SLACK` deadline (60 s) is kept. Cargo.lock needed no change; no `JobReport`/`JobDone` constructors were added by a3, so `consumed_sources` needed nothing. CI workflow, LICENSE and README (affiliation line, License section) merged cleanly.
+- **Tab titles**: the tab strip renders only tab numbers and stale marks, never directory names, so there is no title text to sanitise; no change or test was needed.
+- **Keymap**: a3 added no Action or default key; `docs/keymap.md` and README key tables unchanged. No `.snap.new`; a3's `diff_guard_*` snapshots are as committed.
+- **Decisions/open issues**: as in `docs/progress/a3.md` (running instances do not pick up another instance's bookmark/frecency writes; stale-lock break race accepted; Windows CI and Linux test execution unverified). Load flakes seen in ks-app lib: `persist::many_threads_writing_at_once_lose_no_bookmark` (once in a full run, 3/3 alone) and `event_loop::palette_switch_theme_changes_the_drawn_colours` / `palette_reload_config_applies_keymap_icons_and_theme` (once in 6 repeated lib runs; quit key can beat the blocking reload; a3 did not touch event_loop). Not hidden; not root-caused here.
+- **Gates**: fmt, clippy `-D warnings` clean; final `cargo test --workspace --no-fail-fast` all green.

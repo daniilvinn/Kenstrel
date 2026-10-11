@@ -198,11 +198,33 @@ pub fn purge_trash_under(root: &Path) {
     let _ = root;
 }
 
+/// Whether the machine has a working Recycle Bin / trash: probed once by trashing a scratch
+/// file. A CI runner or container without one skips the tests that need it (with a message)
+/// instead of failing them.
+pub fn recycle_bin_usable() -> bool {
+    static USABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *USABLE.get_or_init(|| {
+        let dir = tempfile::tempdir().expect("scratch dir");
+        let probe = dir.path().join("kestrel-trash-probe.txt");
+        std::fs::write(&probe, "probe").expect("probe file");
+        let usable = trash::delete(&probe).is_ok() && !probe.exists();
+        purge_trash_under(dir.path());
+        if !usable {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("SKIP: this machine has no usable Recycle Bin / trash");
+            }
+        }
+        usable
+    })
+}
+
 /// Whether trash restore tests can run. On Windows support is mandatory, so a regression in
-/// capability detection fails loudly instead of silently skipping; elsewhere the test skips.
+/// capability detection fails loudly instead of silently skipping; elsewhere the test skips. A
+/// machine without a working bin (see [`recycle_bin_usable`]) skips too.
 pub fn trash_supported() -> bool {
     let supported = std::hint::black_box(ks_fs::ops::TRASH_RESTORE_SUPPORTED);
     #[cfg(windows)]
     assert!(supported, "trash restore must be supported on Windows");
-    supported
+    supported && recycle_bin_usable()
 }

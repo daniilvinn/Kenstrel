@@ -13,6 +13,7 @@ jobs:
   check:
     name: check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -33,9 +34,10 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
         env:
           INSTA_UPDATE: "no"
+          RUST_BACKTRACE: "1"
       - name: Keypress latency budget (release build, p99 under 16 ms)
         if: runner.os == 'Windows'
         run: cargo test --release -p ks-ui keypress_to_frame_stays_within_budget -- --nocapture

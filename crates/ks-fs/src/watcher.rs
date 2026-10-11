@@ -109,7 +109,7 @@ mod tests {
     }
 
     /// Generous: the debounce is 100 ms plus up to one tick; CI machines can be slow.
-    const WAIT: Duration = Duration::from_secs(3);
+    const WAIT: Duration = Duration::from_secs(10);
 
     #[test]
     fn creating_a_file_is_reported_after_the_debounce() {
@@ -148,13 +148,28 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let (_watcher, rx) = watch(dir.path());
         std::thread::sleep(Duration::from_millis(100));
+        let started = Instant::now();
         for i in 0..20 {
             fs::write(dir.path().join(format!("f{i}")), "x").unwrap();
         }
+        let burst = started.elapsed();
+        let mut count = 0;
         rx.recv_timeout(WAIT).expect("a notification");
-        std::thread::sleep(Duration::from_millis(400));
-        let extra = std::iter::from_fn(|| rx.try_recv().ok()).count();
-        assert!(extra <= 1, "{extra} extra notifications for one burst");
+        count += 1;
+        // Collect until the watcher has been quiet for much longer than the debounce.
+        while rx.recv_timeout(Duration::from_millis(600)).is_ok() {
+            count += 1;
+        }
+        // On a quiet machine the burst lasts a few milliseconds and is one notification. A
+        // slow disk (antivirus scanning each new file) stretches the burst over several
+        // debounce windows, and each window may legitimately report once: what must hold is
+        // that 20 writes are far fewer notifications than writes, in proportion to the time
+        // the burst took.
+        let windows = (burst.as_millis() / DEBOUNCE.as_millis()) as usize;
+        assert!(
+            count <= 2 + 2 * windows && count < 20,
+            "{count} notifications for one {burst:?} burst"
+        );
     }
 
     #[test]

@@ -5,6 +5,8 @@ A keyboard-first terminal file explorer for Windows (binary: `ks`), written in R
 vim-style keys, fuzzy find and live grep built in, and an optional integration with your own
 installed [Claude Code](https://claude.com/claude-code).
 
+Kestrel is not affiliated with or endorsed by Anthropic; it launches your own installed Claude Code.
+
 > Screenshots and a short GIF are not included yet. Record them once in Windows Terminal and
 > put them in `docs/img/`:
 >
@@ -503,3 +505,7 @@ files and accept them with `cargo insta accept`. `docs/keymap.md` is generated:
 `KESTREL_UPDATE_DOCS=1 cargo test -p ks-core docs`. The ignored performance tests are listed in
 [docs/manual-test.md](docs/manual-test.md#10-performance). Tests never run `claude -p` or send a
 prompt to a real Claude; they use fake binaries.
+
+## License
+
+MIT, see [LICENSE](LICENSE).

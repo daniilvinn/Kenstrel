@@ -65,6 +65,9 @@ fn delete_missing_path_is_ok_and_dir_with_files() {
 
 #[test]
 fn trash_removes_from_disk() {
+    if !trash_supported() {
+        return;
+    }
     let h = Harness::new();
     let td = tempfile::tempdir().unwrap();
     write(&td.path().join("t.txt"), "bye");

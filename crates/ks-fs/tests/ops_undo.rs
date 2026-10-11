@@ -42,6 +42,9 @@ fn undo_move_recreates_parent() {
 
 #[test]
 fn undo_create_goes_to_trash() {
+    if !trash_supported() {
+        return;
+    }
     let h = Harness::new();
     let td = tempfile::tempdir().unwrap();
     h.run(JobSpec::Create {
@@ -75,6 +78,9 @@ fn undo_create_refuses_when_file_was_edited() {
 
 #[test]
 fn undo_copy_trashes_the_copies() {
+    if !trash_supported() {
+        return;
+    }
     let h = Harness::new();
     let td = tempfile::tempdir().unwrap();
     let (src, dst) = (td.path().join("src"), td.path().join("dst"));

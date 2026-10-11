@@ -97,7 +97,8 @@ impl Frecency {
         entry.path = text.to_owned();
         entry.rank += 1.0;
         entry.last = now;
-        self.age_if_needed();
+        let key = key_of(text);
+        self.age_if_needed(Some(&key));
     }
 
     /// Forgets a directory (it no longer exists).
@@ -106,22 +107,31 @@ impl Frecency {
             .is_some_and(|p| self.entries.remove(&key_of(p)).is_some())
     }
 
-    fn age_if_needed(&mut self) {
+    /// Ages the database and enforces the caps. `protect` (the key just visited) is never
+    /// evicted by the entry cap; ties on rank are broken by recency, then by key.
+    fn age_if_needed(&mut self, protect: Option<&str>) {
         let total: f64 = self.entries.values().map(|e| e.rank).sum();
         if total > MAX_TOTAL_RANK {
             for entry in self.entries.values_mut() {
                 entry.rank *= 0.9;
             }
-            self.entries.retain(|_, e| e.rank >= 1.0);
+            self.entries
+                .retain(|k, e| e.rank >= 1.0 || Some(k.as_str()) == protect);
         }
         if self.entries.len() > MAX_ENTRIES {
-            let mut by_rank: Vec<(String, f64)> = self
+            let mut by_rank: Vec<(String, f64, u64)> = self
                 .entries
                 .iter()
-                .map(|(k, e)| (k.clone(), e.rank))
+                .map(|(k, e)| (k.clone(), e.rank, e.last))
                 .collect();
-            by_rank.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-            for (key, _) in by_rank.into_iter().skip(MAX_ENTRIES) {
+            by_rank.sort_by(|a, b| {
+                (Some(b.0.as_str()) == protect)
+                    .cmp(&(Some(a.0.as_str()) == protect))
+                    .then_with(|| b.1.total_cmp(&a.1))
+                    .then_with(|| b.2.cmp(&a.2))
+                    .then_with(|| a.0.cmp(&b.0))
+            });
+            for (key, _, _) in by_rank.into_iter().skip(MAX_ENTRIES) {
                 self.entries.remove(&key);
             }
         }
@@ -148,7 +158,50 @@ impl Frecency {
                 }
             }
         }
-        self.age_if_needed();
+        self.age_if_needed(None);
+    }
+
+    /// Three-way merge for concurrent instances: `base` is what this instance last synced with
+    /// the file, `ours` its current database, `disk` what the file holds now. Visits are
+    /// counters, so this instance's change since `base` (its rank delta) is added to the
+    /// file's rank; entries it forgot are dropped; the later visit wins.
+    pub fn merge_three_way(base: &Frecency, ours: &Frecency, disk: Frecency) -> Frecency {
+        let mut merged = disk;
+        // The directory this instance visited last must survive the cap below.
+        let mut protect: Option<(&str, u64)> = None;
+        for (key, mine) in &ours.entries {
+            let before = base.entries.get(key);
+            let delta = mine.rank - before.map_or(0.0, |b| b.rank);
+            if delta > 0.0 && protect.is_none_or(|(_, last)| mine.last > last) {
+                protect = Some((key.as_str(), mine.last));
+            }
+            match merged.entries.get_mut(key) {
+                Some(theirs) => {
+                    theirs.rank += delta;
+                    theirs.last = theirs.last.max(mine.last);
+                    if theirs.rank <= 0.0 {
+                        merged.entries.remove(key);
+                    }
+                }
+                None if before.is_none() => {
+                    merged.entries.insert(key.clone(), mine.clone());
+                }
+                // The other instance forgot it; keep only what we added since.
+                None if delta > 0.0 => {
+                    let mut entry = mine.clone();
+                    entry.rank = delta;
+                    merged.entries.insert(key.clone(), entry);
+                }
+                None => {}
+            }
+        }
+        for key in base.entries.keys() {
+            if !ours.entries.contains_key(key) {
+                merged.entries.remove(key);
+            }
+        }
+        merged.age_if_needed(protect.map(|(key, _)| key));
+        merged
     }
 
     /// The `frecency.toml` text (entries sorted by path for stable files).
@@ -244,6 +297,62 @@ mod tests {
             db.visit(Path::new(&format!("/d{i}")), T0);
         }
         assert_eq!(db.len(), MAX_ENTRIES);
+    }
+
+    #[test]
+    fn a_just_visited_directory_survives_the_entry_cap() {
+        let mut db = Frecency::default();
+        for i in 0..MAX_ENTRIES {
+            db.visit(Path::new(&format!("/d{i:05}")), T0 + i as u64);
+        }
+        assert_eq!(db.len(), MAX_ENTRIES);
+        // Sorts alphabetically last and has the lowest possible rank (1.0): it used to be the
+        // first thing evicted.
+        db.visit(Path::new("/zeta"), T0 + 1_000_000);
+        assert!(db.get(Path::new("/zeta")).is_some(), "fresh visit evicted");
+        assert_eq!(db.len(), MAX_ENTRIES);
+        // Among equal ranks the least recently visited goes (d00000, visited first).
+        assert!(db.get(Path::new("/d00000")).is_none());
+        assert!(db.get(Path::new("/d00001")).is_some());
+    }
+
+    #[test]
+    fn a_merge_never_evicts_the_latest_visit_of_the_writer() {
+        let mut disk = Frecency::default();
+        for i in 0..MAX_ENTRIES {
+            disk.visit(Path::new(&format!("/d{i:05}")), T0 + i as u64);
+        }
+        let base = disk.clone();
+        let mut ours = base.clone();
+        // Sorts last, rank 1.0 (the lowest) and the newest visit.
+        ours.visit(Path::new("/zeta"), T0 + 1_000_000);
+        let merged = Frecency::merge_three_way(&base, &ours, disk);
+        assert!(
+            merged.get(Path::new("/zeta")).is_some(),
+            "fresh visit evicted"
+        );
+        assert_eq!(merged.len(), MAX_ENTRIES);
+    }
+
+    #[test]
+    fn three_way_merge_adds_rank_deltas_and_honours_forgetting() {
+        let mut base = Frecency::default();
+        base.visit(Path::new("/x"), T0);
+        base.visit(Path::new("/gone"), T0);
+        let mut ours = base.clone();
+        ours.visit(Path::new("/x"), T0 + 10);
+        ours.visit(Path::new("/new"), T0 + 10);
+        ours.remove(Path::new("/gone"));
+        let mut disk = base.clone();
+        disk.visit(Path::new("/x"), T0 + 20);
+        disk.visit(Path::new("/x"), T0 + 21);
+        disk.visit(Path::new("/theirs"), T0 + 21);
+        let merged = Frecency::merge_three_way(&base, &ours, disk);
+        let x = merged.get(Path::new("/x")).unwrap();
+        assert_eq!((x.rank, x.last), (4.0, T0 + 21));
+        assert!(merged.get(Path::new("/new")).is_some());
+        assert!(merged.get(Path::new("/theirs")).is_some());
+        assert!(merged.get(Path::new("/gone")).is_none());
     }
 
     #[test]

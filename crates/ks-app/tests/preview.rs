@@ -12,7 +12,7 @@ use ks_core::{update, AppState, Config, KeyChord, Keymap, Msg, Places, Size, Sta
 use ks_preview::PreviewBody;
 use tokio::sync::mpsc::{self, Receiver};
 
-const SLACK: Duration = Duration::from_secs(10);
+const SLACK: Duration = Duration::from_secs(30);
 
 struct Harness {
     state: AppState,

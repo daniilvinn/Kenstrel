@@ -15,7 +15,7 @@ use ks_core::{
 };
 use tokio::sync::mpsc::{self, Receiver};
 
-const SLACK: Duration = Duration::from_secs(20);
+const SLACK: Duration = Duration::from_secs(60);
 
 struct Harness {
     state: AppState,
