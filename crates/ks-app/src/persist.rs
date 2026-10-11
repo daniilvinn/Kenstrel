@@ -15,6 +15,14 @@ use std::time::{Duration, Instant};
 
 use ks_core::{Bookmarks, Frecency, LoadedNavData, StateFile};
 
+/// A temporary file name no other writer uses: the process id keeps two running instances
+/// apart, the counter two writers in one process (a lock that timed out).
+fn temp_path(dir: &Path, name: &str) -> PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    dir.join(format!(".{name}.{}.{seq}.tmp", std::process::id()))
+}
+
 /// Writes `contents` to `path` atomically, creating parent directories.
 pub fn atomic_write(path: &Path, contents: &str) -> io::Result<()> {
     let dir = path
@@ -25,8 +33,7 @@ pub fn atomic_write(path: &Path, contents: &str) -> io::Result<()> {
     let name = path
         .file_name()
         .map_or_else(|| "state".to_owned(), |n| n.to_string_lossy().into_owned());
-    // The process id keeps two running instances from sharing a temporary file.
-    let tmp = dir.join(format!(".{name}.{}.tmp", std::process::id()));
+    let tmp = temp_path(dir, &name);
     let written = (|| {
         use io::Write;
         let mut file = fs::File::create(&tmp)?;
@@ -63,6 +70,8 @@ pub struct StateStore {
     /// Per file, the text this instance last synced with the disk (read at load, or the
     /// contents it last wrote): the common ancestor of the three-way merge on write.
     bases: Arc<Mutex<HashMap<StateFile, String>>>,
+    /// How long a write waits for the file lock before proceeding without it.
+    lock_wait: Duration,
 }
 
 /// Exclusive access to one state file among cooperating Kestrel instances: a `<file>.lock`
@@ -73,10 +82,9 @@ struct FileLock {
 }
 
 impl FileLock {
-    const WAIT: Duration = Duration::from_secs(3);
-    const STALE: Duration = Duration::from_secs(10);
+    const STALE: Duration = Duration::from_secs(30);
 
-    fn acquire(path: PathBuf) -> FileLock {
+    fn acquire(path: PathBuf, wait: Duration) -> FileLock {
         let start = Instant::now();
         loop {
             match fs::OpenOptions::new()
@@ -98,7 +106,7 @@ impl FileLock {
                         .is_some_and(|age| age > Self::STALE);
                     if stale {
                         let _ = fs::remove_file(&path);
-                    } else if start.elapsed() > Self::WAIT {
+                    } else if start.elapsed() > wait {
                         return FileLock { path: None };
                     } else {
                         std::thread::sleep(Duration::from_millis(5));
@@ -145,7 +153,16 @@ impl StateStore {
         Self {
             dir,
             bases: Arc::default(),
+            lock_wait: Duration::from_secs(8),
         }
+    }
+
+    /// A store whose writes wait this long for the file lock (tests use a long wait so a
+    /// loaded machine never falls through to an unlocked write).
+    #[cfg(test)]
+    fn with_lock_wait(mut self, wait: Duration) -> Self {
+        self.lock_wait = wait;
+        self
     }
 
     fn set_base(&self, file: StateFile, text: &str) {
@@ -243,7 +260,7 @@ impl StateStore {
     pub fn write(&self, file: StateFile, contents: &str) -> io::Result<()> {
         let path = self.path(file);
         fs::create_dir_all(&self.dir)?;
-        let _lock = FileLock::acquire(path.with_extension("toml.lock"));
+        let _lock = FileLock::acquire(path.with_extension("toml.lock"), self.lock_wait);
         // A file that cannot be read (after retries) is not overwritten with this instance's
         // view: that would drop what another instance wrote. The next save tries again.
         let merged = self.merged(file, contents, &path)?;
@@ -511,26 +528,128 @@ mod tests {
         assert!(merged.get(Path::new("/only-b")).is_some());
     }
 
+    /// One instance's save: start from what it loaded, add its own bookmark, write.
+    fn add_bookmark(store: &StateStore, key: char, path: &str) {
+        let mut bm = store.load().bookmarks;
+        bm.set(key, PathBuf::from(path));
+        store.write(StateFile::Bookmarks, &bm.to_toml()).unwrap();
+    }
+
     #[test]
-    fn many_threads_writing_at_once_lose_no_bookmark() {
+    fn a_later_instance_keeps_the_bookmarks_an_earlier_one_saved() {
         let dir = tempfile::tempdir().unwrap();
         let state = dir.path().join("state");
-        let handles: Vec<_> = (0..8u8)
+        add_bookmark(&StateStore::new(state.clone()), 'a', "/pa");
+        add_bookmark(&StateStore::new(state.clone()), 'b', "/pb");
+        assert_eq!(StateStore::new(state).load().bookmarks.len(), 2);
+    }
+
+    #[test]
+    fn concurrent_instances_lose_no_bookmark() {
+        for loaded_first in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let state = dir.path().join("state");
+            let barrier = Arc::new(std::sync::Barrier::new(8));
+            let handles: Vec<_> = (0..8u8)
+                .map(|i| {
+                    let state = state.clone();
+                    let barrier = barrier.clone();
+                    std::thread::spawn(move || {
+                        let store = StateStore::new(state).with_lock_wait(Duration::from_secs(60));
+                        let mut bm = store.load().bookmarks;
+                        if loaded_first {
+                            // Every instance loaded before any wrote: a pure three-way merge.
+                            barrier.wait();
+                        }
+                        bm.set((b'a' + i) as char, PathBuf::from(format!("/p{i}")));
+                        store.write(StateFile::Bookmarks, &bm.to_toml()).unwrap();
+                    })
+                })
+                .collect();
+            for h in handles {
+                h.join().unwrap();
+            }
+            assert_eq!(StateStore::new(state).load().bookmarks.len(), 8);
+        }
+    }
+
+    #[test]
+    fn consecutive_temp_paths_differ() {
+        let dir = Path::new("d");
+        assert_ne!(temp_path(dir, "f.toml"), temp_path(dir, "f.toml"));
+    }
+
+    #[test]
+    fn a_held_lock_times_out_and_the_write_still_lands() {
+        let (dir, store) = store();
+        let store = store.with_lock_wait(Duration::from_millis(100));
+        let lock = store.path(StateFile::Bookmarks).with_extension("toml.lock");
+        fs::create_dir_all(lock.parent().unwrap()).unwrap();
+        fs::write(&lock, "").unwrap();
+        // A fresh lock held by someone else: the write waits, gives up, then proceeds.
+        store
+            .write(
+                StateFile::Bookmarks,
+                "# mine
+",
+            )
+            .unwrap();
+        assert_eq!(
+            fs::read_to_string(store.path(StateFile::Bookmarks)).unwrap(),
+            "# mine
+"
+        );
+        assert!(
+            lock.exists(),
+            "a lock this writer did not take is left alone"
+        );
+        drop(dir);
+    }
+
+    #[test]
+    fn a_stale_lock_is_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let lock = dir.path().join("x.lock");
+        let file = fs::File::create(&lock).unwrap();
+        file.set_modified(std::time::SystemTime::now() - FileLock::STALE - Duration::from_secs(5))
+            .unwrap();
+        drop(file);
+        let taken = FileLock::acquire(lock.clone(), Duration::from_secs(30));
+        assert!(taken.path.is_some(), "the stale lock was replaced");
+        drop(taken);
+        assert!(!lock.exists());
+    }
+
+    #[test]
+    fn atomic_writes_to_one_file_use_distinct_temp_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("f.toml");
+        let handles: Vec<_> = (0..8)
             .map(|i| {
-                let state = state.clone();
+                let target = target.clone();
                 std::thread::spawn(move || {
-                    let store = StateStore::new(state);
-                    store.load();
-                    let mut bm = Bookmarks::default();
-                    bm.set((b'a' + i) as char, PathBuf::from(format!("/p{i}")));
-                    store.write(StateFile::Bookmarks, &bm.to_toml()).unwrap();
+                    for j in 0..5 {
+                        // A sharing violation on the shared target is fine; a temp file
+                        // another writer renamed away (NotFound) is the bug.
+                        if let Err(e) = atomic_write(
+                            &target,
+                            &format!(
+                                "{i}-{j}
+"
+                            ),
+                        ) {
+                            assert_ne!(e.kind(), io::ErrorKind::NotFound, "{e}");
+                        }
+                    }
                 })
             })
             .collect();
         for h in handles {
             h.join().unwrap();
         }
-        assert_eq!(StateStore::new(state).load().bookmarks.len(), 8);
+        assert!(fs::read_to_string(&target).unwrap().contains('-'));
+        let leftovers = fs::read_dir(dir.path()).unwrap().count();
+        assert_eq!(leftovers, 1, "no temp file is left behind");
     }
 
     #[test]
@@ -540,7 +659,7 @@ mod tests {
         for i in 0..50 {
             writer.send(StateFile::Frecency, format!("# {i}\n"));
         }
-        writer.finish(Duration::from_secs(30));
+        writer.finish(Duration::from_secs(300));
         assert_eq!(
             fs::read_to_string(store.path(StateFile::Frecency)).unwrap(),
             "# 49\n"

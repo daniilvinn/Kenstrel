@@ -980,6 +980,25 @@ mod fs_effect_tests {
         }
     }
 
+    /// Creates a fresh file in `dir` every 250 ms until `expected` arrives (other messages are
+    /// skipped). The watch is installed asynchronously, so a single write can land before it
+    /// exists and would never be reported; retrying makes the test independent of timing.
+    async fn change_until(rx: &mut Receiver<Msg>, dir: &std::path::Path, expected: &Msg) {
+        let deadline = tokio::time::Instant::now() + WAIT;
+        for i in 0.. {
+            std::fs::write(dir.join(format!("probe{i}.txt")), "x").unwrap();
+            if let Ok(Some(msg)) = timeout(Duration::from_millis(250), rx.recv()).await {
+                if &msg == expected {
+                    return;
+                }
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "no {expected:?} in time"
+            );
+        }
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn a_watched_directory_reports_changes_until_watching_stops() {
         let dir = tempfile::tempdir().unwrap();
@@ -990,10 +1009,7 @@ mod fs_effect_tests {
             gen: g,
             path: dir.path().to_owned(),
         }]);
-        // Give the watch time to be established.
-        tokio::time::sleep(Duration::from_millis(300)).await;
-        std::fs::write(dir.path().join("new.txt"), "x").unwrap();
-        assert_eq!(next(&mut rx).await, Msg::DirChanged { gen: g });
+        change_until(&mut rx, dir.path(), &Msg::DirChanged { gen: g }).await;
 
         runner.run([Effect::StopWatching]);
         tokio::time::sleep(Duration::from_millis(300)).await;
@@ -1013,39 +1029,37 @@ mod fs_effect_tests {
         runner.run([Effect::WatchParked {
             paths: vec![a.path().to_owned(), b.path().to_owned()],
         }]);
-        tokio::time::sleep(Duration::from_millis(400)).await;
-        std::fs::write(b.path().join("new.txt"), "x").unwrap();
-        assert_eq!(
-            next(&mut rx).await,
-            Msg::ParkedDirChanged {
-                path: b.path().to_owned()
-            }
-        );
-        std::fs::write(a.path().join("new.txt"), "x").unwrap();
-        assert_eq!(
-            next(&mut rx).await,
-            Msg::ParkedDirChanged {
-                path: a.path().to_owned()
-            }
-        );
+        let changed = |p: &std::path::Path| Msg::ParkedDirChanged { path: p.to_owned() };
+        change_until(&mut rx, b.path(), &changed(b.path())).await;
+        change_until(&mut rx, a.path(), &changed(a.path())).await;
 
         // Dropping `a` from the set stops its watch; `b` keeps working.
         runner.run([Effect::WatchParked {
             paths: vec![b.path().to_owned()],
         }]);
-        tokio::time::sleep(Duration::from_millis(400)).await;
-        while rx.try_recv().is_ok() {}
+        // Wait for the new set to be live (a change in `b` arrives), then write `a` and `b`
+        // in turn: once the `b` sentinel is seen, any event for `a` would have come first.
+        change_until(&mut rx, b.path(), &changed(b.path())).await;
         std::fs::write(a.path().join("later.txt"), "x").unwrap();
-        assert!(timeout(Duration::from_millis(700), rx.recv())
-            .await
-            .is_err());
-        std::fs::write(b.path().join("later.txt"), "x").unwrap();
-        assert_eq!(
-            next(&mut rx).await,
-            Msg::ParkedDirChanged {
-                path: b.path().to_owned()
+        let mut seen = Vec::new();
+        let deadline = tokio::time::Instant::now() + WAIT;
+        std::fs::write(b.path().join("sentinel.txt"), "x").unwrap();
+        loop {
+            match timeout(Duration::from_millis(250), rx.recv()).await {
+                Ok(Some(msg)) => {
+                    let done = msg == changed(b.path());
+                    seen.push(msg);
+                    if done {
+                        break;
+                    }
+                }
+                _ => {
+                    assert!(tokio::time::Instant::now() < deadline, "no sentinel event");
+                    std::fs::write(b.path().join("sentinel.txt"), "y").unwrap();
+                }
             }
-        );
+        }
+        assert!(!seen.contains(&changed(a.path())), "{seen:?}");
     }
 
     #[tokio::test(flavor = "multi_thread")]
