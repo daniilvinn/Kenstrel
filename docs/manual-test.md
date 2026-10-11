@@ -263,7 +263,7 @@ exchange counts against your plan. Keep it to the minimum below.
   from the start of `run` to the first drawn frame (5 to 6 ms on the development machine), which does
   **not** include process creation or the loader. That part is the bare process cost: time it with
   `Measure-Command { ks --version }` (about 75 to 80 ms there with Defender real-time protection on, almost
-  all of it because the image is 14.7 MB, see PROGRESS.md open issue 24) and add the two to judge the
+  all of it because the image is 14.7 MB, see [performance.md](performance.md)) and add the two to judge the
   launch, or judge it by eye. The `image protocol ... took_ms=` line shows how long the terminal query
   took (it runs after the first frame; at most 250 ms in a terminal that never answers).
 - [ ] **Keypress latency.** `cargo test --release -p ks-ui keypress_to_frame_stays_within_budget -- --nocapture`.
@@ -286,9 +286,9 @@ exchange counts against your plan. Keep it to the minimum below.
   (`cargo test -p ks-search --release --test memory -- --ignored --nocapture`, peak working set under
   250 MB for a 1M-path cache) needs the `mem` example built first (`cargo build -p ks-search --release --examples`).
   The 100k-file test creates its files in `%TEMP%`: point `TEMP` at a fast SSD (on an HDD the creation alone
-  took over 5 minutes). Final numbers: PROGRESS.md, P8 Measurements.
+  took over 5 minutes). Reference numbers: [performance.md](performance.md).
 - [ ] **Grep versus ripgrep.** If `rg` is installed, in a large repository time
   `Measure-Command { rg --count "TODO" . }` and compare with the time until the footer of
   `ctrl-f` for `TODO` stops spinning. Expect: the same order of magnitude (the engine measured 0.52 to
-  0.80 times the wall time of `rg` on three corpora; the table is in PROGRESS.md, P8 Measurements, and the
+  0.80 times the wall time of `rg` on three corpora; the table is in [performance.md](performance.md), and the
   `grepbench` example compares the two headlessly: `cargo run -p ks-search --release --example grepbench -- <root> <pattern>`).

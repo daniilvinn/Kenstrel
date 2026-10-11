@@ -14,6 +14,13 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+authors = ["Daniil Vinnik"]
+description = "A keyboard-first terminal file explorer for Windows"
+repository = "https://github.com/daniilvinn/Kestrel"
+homepage = "https://github.com/daniilvinn/Kestrel"
+readme = "README.md"
+keywords = ["file-manager", "tui", "terminal", "ratatui", "windows"]
+categories = ["command-line-utilities", "filesystem"]
 publish = false
 
 [workspace.lints.rust]
