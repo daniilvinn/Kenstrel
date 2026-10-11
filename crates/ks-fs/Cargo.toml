@@ -3,6 +3,13 @@ name = "ks-fs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+description = "Kestrel file system layer: listing, watcher, git, file jobs and launching"
+repository.workspace = true
+homepage.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 publish.workspace = true
 
 # Not `workspace = true`: the Windows module needs `unsafe` for Win32 calls, and a workspace

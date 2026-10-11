@@ -1,4 +1,4 @@
-# PLAN section 2: ks.exe is a single static executable. Statically link the MSVC CRT so it does
+# ks.exe is a single static executable. Statically link the MSVC CRT so it does
 # not need the VC++ redistributable (no vcruntime140.dll / api-ms-win-crt-* imports).
 # NOTE: the RUSTFLAGS environment variable replaces this setting entirely; set
 # "-C target-feature=+crt-static" there too (see .github/workflows/ci.yml).
