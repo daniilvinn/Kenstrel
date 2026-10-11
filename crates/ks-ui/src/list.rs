@@ -34,6 +34,9 @@ const TIME_WIDTH: usize = 10;
 const TIME_MIN_WIDTH: u16 = 90;
 /// Names are never squeezed below this; other columns give way first.
 const MIN_NAME_WIDTH: usize = 12;
+/// Narrowest list pane that shows the size column: fixed cells, size cell and a usable name.
+const SIZE_PANE_MIN: usize =
+    LEAD_WIDTH + ICON_WIDTH + GIT_WIDTH + MARGIN_RIGHT + SIZE_WIDTH + 1 + MIN_NAME_WIDTH;
 
 /// Which optional columns fit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,10 +46,12 @@ struct Columns {
 }
 
 impl Columns {
-    fn for_width(width: u16) -> Self {
+    /// `pane` is the list pane width, `terminal` the whole terminal width: PLAN 4.6 hides
+    /// sizes under 60 terminal columns, and the pane must still leave names their minimum.
+    fn for_width(pane: u16, terminal: u16) -> Self {
         Self {
-            size: width >= SIZES_MIN_WIDTH,
-            time: width >= TIME_MIN_WIDTH,
+            size: terminal >= SIZES_MIN_WIDTH && usize::from(pane) >= SIZE_PANE_MIN,
+            time: pane >= TIME_MIN_WIDTH,
         }
     }
 
@@ -74,7 +79,7 @@ pub fn render_list(frame: &mut Frame, area: Rect, state: &AppState, theme: &Them
         return;
     }
 
-    let columns = Columns::for_width(area.width);
+    let columns = Columns::for_width(area.width, state.size.width);
     let name_width = usize::from(area.width)
         .saturating_sub(columns.fixed_width())
         .max(MIN_NAME_WIDTH.min(usize::from(area.width)));
@@ -587,23 +592,33 @@ mod tests {
     }
 
     #[test]
+    fn sizes_show_for_a_preview_sized_pane_on_a_wide_enough_terminal() {
+        // 80x24 and 120x32 with the preview open: 40% panes of 31 and 47 cells.
+        assert!(Columns::for_width(31, 80).size);
+        assert!(Columns::for_width(47, 120).size);
+        assert!(!Columns::for_width(29, 80).size);
+        // Under 60 terminal columns sizes go, whatever the pane.
+        assert!(!Columns::for_width(40, 59).size);
+    }
+
+    #[test]
     fn optional_columns_follow_the_terminal_width() {
         assert_eq!(
-            Columns::for_width(59),
+            Columns::for_width(59, 59),
             Columns {
                 size: false,
                 time: false
             }
         );
         assert_eq!(
-            Columns::for_width(80),
+            Columns::for_width(80, 80),
             Columns {
                 size: true,
                 time: false
             }
         );
         assert_eq!(
-            Columns::for_width(120),
+            Columns::for_width(120, 120),
             Columns {
                 size: true,
                 time: true

@@ -1,0 +1,153 @@
+---
+source: crates/ks-ui/src/preview_tests.rs
+expression: rendered
+---
+ ~/projects/omniforce/src/renderer                                                                     main ↑1 +1 ~2 ?1
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   ◆ current/                                  │ vulkan_device.rs                                      14.2 KB · 3h ago
+   ◆ passes/                               7 M │────────────────────────────────────────────────────────────────────────
+   ◆ shaders/                             12 ! │
+   ◆ a_rather_long_file_na…_row.rs   75.2 KB   │
+   ◆ build.ps1                        1.9 KB   │
+   ◆ bundle.zip                      21.5 KB   │
+   ◆ descriptors.rs                   6.1 KB + │
+   ◆ firmware.bin                     4.0 KB   │
+   ◆ logo.png                       510.7 KB   │
+   ◆ mod.rs                            412 B   │
+   ◆ new_pass.rs                         0 B ? │
+   ◆ photo_from_phone.jpg             4.0 MB   │
+   ◆ pipeline_cache.rs                3.3 KB   │
+   ◆ README.md                        3.0 KB   │
+  ●◆ swapchain.rs                     9.8 KB   │
+ ▌ ◆ vulkan_device.rs                14.2 KB M │
+   ◆ 日本語のメモ.txt                  220 B   │
+                                               │
+                                               │
+                                               │
+                                               │
+                                               │
+                                               │
+                                               │
+                                               │
+                                               │
+                                               │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ›                                                                                                   16/17 · 1 selected
+   ‹h› parent  ‹l› open  ‹space› mark  ‹/› filter  ‹ctrl-p› find  ‹ctrl-f› search  ‹:› commands  ‹?› help  ‹q› quit
+--- styles (row cols fg bg mods) ---
+  0   1..26  fg=#a9a29a bg=reset
+  0  26..103 fg=#e8e3dc bg=reset bold
+  0 103..108 fg=#a9a29a bg=reset bold
+  0 108..111 fg=#a9a29a bg=reset
+  0 111..114 fg=#92c07f bg=reset
+  0 114..117 fg=#e5b567 bg=reset
+  0 117..120 fg=#c9a27f bg=reset
+  1   0..120 fg=#403a35 bg=reset
+  2   3..5   fg=#7fa8c9 bg=reset
+  2   5..47  fg=#b799d9 bg=reset
+  2  47..49  fg=#403a35 bg=reset
+  2  49..103 fg=#e8e3dc bg=reset bold
+  2 103..120 fg=#a9a29a bg=reset
+  3   3..43  fg=#7fa8c9 bg=reset
+  3  43..45  fg=#a9a29a bg=reset
+  3  45..47  fg=#e5b567 bg=reset
+  3  47..120 fg=#403a35 bg=reset
+  4   3..42  fg=#7fa8c9 bg=reset
+  4  42..45  fg=#a9a29a bg=reset
+  4  45..47  fg=#625c56 bg=reset
+  4  47..120 fg=#403a35 bg=reset
+  5   3..5   fg=#a9a29a bg=reset
+  5   5..37  fg=#e8e3dc bg=reset
+  5  37..47  fg=#a9a29a bg=reset
+  5  47..120 fg=#403a35 bg=reset
+  6   3..38  fg=#92c07f bg=reset
+  6  38..47  fg=#a9a29a bg=reset
+  6  47..120 fg=#403a35 bg=reset
+  7   3..5   fg=#a9a29a bg=reset
+  7   5..37  fg=#e8e3dc bg=reset
+  7  37..47  fg=#a9a29a bg=reset
+  7  47..120 fg=#403a35 bg=reset
+  8   3..5   fg=#a9a29a bg=reset
+  8   5..38  fg=#e8e3dc bg=reset
+  8  38..45  fg=#a9a29a bg=reset
+  8  45..47  fg=#92c07f bg=reset
+  8  47..120 fg=#403a35 bg=reset
+  9   3..5   fg=#a9a29a bg=reset
+  9   5..38  fg=#e8e3dc bg=reset
+  9  38..47  fg=#a9a29a bg=reset
+  9  47..120 fg=#403a35 bg=reset
+ 10   3..5   fg=#a9a29a bg=reset
+ 10   5..36  fg=#e8e3dc bg=reset
+ 10  36..47  fg=#a9a29a bg=reset
+ 10  47..120 fg=#403a35 bg=reset
+ 11   3..5   fg=#a9a29a bg=reset
+ 11   5..39  fg=#e8e3dc bg=reset
+ 11  39..47  fg=#a9a29a bg=reset
+ 11  47..120 fg=#403a35 bg=reset
+ 12   3..5   fg=#a9a29a bg=reset
+ 12   5..41  fg=#e8e3dc bg=reset
+ 12  41..45  fg=#a9a29a bg=reset
+ 12  45..47  fg=#c9a27f bg=reset
+ 12  47..120 fg=#403a35 bg=reset
+ 13   3..5   fg=#a9a29a bg=reset
+ 13   5..38  fg=#a9a29a bg=reset italic
+ 13  38..47  fg=#a9a29a bg=reset
+ 13  47..120 fg=#403a35 bg=reset
+ 14   3..5   fg=#a9a29a bg=reset
+ 14   5..38  fg=#e8e3dc bg=reset
+ 14  38..47  fg=#a9a29a bg=reset
+ 14  47..120 fg=#403a35 bg=reset
+ 15   3..5   fg=#a9a29a bg=reset
+ 15   5..38  fg=#e8e3dc bg=reset
+ 15  38..47  fg=#a9a29a bg=reset
+ 15  47..120 fg=#403a35 bg=reset
+ 16   2..3   fg=#d97757 bg=reset
+ 16   3..5   fg=#a9a29a bg=reset
+ 16   5..38  fg=#d97757 bg=reset bold
+ 16  38..47  fg=#a9a29a bg=reset
+ 16  47..120 fg=#403a35 bg=reset
+ 17   0..1   fg=#e8e3dc bg=#2f2a26
+ 17   1..3   fg=#d97757 bg=#2f2a26
+ 17   3..5   fg=#a9a29a bg=#2f2a26
+ 17   5..35  fg=#e8e3dc bg=#2f2a26
+ 17  35..44  fg=#a9a29a bg=#2f2a26
+ 17  44..45  fg=#e8e3dc bg=#2f2a26
+ 17  45..46  fg=#e5b567 bg=#2f2a26
+ 17  46..47  fg=#e8e3dc bg=#2f2a26
+ 17  47..120 fg=#403a35 bg=reset
+ 18   3..5   fg=#a9a29a bg=reset
+ 18   5..39  fg=#e8e3dc bg=reset
+ 18  39..47  fg=#a9a29a bg=reset
+ 18  47..120 fg=#403a35 bg=reset
+ 19  47..120 fg=#403a35 bg=reset
+ 20  47..120 fg=#403a35 bg=reset
+ 21  47..120 fg=#403a35 bg=reset
+ 22  47..120 fg=#403a35 bg=reset
+ 23  47..120 fg=#403a35 bg=reset
+ 24  47..120 fg=#403a35 bg=reset
+ 25  47..120 fg=#403a35 bg=reset
+ 26  47..120 fg=#403a35 bg=reset
+ 27  47..120 fg=#403a35 bg=reset
+ 28  47..120 fg=#403a35 bg=reset
+ 29   0..120 fg=#403a35 bg=reset
+ 30   1..101 fg=#d97757 bg=reset bold
+ 30 101..120 fg=#a9a29a bg=reset
+ 31   3..4   fg=#716b64 bg=reset
+ 31   4..5   fg=#a9a29a bg=reset
+ 31   5..16  fg=#716b64 bg=reset
+ 31  16..17  fg=#a9a29a bg=reset
+ 31  17..26  fg=#716b64 bg=reset
+ 31  26..31  fg=#a9a29a bg=reset
+ 31  31..40  fg=#716b64 bg=reset
+ 31  40..41  fg=#a9a29a bg=reset
+ 31  41..52  fg=#716b64 bg=reset
+ 31  52..58  fg=#a9a29a bg=reset
+ 31  58..67  fg=#716b64 bg=reset
+ 31  67..73  fg=#a9a29a bg=reset
+ 31  73..84  fg=#716b64 bg=reset
+ 31  84..85  fg=#a9a29a bg=reset
+ 31  85..98  fg=#716b64 bg=reset
+ 31  98..99  fg=#a9a29a bg=reset
+ 31  99..108 fg=#716b64 bg=reset
+ 31 108..109 fg=#a9a29a bg=reset
+ 31 109..120 fg=#716b64 bg=reset

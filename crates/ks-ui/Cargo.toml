@@ -20,6 +20,7 @@ unicode-width.workspace = true
 ratatui-image = { version = "11.1.0", default-features = false, features = ["image-defaults", "crossterm"] }
 ks-preview = { version = "0.1.0", path = "../ks-preview" }
 image = { version = "0.25.10", default-features = false }
+unicode-segmentation = "1.13.3"
 
 [dev-dependencies]
 insta.workspace = true

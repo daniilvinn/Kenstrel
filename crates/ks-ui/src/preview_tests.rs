@@ -178,6 +178,7 @@ fn an_image_is_drawn_once_per_frame_under_a_finder_overlay() {
         total: 1,
         walking: false,
         from_cache: false,
+        denied: 0,
         offset: 0,
         results: vec![ks_search::FinderResult {
             rel: "logo.png".into(),
@@ -600,13 +601,26 @@ fn bidi_overrides_in_names_never_reach_the_buffer() {
         let rows = state.viewport_height();
         state
             .view
-            .push_chunk(vec![Entry::file("invoice\u{202E}fdp.exe", 10)], rows);
+            .push_chunk(vec![Entry::file("in\u{202E}fdp.exe", 10)], rows);
         let text = text_of(&state);
         assert!(!text.contains('\u{202E}'), "list row at {w}x{h}");
-        assert!(text.contains("invoice?fdp.exe"), "list row at {w}x{h}");
+        assert!(text.contains("in?fdp.exe"), "list row at {w}x{h}");
         state.view.label = Some("results \u{202E}evil".to_owned());
         let text = text_of(&state);
         assert!(!text.contains('\u{202E}'), "header label at {w}x{h}");
         assert!(text.contains("results ?evil"), "header label at {w}x{h}");
+    }
+}
+
+/// PLAN 4.2 main screen at 120x32: sizes and child counts show next to the open preview.
+#[test]
+fn main_screen_120x32_shows_sizes_and_child_counts() {
+    for theme_name in THEMES {
+        let theme = theme(theme_name);
+        let state = preview_state(120, 32);
+        let rendered = draw(&state, &theme);
+        let text = rendered.split("--- styles").next().unwrap();
+        assert!(text.contains("KB"), "{text}");
+        insta::assert_snapshot!(format!("main_{theme_name}_120x32"), rendered);
     }
 }

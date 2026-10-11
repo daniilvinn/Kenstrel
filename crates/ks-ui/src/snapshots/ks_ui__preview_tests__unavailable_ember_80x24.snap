@@ -5,22 +5,22 @@ expression: "draw(&state, &theme)"
  ~/projects/omniforce/src/renderer                             main ↑1 +1 ~2 ?1
 ────────────────────────────────────────────────────────────────────────────────
    ◆ current/                  │ photo_from_phone.jpg       4.0 MB · 2025-02-22
-   ◆ passes/                 M │────────────────────────────────────────────────
-   ◆ shaders/                ! │ Cloud placeholder: the content is not on this
-   ◆ a_rather_long_f…_row.rs   │ PC, so it is not downloaded
-   ◆ build.ps1                 │
-   ◆ bundle.zip                │ Name      photo_from_phone.jpg
-   ◆ descriptors.rs          + │ Path      /home/me/projects/omniforce/src/rend
-   ◆ firmware.bin              │ Type      file
-   ◆ logo.png                  │ Size      4.0 MB (4200000 bytes)
-   ◆ mod.rs                    │ Created   2025-02-02 12:00:00
-   ◆ new_pass.rs             ? │ Modified  2025-03-14 09:00:00
- ▌ ◆ photo_from_phone.jpg      │ Accessed  2025-03-14 11:50:00
-   ◆ pipeline_cache.rs         │ Attrs     archive, cloud
-   ◆ README.md                 │
-  ●◆ swapchain.rs              │
-   ◆ vulkan_device.rs        M │
-   ◆ 日本語のメモ.txt          │
+   ◆ passes/               7 M │────────────────────────────────────────────────
+   ◆ shaders/             12 ! │ Cloud placeholder: the content is not on this
+   ◆ a_rath…row.rs   75.2 KB   │ PC, so it is not downloaded
+   ◆ build.ps1        1.9 KB   │
+   ◆ bundle.zip      21.5 KB   │ Name      photo_from_phone.jpg
+   ◆ descri…ors.rs    6.1 KB + │ Path      /home/me/projects/omniforce/src/rend
+   ◆ firmware.bin     4.0 KB   │ Type      file
+   ◆ logo.png       510.7 KB   │ Size      4.0 MB (4200000 bytes)
+   ◆ mod.rs            412 B   │ Created   2025-02-02 12:00:00
+   ◆ new_pass.rs         0 B ? │ Modified  2025-03-14 09:00:00
+ ▌ ◆ photo_…ne.jpg    4.0 MB   │ Accessed  2025-03-14 11:50:00
+   ◆ pipeli…che.rs    3.3 KB   │ Attrs     archive, cloud
+   ◆ README.md        3.0 KB   │
+  ●◆ swapchain.rs     9.8 KB   │
+   ◆ vulkan…ice.rs   14.2 KB M │
+   ◆ 日本語…モ.txt     220 B   │
                                │
                                │
 ────────────────────────────────────────────────────────────────────────────────
@@ -40,47 +40,57 @@ expression: "draw(&state, &theme)"
   2  31..33  fg=#403a35 bg=reset
   2  33..60  fg=#e8e3dc bg=reset bold
   2  60..80  fg=#a9a29a bg=reset
-  3   3..29  fg=#7fa8c9 bg=reset
+  3   3..27  fg=#7fa8c9 bg=reset
+  3  27..29  fg=#a9a29a bg=reset
   3  29..31  fg=#e5b567 bg=reset
   3  31..80  fg=#403a35 bg=reset
-  4   3..29  fg=#7fa8c9 bg=reset
+  4   3..26  fg=#7fa8c9 bg=reset
+  4  26..29  fg=#a9a29a bg=reset
   4  29..31  fg=#625c56 bg=reset
   4  31..33  fg=#403a35 bg=reset
   4  33..80  fg=#e5b567 bg=reset
   5   3..5   fg=#a9a29a bg=reset
-  5   5..31  fg=#e8e3dc bg=reset
+  5   5..21  fg=#e8e3dc bg=reset
+  5  21..31  fg=#a9a29a bg=reset
   5  31..33  fg=#403a35 bg=reset
   5  33..80  fg=#e5b567 bg=reset
-  6   3..31  fg=#92c07f bg=reset
+  6   3..22  fg=#92c07f bg=reset
+  6  22..31  fg=#a9a29a bg=reset
   6  31..80  fg=#403a35 bg=reset
   7   3..5   fg=#a9a29a bg=reset
-  7   5..31  fg=#e8e3dc bg=reset
+  7   5..21  fg=#e8e3dc bg=reset
+  7  21..31  fg=#a9a29a bg=reset
   7  31..33  fg=#403a35 bg=reset
   7  33..43  fg=#716b64 bg=reset
   7  43..80  fg=#e8e3dc bg=reset
   8   3..5   fg=#a9a29a bg=reset
-  8   5..29  fg=#e8e3dc bg=reset
+  8   5..22  fg=#e8e3dc bg=reset
+  8  22..29  fg=#a9a29a bg=reset
   8  29..31  fg=#92c07f bg=reset
   8  31..33  fg=#403a35 bg=reset
   8  33..43  fg=#716b64 bg=reset
   8  43..80  fg=#e8e3dc bg=reset
   9   3..5   fg=#a9a29a bg=reset
-  9   5..31  fg=#e8e3dc bg=reset
+  9   5..22  fg=#e8e3dc bg=reset
+  9  22..31  fg=#a9a29a bg=reset
   9  31..33  fg=#403a35 bg=reset
   9  33..43  fg=#716b64 bg=reset
   9  43..80  fg=#e8e3dc bg=reset
  10   3..5   fg=#a9a29a bg=reset
- 10   5..31  fg=#e8e3dc bg=reset
+ 10   5..20  fg=#e8e3dc bg=reset
+ 10  20..31  fg=#a9a29a bg=reset
  10  31..33  fg=#403a35 bg=reset
  10  33..43  fg=#716b64 bg=reset
  10  43..80  fg=#e8e3dc bg=reset
  11   3..5   fg=#a9a29a bg=reset
- 11   5..31  fg=#e8e3dc bg=reset
+ 11   5..23  fg=#e8e3dc bg=reset
+ 11  23..31  fg=#a9a29a bg=reset
  11  31..33  fg=#403a35 bg=reset
  11  33..43  fg=#716b64 bg=reset
  11  43..80  fg=#e8e3dc bg=reset
  12   3..5   fg=#a9a29a bg=reset
- 12   5..29  fg=#e8e3dc bg=reset
+ 12   5..25  fg=#e8e3dc bg=reset
+ 12  25..29  fg=#a9a29a bg=reset
  12  29..31  fg=#c9a27f bg=reset
  12  31..33  fg=#403a35 bg=reset
  12  33..43  fg=#716b64 bg=reset
@@ -88,29 +98,36 @@ expression: "draw(&state, &theme)"
  13   0..1   fg=#e8e3dc bg=#2f2a26
  13   1..3   fg=#d97757 bg=#2f2a26
  13   3..5   fg=#a9a29a bg=#2f2a26
- 13   5..25  fg=#a9a29a bg=#2f2a26 italic
- 13  25..31  fg=#e8e3dc bg=#2f2a26
+ 13   5..18  fg=#a9a29a bg=#2f2a26 italic
+ 13  18..19  fg=#e8e3dc bg=#2f2a26
+ 13  19..28  fg=#a9a29a bg=#2f2a26
+ 13  28..31  fg=#e8e3dc bg=#2f2a26
  13  31..33  fg=#403a35 bg=reset
  13  33..43  fg=#716b64 bg=reset
  13  43..80  fg=#e8e3dc bg=reset
  14   3..5   fg=#a9a29a bg=reset
- 14   5..31  fg=#e8e3dc bg=reset
+ 14   5..22  fg=#e8e3dc bg=reset
+ 14  22..31  fg=#a9a29a bg=reset
  14  31..33  fg=#403a35 bg=reset
  14  33..43  fg=#716b64 bg=reset
  14  43..80  fg=#e8e3dc bg=reset
  15   3..5   fg=#a9a29a bg=reset
- 15   5..31  fg=#e8e3dc bg=reset
+ 15   5..22  fg=#e8e3dc bg=reset
+ 15  22..31  fg=#a9a29a bg=reset
  15  31..80  fg=#403a35 bg=reset
  16   2..3   fg=#d97757 bg=reset
  16   3..5   fg=#a9a29a bg=reset
- 16   5..31  fg=#d97757 bg=reset bold
+ 16   5..22  fg=#d97757 bg=reset bold
+ 16  22..31  fg=#a9a29a bg=reset
  16  31..80  fg=#403a35 bg=reset
  17   3..5   fg=#a9a29a bg=reset
- 17   5..29  fg=#e8e3dc bg=reset
+ 17   5..21  fg=#e8e3dc bg=reset
+ 17  21..29  fg=#a9a29a bg=reset
  17  29..31  fg=#e5b567 bg=reset
  17  31..80  fg=#403a35 bg=reset
  18   3..5   fg=#a9a29a bg=reset
- 18   5..31  fg=#e8e3dc bg=reset
+ 18   5..23  fg=#e8e3dc bg=reset
+ 18  23..31  fg=#a9a29a bg=reset
  18  31..80  fg=#403a35 bg=reset
  19  31..80  fg=#403a35 bg=reset
  20  31..80  fg=#403a35 bg=reset

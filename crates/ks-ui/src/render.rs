@@ -297,7 +297,10 @@ fn render_prompt(frame: &mut Frame, area: Rect, state: &AppState, theme: &Theme)
         let budget = usize::from(area.width).saturating_sub(left_width + used + others + 4);
         add(
             &mut segments,
-            Span::styled(truncate_end(&status.text, budget), Style::new().fg(color)),
+            Span::styled(
+                truncate_end(&crate::text::sanitize(&status.text), budget),
+                Style::new().fg(color),
+            ),
         );
     }
     add(&mut segments, Span::styled(list, theme.dim()));
@@ -950,6 +953,21 @@ mod tests {
             let _ = draw(&drives_state(w, h), &theme("paper"));
             let _ = draw(&empty_state(w, h), &theme("paper"));
         }
+    }
+
+    #[test]
+    fn status_text_neutralises_bidi_overrides_and_escapes() {
+        let mut s = listing_state(80, 24);
+        update(
+            &mut s,
+            Msg::Notify {
+                level: Level::Info,
+                text: "Deleted invoice\u{202E}fdp.exe \u{1b}[31m".to_owned(),
+            },
+        );
+        let out = text_of(&s);
+        assert!(out.contains("invoice?fdp.exe"), "{out}");
+        assert!(!out.contains('\u{202E}') && !out.contains('\u{1b}'));
     }
 
     #[test]

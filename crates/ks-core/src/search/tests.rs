@@ -261,6 +261,7 @@ fn snapshot(query: &str, results: Vec<FinderResult>) -> Box<FinderSnapshot> {
         total: 100,
         walking: false,
         from_cache: false,
+        denied: 0,
         offset: 0,
         results,
     })
@@ -1536,4 +1537,93 @@ fn lazy_stats_resort_a_size_sorted_results_list() {
     );
     let order: Vec<_> = s.view.entries().iter().map(|e| e.size).collect();
     assert_eq!(order, vec![500, 10]);
+}
+
+// ----- [files] show_hidden / show_ignored defaults -----
+
+fn state_with_files_config(show_hidden: bool, show_ignored: bool) -> AppState {
+    let mut config = Config::default();
+    config.files.show_hidden = show_hidden;
+    config.files.show_ignored = show_ignored;
+    AppState::new(StartParams {
+        cwd: cwd(),
+        home: None,
+        places: Places::default(),
+        config,
+        keymap: Keymap::defaults(),
+        size: Size::new(80, 24),
+        now: SystemTime::UNIX_EPOCH,
+        utc_offset_secs: 0,
+    })
+}
+
+#[test]
+fn config_files_defaults_feed_the_finder() {
+    let mut s = state_with_files_config(true, true);
+    let (_, effects) = open_finder(&mut s);
+    assert!(effects.iter().any(|e| matches!(
+        e,
+        Effect::FinderStart {
+            show_hidden: true,
+            respect_gitignore: false,
+            ..
+        }
+    )));
+    let f = s.search.finder.as_ref().unwrap();
+    assert!(f.show_hidden && !f.respect_gitignore);
+    // The stock config keeps both off.
+    let mut s = state_with_files_config(false, false);
+    let (_, effects) = open_finder(&mut s);
+    assert!(effects.iter().any(|e| matches!(
+        e,
+        Effect::FinderStart {
+            show_hidden: false,
+            respect_gitignore: true,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn config_show_ignored_feeds_content_search() {
+    let mut s = state_with_files_config(false, true);
+    open_grep(&mut s);
+    let first = type_text(&mut s, "x");
+    let (_, effects) = fire_debounce(&mut s, &first);
+    assert!(effects.iter().any(|e| matches!(
+        e,
+        Effect::GrepStart {
+            respect_gitignore: false,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn a_reloaded_config_reseeds_only_changed_finder_defaults() {
+    let mut s = state_with_files_config(false, false);
+    // A session toggle survives a reload that does not touch `[files]`.
+    s.search.finder_hidden = true;
+    let same = s.config.clone();
+    update(
+        &mut s,
+        Msg::ConfigReloaded {
+            config: Box::new(same),
+            keymap: Box::new(Keymap::defaults()),
+            issues: Vec::new(),
+        },
+    );
+    assert!(s.search.finder_hidden);
+    let mut changed = s.config.clone();
+    changed.files.show_ignored = true;
+    update(
+        &mut s,
+        Msg::ConfigReloaded {
+            config: Box::new(changed),
+            keymap: Box::new(Keymap::defaults()),
+            issues: Vec::new(),
+        },
+    );
+    assert!(s.search.finder_gitignore);
+    assert!(s.search.finder_hidden);
 }

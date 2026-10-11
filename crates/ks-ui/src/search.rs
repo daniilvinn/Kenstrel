@@ -157,25 +157,24 @@ fn path_spans(
     row_bg: Style,
 ) -> Vec<Span<'static>> {
     let clean = sanitize(rel);
-    let chars: Vec<char> = clean.chars().collect();
-    let total: usize = chars.iter().map(|c| char_width(*c)).sum();
-    // Drop leading characters until the rest plus the ellipsis fits.
+    let cl = clusters(&clean);
+    let total: usize = cl.iter().map(|c| c.w).sum();
+    // Drop leading clusters until the rest plus the ellipsis fits.
     let mut skip = 0;
     if total > max {
         let mut used = 1;
-        skip = chars.len();
-        for (i, c) in chars.iter().enumerate().rev() {
-            let w = char_width(*c);
-            if used + w > max {
+        skip = cl.len();
+        for (i, c) in cl.iter().enumerate().rev() {
+            if used + c.w > max {
                 break;
             }
-            used += w;
+            used += c.w;
             skip = i;
         }
     }
-    let name_start = chars
+    let name_start = cl
         .iter()
-        .rposition(|c| *c == '/' || *c == '\\')
+        .rposition(|c| c.text == "/" || c.text == "\\")
         .map_or(0, |i| i + 1);
     let mut spans = Vec::new();
     if skip > 0 {
@@ -183,13 +182,12 @@ fn path_spans(
     }
     let mut run = String::new();
     let mut run_style = Style::new();
-    let mut next = indices.iter().peekable();
-    for (i, c) in chars.iter().enumerate() {
-        while next.next_if(|&&n| (n as usize) < i).is_some() {}
-        let matched = next.next_if(|&&n| n as usize == i).is_some();
-        if i < skip {
-            continue;
-        }
+    for (i, c) in cl.iter().enumerate().skip(skip) {
+        // Highlight indices are char positions: a cluster is matched when any of its chars is.
+        let first = indices.partition_point(|&n| (n as usize) < c.start);
+        let matched = indices
+            .get(first)
+            .is_some_and(|&n| (n as usize) < c.start + c.nchars);
         let style = if matched {
             theme.bold_accent()
         } else if i < name_start {
@@ -202,7 +200,7 @@ fn path_spans(
             spans.push(Span::styled(std::mem::take(&mut run), run_style));
         }
         run_style = style;
-        run.push(*c);
+        run.push_str(c.text);
     }
     if !run.is_empty() {
         spans.push(Span::styled(run, run_style));
@@ -210,8 +208,33 @@ fn path_spans(
     spans
 }
 
-fn char_width(c: char) -> usize {
-    unicode_width::UnicodeWidthChar::width(c).unwrap_or(0)
+/// One grapheme cluster of a string: where it starts (in chars and bytes), its text and its
+/// width in cells (measured on the whole cluster, so VS16 emoji and ZWJ sequences are right).
+struct Cluster<'a> {
+    start: usize,
+    byte: usize,
+    nchars: usize,
+    text: &'a str,
+    w: usize,
+}
+
+fn clusters(s: &str) -> Vec<Cluster<'_>> {
+    use unicode_segmentation::UnicodeSegmentation;
+    let mut start = 0;
+    s.grapheme_indices(true)
+        .map(|(byte, text)| {
+            let nchars = text.chars().count();
+            let c = Cluster {
+                start,
+                byte,
+                nchars,
+                text,
+                w: unicode_width::UnicodeWidthStr::width(text),
+            };
+            start += nchars;
+            c
+        })
+        .collect()
 }
 
 /// The text of an input field with a block cursor, scrolled so the cursor stays visible.
@@ -236,33 +259,38 @@ pub(crate) fn input_spans(
         ));
         return spans;
     }
-    let chars: Vec<char> = sanitize(input.text()).chars().collect();
-    let cursor = input.cursor().min(chars.len());
-    // Keep the cursor inside the window: drop leading characters while it would not fit.
+    let clean = sanitize(input.text());
+    let cl = clusters(&clean);
+    // The cluster holding the cursor (a cursor inside one counts as on it).
+    let cursor = cl
+        .iter()
+        .position(|c| c.start + c.nchars > input.cursor())
+        .unwrap_or(cl.len());
+    // Keep the cursor inside the window: drop leading clusters while it would not fit.
+    let span_width = |from: usize, to: usize| -> usize { cl[from..to].iter().map(|c| c.w).sum() };
     let mut start = 0;
-    let span_width =
-        |from: usize, to: usize| -> usize { chars[from..to].iter().map(|c| char_width(*c)).sum() };
     while start < cursor && span_width(start, cursor) + 1 > avail {
         start += 1;
     }
-    let mut end = chars.len();
-    while end > cursor && span_width(start, end) + usize::from(end == chars.len()) > avail {
+    let mut end = cl.len();
+    while end > cursor && span_width(start, end) + usize::from(end == cl.len()) > avail {
         end -= 1;
     }
-    let before: String = chars[start..cursor].iter().collect();
-    let mut spans = vec![Span::styled(before, Style::new().fg(theme.fg))];
+    let join = |from: usize, to: usize| -> String { cl[from..to].iter().map(|c| c.text).collect() };
+    let mut spans = vec![Span::styled(join(start, cursor), Style::new().fg(theme.fg))];
     if active {
-        let under = chars.get(cursor).copied().filter(|_| cursor < end);
+        let under = cl.get(cursor).filter(|_| cursor < end);
         spans.push(Span::styled(
-            under.map_or_else(|| " ".to_owned(), |c| c.to_string()),
+            under.map_or_else(|| " ".to_owned(), |c| c.text.to_owned()),
             Style::new().add_modifier(Modifier::REVERSED),
         ));
         let after_from = if under.is_some() { cursor + 1 } else { cursor };
-        let after: String = chars[after_from.min(end)..end].iter().collect();
-        spans.push(Span::styled(after, Style::new().fg(theme.fg)));
+        spans.push(Span::styled(
+            join(after_from.min(end), end),
+            Style::new().fg(theme.fg),
+        ));
     } else {
-        let after: String = chars[cursor..end].iter().collect();
-        spans.push(Span::styled(after, Style::new().fg(theme.fg)));
+        spans.push(Span::styled(join(cursor, end), Style::new().fg(theme.fg)));
     }
     spans
 }
@@ -464,6 +492,12 @@ fn render_finder(frame: &mut Frame, state: &AppState, theme: &Theme) {
     }
     if f.from_cache && !f.walking {
         spans.push(Span::styled("  cached", theme.muted()));
+    }
+    if f.denied > 0 {
+        spans.push(Span::styled(
+            format!("  {} denied", grouped(f.denied)),
+            theme.muted(),
+        ));
     }
     frame.render_widget(Paragraph::new(Line::from(spans)), footer);
 }
@@ -692,20 +726,21 @@ fn hit_spans(
     theme: &Theme,
     bg: Style,
 ) -> Vec<Span<'static>> {
-    let chars: Vec<(usize, char)> = text.char_indices().collect();
-    let matched = |byte: usize| ranges.iter().any(|r| r.contains(&byte));
+    let chars = clusters(text);
+    let matched = |c: &Cluster| {
+        ranges
+            .iter()
+            .any(|r| r.start < c.byte + c.text.len() && c.byte < r.end)
+    };
     // Skip leading characters so the first match starts near the left edge when it would not
     // fit otherwise.
     let mut skip = 0;
     if let Some(first) = ranges.first() {
         let first_char = chars
             .iter()
-            .position(|(b, _)| *b >= first.start)
+            .position(|c| c.byte + c.text.len() > first.start)
             .unwrap_or(0);
-        let before: usize = chars[..first_char]
-            .iter()
-            .map(|(_, c)| char_width(*c))
-            .sum();
+        let before: usize = chars[..first_char].iter().map(|c| c.w).sum();
         if before + 8 > avail {
             skip = first_char.saturating_sub(6);
         }
@@ -726,18 +761,18 @@ fn hit_spans(
         }
     };
     let mut truncated = false;
-    for (byte, c) in chars.iter().skip(skip) {
-        let w = char_width(*c);
+    for c in chars.iter().skip(skip) {
+        let w = c.w;
         if used + w + 1 > avail && used + w > avail {
             truncated = true;
             break;
         }
-        let hl = matched(*byte);
+        let hl = matched(c);
         if hl != run_hl && !run.is_empty() {
             spans.push(Span::styled(std::mem::take(&mut run), style_of(run_hl)));
         }
         run_hl = hl;
-        run.push(*c);
+        run.push_str(c.text);
         used += w;
     }
     if !run.is_empty() {

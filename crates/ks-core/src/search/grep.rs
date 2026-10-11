@@ -246,9 +246,10 @@ pub(crate) fn on_timer(state: &mut AppState, effects: &mut Vec<Effect>, gen: Gen
     }
     state.search.grep_gen += 1;
     let search_gen = state.search.grep_gen;
-    // Follows the pane's runtime `.` toggle; ignore files are always respected here (the
-    // find-file `alt-g` toggle is deliberately not shared).
-    let (show_hidden, respect_gitignore) = (state.view.show_hidden, true);
+    // Follows the pane's runtime `.` toggle; ignore files are respected unless the config's
+    // `[files] show_ignored` says otherwise (the find-file `alt-g` toggle is not shared).
+    let (show_hidden, respect_gitignore) =
+        (state.view.show_hidden, !state.config.files.show_ignored);
     let Some(g) = state.search.grep.as_mut() else {
         return;
     };
