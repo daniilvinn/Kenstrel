@@ -60,6 +60,25 @@ impl Bookmarks {
         }
     }
 
+    /// Three-way merge for concurrent instances: `base` is what this instance last synced with
+    /// the file, `ours` its current table, `disk` what the file holds now. Starts from `disk`
+    /// (so another instance's additions and deletions survive) and applies only this
+    /// instance's own changes since `base`: keys it set or changed win, keys it deleted go.
+    pub fn merge_three_way(base: &Bookmarks, ours: &Bookmarks, disk: Bookmarks) -> Bookmarks {
+        let mut merged = disk;
+        for (key, path) in &ours.map {
+            if base.map.get(key) != Some(path) {
+                merged.map.insert(*key, path.clone());
+            }
+        }
+        for key in base.map.keys() {
+            if !ours.map.contains_key(key) {
+                merged.map.remove(key);
+            }
+        }
+        merged
+    }
+
     /// The `bookmarks.toml` text. Paths that are not valid Unicode cannot be stored and are
     /// left out (they cannot be created either, see `set_bookmark`).
     pub fn to_toml(&self) -> String {
@@ -97,6 +116,30 @@ impl Bookmarks {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn three_way_merge_keeps_other_instances_changes_and_applies_ours() {
+        let mut base = Bookmarks::default();
+        base.set('a', PathBuf::from("/a"));
+        base.set('d', PathBuf::from("/d"));
+        // We deleted d and added x; the other instance added y and changed a.
+        let mut ours = base.clone();
+        ours.remove('d');
+        ours.set('x', PathBuf::from("/x"));
+        let mut disk = base.clone();
+        disk.set('y', PathBuf::from("/y"));
+        disk.set('a', PathBuf::from("/a2"));
+        let merged = Bookmarks::merge_three_way(&base, &ours, disk);
+        let keys: Vec<_> = merged.iter().map(|(k, p)| (k, p.to_path_buf())).collect();
+        assert_eq!(
+            keys,
+            [
+                ('a', PathBuf::from("/a2")),
+                ('x', PathBuf::from("/x")),
+                ('y', PathBuf::from("/y"))
+            ]
+        );
+    }
 
     #[test]
     fn round_trip_keeps_every_entry() {

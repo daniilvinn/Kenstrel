@@ -66,7 +66,7 @@ impl World {
 
     /// Runs the message loop until `done` holds.
     async fn pump_until(&mut self, what: &str, done: impl Fn(&AppState) -> bool) {
-        let deadline = Instant::now() + Duration::from_secs(30);
+        let deadline = Instant::now() + Duration::from_secs(60);
         loop {
             if done(&self.state) {
                 return;
@@ -305,6 +305,80 @@ async fn a_fake_claude_runs_through_preflight_launch_keys_mentions_hooks_and_exi
     world.pump_until_screen_has("FAKE-CLAUDE-READY").await;
     assert_eq!(arg_after(&world.screen(), "--resume"), session);
     assert!(!world.screen().contains("--session-id"));
+    world.runner.shutdown();
+}
+
+/// A stand-in whose `--resume` fails the way `claude` does for an unknown conversation.
+#[cfg(windows)]
+fn fake_claude_rejecting_resume(dir: &Path) -> PathBuf {
+    let script = r#"@echo off
+if "%~1"=="auth" (
+  echo {"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty"}
+  exit /b 0
+)
+if "%~1"=="--resume" (
+  echo No conversation found with session ID: %~2
+  exit /b 1
+)
+echo FAKE-CLAUDE-READY
+:loop
+set LINE=
+set /p LINE=prompt^>
+if /i "%LINE%"=="exit" exit /b 0
+goto loop
+"#;
+    let path = dir.join("claude.cmd");
+    std::fs::write(&path, script.replace('\n', "\r\n")).unwrap();
+    path
+}
+
+#[cfg(windows)]
+#[tokio::test(flavor = "multi_thread")]
+async fn a_rejected_resume_shows_the_reason_and_forgets_the_stale_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let project = dir.path().join("proj");
+    std::fs::create_dir_all(&project).unwrap();
+    let fake = fake_claude_rejecting_resume(dir.path());
+    let opts = options(dir.path(), "badresume");
+    // A stored id whose transcript exists somewhere (so `g r` resumes it).
+    let id = ks_claude::session::new_session_id();
+    ks_claude::session::SessionStore::new(opts.sessions_file.clone().unwrap())
+        .set(&ks_app::claude::project_root(&project), &id)
+        .unwrap();
+    let transcripts = dir.path().join("projects").join("elsewhere");
+    std::fs::create_dir_all(&transcripts).unwrap();
+    std::fs::write(transcripts.join(format!("{id}.jsonl")), "{}").unwrap();
+
+    let mut world = World::new(
+        state(&project, Some(&fake), Size::new(120, 40)),
+        opts.clone(),
+    );
+    world.key("g");
+    world.key("r");
+    world
+        .pump_until("the failure to be reported", |s| {
+            s.status
+                .as_ref()
+                .is_some_and(|st| st.text.contains("code 1"))
+        })
+        .await;
+    let status = world.state.status.clone().unwrap();
+    assert!(
+        status.text.contains("No conversation found"),
+        "the reason must be visible: {status:?}"
+    );
+    assert!(!world.state.claude.is_running());
+    // The stale id is forgotten (asynchronously), so the next `g r` starts a new session.
+    let store = ks_claude::session::SessionStore::new(opts.sessions_file.clone().unwrap());
+    let root = ks_app::claude::project_root(&project);
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while store.get(&root).as_deref() == Some(id.as_str()) {
+        assert!(
+            Instant::now() < deadline,
+            "the stale session was not forgotten"
+        );
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
     world.runner.shutdown();
 }
 

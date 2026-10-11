@@ -857,13 +857,62 @@ pub(crate) fn on_exited(
             ClaudePhase::Running | ClaudePhase::Starting
         )
     {
+        // What the process printed last is the reason for a failure (a rejected `--resume`,
+        // a bad flag): keep it, the screen goes away with the pane.
+        let tail = state.claude.screen.as_ref().and_then(screen_tail);
         reset(state, effects);
-        let text = match code {
-            Some(0) | None => "Claude exited".to_owned(),
-            Some(code) => format!("Claude exited with code {code}"),
+        let (level, text) = match (code, tail) {
+            (Some(0) | None, _) => (Level::Info, "Claude exited".to_owned()),
+            (Some(code), Some(tail)) => {
+                tracing::warn!(code, %tail, "Claude exited with an error");
+                (
+                    Level::Warning,
+                    format!("Claude exited with code {code}: {tail}"),
+                )
+            }
+            (Some(code), None) => (Level::Warning, format!("Claude exited with code {code}")),
         };
-        set_status(state, Level::Info, text, effects);
+        set_status(state, level, text, effects);
     }
+}
+
+/// The non-blank rows of the pane, trimmed.
+fn screen_rows(screen: &ClaudeScreen) -> Vec<String> {
+    let cols = usize::from(screen.cols).max(1);
+    screen
+        .cells
+        .chunks(cols)
+        .map(|row| {
+            row.iter()
+                .map(|c| {
+                    if c.text.is_empty() {
+                        " "
+                    } else {
+                        c.text.as_str()
+                    }
+                })
+                .collect::<String>()
+                .trim()
+                .to_owned()
+        })
+        .filter(|row| !row.is_empty())
+        .collect()
+}
+
+/// All the text on the pane, one non-blank row per line.
+pub fn screen_text(screen: &ClaudeScreen) -> String {
+    screen_rows(screen).join(
+        "
+",
+    )
+}
+
+/// The last two non-blank rows of the pane, trimmed and joined (at most 160 characters).
+fn screen_tail(screen: &ClaudeScreen) -> Option<String> {
+    let rows = screen_rows(screen);
+    let from = rows.len().saturating_sub(2);
+    let tail = rows[from..].join(" / ");
+    (!tail.is_empty()).then(|| tail.chars().take(160).collect())
 }
 
 fn close(state: &mut AppState, effects: &mut Vec<Effect>) {
@@ -1091,7 +1140,29 @@ pub(crate) fn on_ipc(
                 effects.push(Effect::WalkCacheChanges(vec![
                     ks_search::PathChange::Touched(path.clone()),
                 ]));
-                state.claude.changes.record(path, &tool_name);
+                // With the changes view open the selection must stay on the same file (the
+                // list is ordered by recency, so a new edit shifts every row) and the diff of
+                // a re-edited file is stale.
+                let view_open = state.overlays.last() == Some(&Overlay::ClaudeChanges);
+                let selected = view_open.then(|| selected_change(state)).flatten();
+                state.claude.changes.record(path.clone(), &tool_name);
+                if view_open {
+                    if let Some(selected) = &selected {
+                        if let Some(index) = state
+                            .claude
+                            .changes
+                            .recent()
+                            .iter()
+                            .position(|c| c.path == *selected)
+                        {
+                            state.claude.changes_cursor = index;
+                        }
+                        if *selected == path {
+                            state.claude.diff = None;
+                        }
+                    }
+                    request_diff(state, effects);
+                }
                 state.dirty = true;
             }
             effects.push(reply(ClaudeResponse::Ok));
@@ -1840,6 +1911,41 @@ mod tests {
     }
 
     #[test]
+    fn a_failing_pane_reports_what_it_printed() {
+        let mut s = state();
+        let generation = running(&mut s);
+        let text = "No conversation found with session ID: abc";
+        let cols = 60u16;
+        let mut cells = vec![ClaudeCell::default(); usize::from(cols) * 3];
+        for (i, ch) in text.chars().enumerate() {
+            cells[usize::from(cols) + i].text = ch.to_string();
+        }
+        update(
+            &mut s,
+            Msg::ClaudeScreen {
+                generation,
+                screen: Box::new(ClaudeScreen {
+                    cols,
+                    rows: 3,
+                    cells,
+                    cursor: None,
+                }),
+            },
+        );
+        update(
+            &mut s,
+            Msg::ClaudePaneExited {
+                generation,
+                code: Some(1),
+            },
+        );
+        let status = s.status.as_ref().unwrap();
+        assert_eq!(status.level, Level::Warning);
+        assert_eq!(status.text, format!("Claude exited with code 1: {text}"));
+        assert_eq!(s.claude.phase, ClaudePhase::Idle);
+    }
+
+    #[test]
     fn focus_toggle_without_a_pane_explains() {
         let mut s = state();
         key(&mut s, "ctrl-\\");
@@ -2202,6 +2308,40 @@ mod tests {
         assert_eq!(recent, [PathBuf::from("/p/a"), PathBuf::from("/p/b")]);
         assert_eq!(log.latest().unwrap().tool, "MultiEdit");
         assert_eq!(log.len(), 2);
+    }
+
+    #[test]
+    fn a_new_edit_keeps_the_changes_selection_and_never_shows_another_files_diff() {
+        let mut s = state();
+        let a = cwd().join("a.rs");
+        let b = cwd().join("b.rs");
+        hook(&mut s, "Edit", Some(&a.to_string_lossy()));
+        key(&mut s, "g");
+        key(&mut s, "a");
+        key(&mut s, "d");
+        update(
+            &mut s,
+            Msg::ClaudeDiff {
+                path: a.clone(),
+                text: "+a".into(),
+            },
+        );
+        assert_eq!(s.claude.diff.as_ref().unwrap().path, a);
+        // Claude edits b while the view is open: b becomes row 0, the selection stays on a.
+        let effects = hook(&mut s, "Edit", Some(&b.to_string_lossy()));
+        assert_eq!(selected_change(&s), Some(a.clone()));
+        assert_eq!(s.claude.changes_cursor, 1);
+        assert_eq!(s.claude.diff.as_ref().unwrap().path, a);
+        assert!(!effects
+            .iter()
+            .any(|e| matches!(e, Effect::ClaudeDiff { .. })));
+        // Re-editing the selected file invalidates its diff and asks for a fresh one.
+        let effects = hook(&mut s, "Edit", Some(&a.to_string_lossy()));
+        assert_eq!(selected_change(&s), Some(a.clone()));
+        assert!(effects
+            .iter()
+            .any(|e| matches!(e, Effect::ClaudeDiff { path } if *path == a)));
+        assert!(s.claude.diff.is_none());
     }
 
     #[test]

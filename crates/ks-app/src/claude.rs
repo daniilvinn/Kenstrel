@@ -48,6 +48,9 @@ const WALK_CACHE_TTL: Duration = Duration::from_secs(5);
 const DIFF_DEBOUNCE: Duration = Duration::from_millis(60);
 /// Launch directories of dead processes are removed once they are older than this margin.
 const STALE_LAUNCH_DIR_AGE: Duration = Duration::from_secs(60);
+/// A resumed session that fails this soon after launch is taken to be unresumable (`claude`
+/// rejected the stored id): the id is forgotten so `g r` does not retry it forever.
+const RESUME_FAILURE_WINDOW: Duration = Duration::from_secs(30);
 
 /// Where the host keeps its files. All optional so tests never touch the real locations.
 #[derive(Clone, Debug, Default)]
@@ -86,7 +89,26 @@ struct Running {
     input: std_mpsc::Sender<InputOp>,
 }
 
+/// What the latest launch was, to judge its exit.
+struct LaunchInfo {
+    generation: u64,
+    root: PathBuf,
+    resumed: bool,
+    started: std::time::Instant,
+}
+
+/// Whether the exit of a launched pane means its stored session id is no good: a `--resume`
+/// that failed at once *and* said so. A quick Ctrl+C or an unrelated crash (network, auth)
+/// leaves a valid conversation alone.
+fn resume_failed(info: &LaunchInfo, code: Option<u32>, output: &str) -> bool {
+    info.resumed
+        && code.is_some_and(|c| c != 0)
+        && info.started.elapsed() < RESUME_FAILURE_WINDOW
+        && output.to_lowercase().contains("no conversation found")
+}
+
 struct Inner {
+    last_launch: Mutex<Option<LaunchInfo>>,
     options: ClaudeOptions,
     tx: mpsc::Sender<Msg>,
     shutdown: CancellationToken,
@@ -126,6 +148,7 @@ impl ClaudeHost {
         });
         Self {
             inner: Arc::new(Inner {
+                last_launch: Mutex::new(None),
                 options,
                 tx,
                 shutdown: CancellationToken::new(),
@@ -422,10 +445,16 @@ impl Inner {
                 if self.options.projects_dir.is_some() {
                     store = store.with_projects_dir(self.options.projects_dir.clone());
                 }
-                store.mode_for(&project_root(&cwd), resume)?
+                store.mode_for_in(&project_root(&cwd), &cwd, resume)?
             }
             None => SessionMode::New(new_session_id()),
         };
+        *lock(&self.last_launch) = Some(LaunchInfo {
+            generation,
+            root: project_root(&cwd),
+            resumed: matches!(mode, SessionMode::Resume(_)),
+            started: std::time::Instant::now(),
+        });
         let mut args = mode.args();
         let mut env = Vec::new();
         if let Some(name) = &ipc_name {
@@ -687,6 +716,16 @@ async fn forward(inner: Arc<Inner>, mut events: UnboundedReceiver<ClaudeEvent>) 
                         }
                     }
                     ClaudeEvent::PaneExited { generation, code } => {
+                        // The last output of a failing process is the reason it failed: make
+                        // sure the state has seen it before the pane is reset.
+                        if code != Some(0) {
+                            if let Some(screen) = screen_msg(&inner, generation) {
+                                if inner.tx.send(screen).await.is_err() {
+                                    break;
+                                }
+                            }
+                        }
+                        forget_failed_resume(&inner, generation, code);
                         let mut running = lock(&inner.running);
                         if running.as_ref().is_some_and(|r| r.generation == generation) {
                             *running = None;
@@ -725,6 +764,27 @@ async fn forward(inner: Arc<Inner>, mut events: UnboundedReceiver<ClaudeEvent>) 
                 break;
             }
         }
+    }
+}
+
+/// A `--resume` that died at once: drop the stored session id (off the async threads).
+fn forget_failed_resume(inner: &Arc<Inner>, generation: u64, code: Option<u32>) {
+    let info = lock(&inner.last_launch).take_if(|i| i.generation == generation);
+    let (Some(info), Some(file)) = (info, inner.options.sessions_file.clone()) else {
+        return;
+    };
+    let output = lock(&inner.running)
+        .as_ref()
+        .filter(|r| r.generation == generation)
+        .map(|r| ks_core::claude::screen_text(&convert_screen(&r.pane.snapshot())))
+        .unwrap_or_default();
+    if resume_failed(&info, code, &output) {
+        tracing::warn!(root = %info.root.display(), "resume failed; forgetting the stored session");
+        tokio::task::spawn_blocking(move || {
+            if let Err(error) = SessionStore::new(file).forget(&info.root) {
+                tracing::warn!(%error, "cannot forget the session");
+            }
+        });
     }
 }
 
@@ -1165,6 +1225,38 @@ mod tests {
             sessions_file(Path::new("/s")),
             PathBuf::from("/s/claude-sessions.json")
         );
+    }
+}
+
+#[cfg(test)]
+mod resume_failed_tests {
+    use super::*;
+
+    fn info(resumed: bool, age: Duration) -> LaunchInfo {
+        LaunchInfo {
+            generation: 1,
+            root: PathBuf::from("r"),
+            resumed,
+            started: std::time::Instant::now() - age,
+        }
+    }
+
+    #[test]
+    fn only_a_quick_rejected_resume_forgets_the_session() {
+        let said = "No conversation found with session ID: x";
+        let quick = Duration::from_secs(1);
+        assert!(resume_failed(&info(true, quick), Some(1), said));
+        // Not a resume, a clean exit, an unknown code, or too late.
+        assert!(!resume_failed(&info(false, quick), Some(1), said));
+        assert!(!resume_failed(&info(true, quick), Some(0), said));
+        assert!(!resume_failed(&info(true, quick), None, said));
+        assert!(!resume_failed(
+            &info(true, Duration::from_secs(60)),
+            Some(1),
+            said
+        ));
+        // A quick non-zero exit for another reason keeps the conversation.
+        assert!(!resume_failed(&info(true, quick), Some(130), "^C"));
     }
 }
 

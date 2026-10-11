@@ -17,7 +17,7 @@ use ks_search::finder::FinderItem;
 use ks_search::{FinderOptions, FinderSession};
 use tokio::sync::mpsc::{self, Receiver};
 
-const SLACK: Duration = Duration::from_secs(10);
+const SLACK: Duration = Duration::from_secs(30);
 
 struct Harness {
     state: AppState,

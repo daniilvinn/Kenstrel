@@ -3,6 +3,7 @@
 //! Produces exactly (plan 10.2 10a):
 //!
 //! ```text
+//! (the script is passed as `-EncodedCommand <base64>`; shown here decoded as `-Command`)
 //! wt -w 0 sp -V -d "<cwd>" pwsh -NoProfile -Command "Remove-Item Env:A,Env:B -ErrorAction SilentlyContinue; claude"
 //! ```
 //!
@@ -90,9 +91,24 @@ pub fn escape_wt_arg(arg: &str) -> String {
     arg.replace(';', "\\;")
 }
 
-/// Quote a string as a PowerShell single-quoted literal.
+/// Characters PowerShell's tokenizer treats as a single quote: ASCII `'` and the typographic
+/// U+2018, U+2019, U+201A, U+201B. Inside a single-quoted literal each must be doubled.
+fn is_ps_single_quote_char(c: char) -> bool {
+    matches!(c, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}')
+}
+
+/// Quote a string as a PowerShell single-quoted literal (every quote-like character doubled).
 pub fn ps_single_quote(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "''"))
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        out.push(c);
+        if is_ps_single_quote_char(c) {
+            out.push(c);
+        }
+    }
+    out.push('\'');
+    out
 }
 
 fn is_ps_bare_word(s: &str) -> bool {
@@ -137,6 +153,27 @@ pub fn powershell_command_with_env(
     out
 }
 
+/// `-EncodedCommand` payload: base64 of the script as UTF-16LE.
+pub fn encode_powershell_command(script: &str) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let bytes: Vec<u8> = script.encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |n, (i, &b)| n | u32::from(b) << (16 - 8 * i));
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(char::from(ALPHABET[(n >> (18 - 6 * i) & 63) as usize]));
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
 fn wt_cwd(cwd: &Path) -> String {
     let s = cwd.to_string_lossy().into_owned();
     // A trailing backslash would escape the closing quote in some parsers; keep roots (`C:\`).
@@ -163,8 +200,14 @@ pub fn build_wt_args(split: &WtSplit) -> Vec<String> {
         wt_cwd(&split.cwd),
         split.shell.exe().into(),
         "-NoProfile".into(),
-        "-Command".into(),
-        powershell_command_with_env(&split.env, &split.set_env, &split.claude_args),
+        // Not `-Command`: the script travels as base64 so no quoting rule of PowerShell's
+        // tokenizer (or of WT's command-line parser) can ever apply to its contents.
+        "-EncodedCommand".into(),
+        encode_powershell_command(&powershell_command_with_env(
+            &split.env,
+            &split.set_env,
+            &split.claude_args,
+        )),
     ];
     raw.iter().map(|a| escape_wt_arg(a)).collect()
 }
@@ -202,6 +245,45 @@ mod tests {
         s
     }
 
+    /// Decodes an `-EncodedCommand` payload back to the script.
+    fn decode(b64: &str) -> String {
+        let val = |c: u8| match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            _ => 63,
+        };
+        let mut bytes = Vec::new();
+        for chunk in b64.as_bytes().chunks(4) {
+            let n = chunk
+                .iter()
+                .take_while(|&&c| c != b'=')
+                .enumerate()
+                .fold(0u32, |n, (i, &c)| n | u32::from(val(c)) << (18 - 6 * i));
+            let count = chunk.iter().take_while(|&&c| c != b'=').count() - 1;
+            for i in 0..count {
+                bytes.push((n >> (16 - 8 * i)) as u8);
+            }
+        }
+        let units: Vec<u16> = bytes
+            .chunks(2)
+            .map(|p| u16::from_le_bytes([p[0], p[1]]))
+            .collect();
+        String::from_utf16(&units).unwrap()
+    }
+
+    #[test]
+    fn encoding_matches_a_known_value() {
+        // [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("dir"))
+        assert_eq!(encode_powershell_command("dir"), "ZABpAHIA");
+        assert_eq!(encode_powershell_command("a"), "YQA=");
+        assert_eq!(
+            decode(&encode_powershell_command("O’Neil 'x' `$(y); 😀")),
+            "O’Neil 'x' `$(y); 😀"
+        );
+    }
+
     #[test]
     fn matches_plan_shape() {
         let a = build_wt_args(&split("C:\\work\\proj"));
@@ -216,12 +298,39 @@ mod tests {
                 "C:\\work\\proj",
                 "pwsh",
                 "-NoProfile",
-                "-Command"
+                "-EncodedCommand"
             ]
         );
         assert_eq!(
-            a[9],
-            "Remove-Item Env:ANTHROPIC_API_KEY,Env:ANTHROPIC_AUTH_TOKEN,Env:CLAUDE_CODE_OAUTH_TOKEN,Env:CLAUDE_CODE_USE_BEDROCK,Env:CLAUDE_CODE_USE_VERTEX,Env:CLAUDE_CODE_USE_FOUNDRY -ErrorAction SilentlyContinue\\; claude"
+            decode(&a[9]),
+            "Remove-Item Env:ANTHROPIC_API_KEY,Env:ANTHROPIC_AUTH_TOKEN,Env:CLAUDE_CODE_OAUTH_TOKEN,Env:CLAUDE_CODE_USE_BEDROCK,Env:CLAUDE_CODE_USE_VERTEX,Env:CLAUDE_CODE_USE_FOUNDRY -ErrorAction SilentlyContinue; claude"
+        );
+    }
+
+    #[test]
+    fn typographic_quotes_are_doubled_like_ascii_ones() {
+        assert_eq!(ps_single_quote("a'b"), "'a''b'");
+        assert_eq!(
+            ps_single_quote("C:\\Users\\O\u{2019}Neil\\mcp.json"),
+            "'C:\\Users\\O\u{2019}\u{2019}Neil\\mcp.json'"
+        );
+        for q in ['\u{2018}', '\u{2019}', '\u{201A}', '\u{201B}'] {
+            assert_eq!(ps_single_quote(&format!("x{q}y")), format!("'x{q}{q}y'"));
+        }
+        let mut s = split("C:\\work");
+        s.claude_args = vec![
+            "--mcp-config".into(),
+            "C:\\Users\\O\u{2019}Neil\\mcp.json".into(),
+        ];
+        s.set_env = vec![("KESTREL_IPC".into(), "it\u{2018}s".into())];
+        let cmd = decode(&build_wt_args(&s).pop().unwrap());
+        assert!(
+            cmd.ends_with("'C:\\Users\\O\u{2019}\u{2019}Neil\\mcp.json'"),
+            "{cmd}"
+        );
+        assert!(
+            cmd.contains("$env:KESTREL_IPC='it\u{2018}\u{2018}s'"),
+            "{cmd}"
         );
     }
 
@@ -278,7 +387,7 @@ mod tests {
     fn set_env_comes_after_stripping_and_before_claude() {
         let mut s = split("C:\\p");
         s.set_env = vec![("KESTREL_IPC".into(), "kestrel-42".into())];
-        let cmd = build_wt_args(&s)[9].clone();
+        let cmd = decode(&build_wt_args(&s)[9]);
         let strip = cmd.find("Remove-Item").unwrap();
         let set = cmd.find("$env:KESTREL_IPC='kestrel-42'").unwrap();
         assert!(strip < set && set < cmd.find("claude").unwrap());
@@ -298,7 +407,7 @@ mod tests {
     fn empty_env_policy_omits_remove_item() {
         let mut s = split("C:\\p");
         s.env = EnvPolicy::new(Vec::<String>::new());
-        assert_eq!(build_wt_args(&s)[9], "claude");
+        assert_eq!(decode(&build_wt_args(&s)[9]), "claude");
     }
 
     #[test]

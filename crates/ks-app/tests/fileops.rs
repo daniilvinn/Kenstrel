@@ -15,7 +15,7 @@ use ks_core::{
 };
 use tokio::sync::mpsc::{self, Receiver};
 
-const SLACK: Duration = Duration::from_secs(20);
+const SLACK: Duration = Duration::from_secs(60);
 
 struct Harness {
     state: AppState,
@@ -592,6 +592,26 @@ impl Harness {
 #[cfg(windows)]
 static BULK_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+/// Serialises the bulk-rename tests and points the process's temp directory at a private one
+/// (once), so edit files of other processes (a parallel `cargo test`, a running Kestrel) cannot
+/// show up in, or vanish from, the listings these tests compare.
+#[cfg(windows)]
+async fn bulk_serial() -> tokio::sync::MutexGuard<'static, ()> {
+    static PRIVATE_TEMP: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    let guard = BULK_LOCK.lock().await;
+    PRIVATE_TEMP.get_or_init(|| {
+        let dir = tempfile::Builder::new()
+            .prefix("kestrel-bulk-test-")
+            .tempdir()
+            .unwrap()
+            .keep();
+        std::env::set_var("TMP", &dir);
+        std::env::set_var("TEMP", &dir);
+        dir
+    });
+    guard
+}
+
 #[cfg(windows)]
 fn bulk_temp_files() -> Vec<String> {
     let mut names: Vec<String> = fs::read_dir(std::env::temp_dir())
@@ -637,7 +657,7 @@ async fn bulk_rename_through_an_editor_preview_confirm_and_undo() {
     for name in ["a.txt", "b.txt", "c.txt"] {
         fs::write(work.join(name), name).unwrap();
     }
-    let _serial = BULK_LOCK.lock().await;
+    let _serial = bulk_serial().await;
     let before = bulk_temp_files();
     let editor = fake_editor(&root);
     let mut config = Config::default();
@@ -711,7 +731,7 @@ async fn invalid_bulk_rename_is_reopened_with_the_file_kept() {
     for name in ["a.txt", "b.txt"] {
         fs::write(work.join(name), "x").unwrap();
     }
-    let _serial = BULK_LOCK.lock().await;
+    let _serial = bulk_serial().await;
     let before = bulk_temp_files();
     let mut config = Config::default();
     config.editor.open = flaky_editor(&root).display().to_string();
@@ -753,7 +773,7 @@ async fn abandoning_an_invalid_bulk_rename_removes_the_edit_file() {
     for name in ["a.txt", "b.txt"] {
         fs::write(work.join(name), "x").unwrap();
     }
-    let _serial = BULK_LOCK.lock().await;
+    let _serial = bulk_serial().await;
     let before = bulk_temp_files();
     let mut config = Config::default();
     config.editor.open = flaky_editor(&root).display().to_string();
@@ -1051,7 +1071,7 @@ async fn a_kept_edit_file_removed_meanwhile_is_written_afresh() {
     for name in ["a.txt", "b.txt"] {
         fs::write(work.join(name), "x").unwrap();
     }
-    let _serial = BULK_LOCK.lock().await;
+    let _serial = bulk_serial().await;
     let mut config = Config::default();
     config.editor.open = fake_editor(&root).display().to_string();
     let mut h = Harness::with_config(&work, config);

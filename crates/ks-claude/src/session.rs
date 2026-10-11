@@ -75,6 +75,27 @@ pub fn transcript_exists(projects_dir: &Path, id: &str) -> bool {
     entries.flatten().any(|e| e.path().join(&file).is_file())
 }
 
+/// Name of the directory Claude uses for `cwd` below `projects`: every character that is not an
+/// ASCII letter or digit becomes `-` (`C:\Users\me\app` -> `C--Users-me-app`).
+pub fn project_dir_name(cwd: &Path) -> String {
+    let s = cwd.to_string_lossy();
+    let s = s.strip_prefix(r"\\?\").unwrap_or(&s);
+    s.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect()
+}
+
+/// Like [`transcript_exists`], but looks only in the project directory of `cwd` when that
+/// directory exists (a resume only works from the cwd the session was created in); when it does
+/// not (unusual path encoding), falls back to searching every project directory.
+pub fn transcript_exists_for(projects_dir: &Path, cwd: &Path, id: &str) -> bool {
+    let dir = projects_dir.join(project_dir_name(cwd));
+    if dir.is_dir() {
+        return dir.join(format!("{id}.jsonl")).is_file();
+    }
+    transcript_exists(projects_dir, id)
+}
+
 /// File-backed store.
 #[derive(Debug, Clone)]
 pub struct SessionStore {
@@ -90,14 +111,21 @@ struct StoreLock(Option<PathBuf>);
 impl StoreLock {
     fn acquire(store: &Path) -> Self {
         let lock = store.with_extension("json.lock");
-        for _ in 0..80 {
+        for _ in 0..600 {
             match std::fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
                 .open(&lock)
             {
                 Ok(_) => return StoreLock(Some(lock)),
-                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                // On Windows a lock file that is being deleted reports PermissionDenied for a
+                // moment: that is contention too, not a reason to go on unlocked.
+                Err(e)
+                    if matches!(
+                        e.kind(),
+                        io::ErrorKind::AlreadyExists | io::ErrorKind::PermissionDenied
+                    ) =>
+                {
                     let stale = std::fs::metadata(&lock)
                         .and_then(|m| m.modified())
                         .ok()
@@ -106,7 +134,7 @@ impl StoreLock {
                     if stale {
                         let _ = std::fs::remove_file(&lock);
                     } else {
-                        std::thread::sleep(std::time::Duration::from_millis(25));
+                        std::thread::sleep(std::time::Duration::from_millis(10));
                     }
                 }
                 Err(_) => break,
@@ -144,8 +172,19 @@ impl SessionStore {
     /// Load the map. A corrupt file is moved aside to `<file>.corrupt` (so the next save does not
     /// silently destroy it) and treated as empty.
     fn load(&self) -> BTreeMap<String, String> {
-        let Ok(text) = std::fs::read_to_string(&self.path) else {
-            return BTreeMap::new();
+        // A read can fail for a moment on Windows while another process replaces the file
+        // (sharing violation); an empty map here would make the next save drop every entry.
+        let mut attempt = 0;
+        let text = loop {
+            match std::fs::read_to_string(&self.path) {
+                Ok(text) => break text,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => return BTreeMap::new(),
+                Err(_) if attempt < 20 => {
+                    attempt += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(_) => return BTreeMap::new(),
+            }
         };
         match serde_json::from_str(&text) {
             Ok(map) => map,
@@ -170,9 +209,21 @@ impl SessionStore {
             &tmp,
             serde_json::to_vec_pretty(map).map_err(io::Error::other)?,
         )?;
-        std::fs::rename(&tmp, &self.path).inspect_err(|_| {
-            let _ = std::fs::remove_file(&tmp);
-        })
+        // On Windows the rename fails for a moment while a reader has the target open.
+        let mut attempt = 0;
+        loop {
+            match std::fs::rename(&tmp, &self.path) {
+                Err(_) if attempt < 20 => {
+                    attempt += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(e) => {
+                    let _ = std::fs::remove_file(&tmp);
+                    return Err(e);
+                }
+                Ok(()) => return Ok(()),
+            }
+        }
     }
 
     /// Last session id for a project root, if valid.
@@ -198,7 +249,10 @@ impl SessionStore {
     pub fn forget(&self, root: &Path) -> io::Result<()> {
         let _lock = StoreLock::acquire(&self.path);
         let mut map = self.load();
-        if map.remove(&project_key(root)).is_some() {
+        let key = project_key(root);
+        let removed = map.remove(&key).is_some();
+        let removed_confirmed = map.remove(&format!("{key}{CONFIRMED_SUFFIX}")).is_some();
+        if removed || removed_confirmed {
             self.save(&map)?;
         }
         Ok(())
@@ -208,28 +262,73 @@ impl SessionStore {
     ///
     /// * `resume` and a stored id **with a transcript on disk**: [`SessionMode::Resume`].
     /// * `resume` and a stored id **without** a transcript (the previous session was closed before
-    ///   the first message, or never started): [`SessionMode::New`] reusing that id, since Claude
-    ///   never saw it.
-    /// * Otherwise a fresh id, stored immediately.
+    ///   the first message, or never started): the last *confirmed* id (one that had a transcript
+    ///   when it was replaced) is resumed if there is one, otherwise [`SessionMode::New`] reuses
+    ///   the stored id, since Claude never saw it.
+    /// * Otherwise (a fresh start): the stored id is reused if Claude never saw it (it is still
+    ///   unused), else a fresh id is stored and the old, transcript-backed id is kept as the
+    ///   confirmed one, so a fresh session that is closed unused cannot lose the conversation.
     pub fn mode_for(&self, root: &Path, resume: bool) -> io::Result<SessionMode> {
-        if resume {
-            if let Some(id) = self.get(root) {
-                let confirmed = match &self.projects_dir {
-                    Some(dir) => transcript_exists(dir, &id),
-                    None => true,
-                };
-                return Ok(if confirmed {
-                    SessionMode::Resume(id)
-                } else {
-                    SessionMode::New(id)
-                });
-            }
+        self.mode_for_in(root, root, resume)
+    }
+
+    /// Like [`Self::mode_for`] for a process launched in `cwd` (inside the project `root`, the
+    /// store key): Claude writes transcripts under the project directory of the launch cwd, so
+    /// that is where they are looked up.
+    pub fn mode_for_in(&self, root: &Path, cwd: &Path, resume: bool) -> io::Result<SessionMode> {
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
         }
-        let id = new_session_id();
-        self.set(root, &id)?;
-        Ok(SessionMode::New(id))
+        let _lock = StoreLock::acquire(&self.path);
+        let mut map = self.load();
+        let key = project_key(root);
+        let confirmed_key = format!("{key}{CONFIRMED_SUFFIX}");
+        let valid = |map: &BTreeMap<String, String>, k: &str| {
+            map.get(k).filter(|id| is_valid_session_id(id)).cloned()
+        };
+        let has_transcript = |id: &str| match &self.projects_dir {
+            Some(dir) => transcript_exists_for(dir, cwd, id),
+            None => true,
+        };
+        let current = valid(&map, &key);
+        let confirmed = valid(&map, &confirmed_key).filter(|c| has_transcript(c));
+        if let Some(id) = &current {
+            if has_transcript(id) {
+                if resume {
+                    return Ok(SessionMode::Resume(id.clone()));
+                }
+                // Fresh start: keep this conversation resumable until the new one exists.
+                let fresh = new_session_id();
+                map.insert(confirmed_key, id.clone());
+                map.insert(key, fresh.clone());
+                self.save(&map)?;
+                return Ok(SessionMode::New(fresh));
+            }
+            // The stored id was never used by Claude.
+            if let (true, Some(old)) = (resume, confirmed) {
+                map.insert(key, old.clone());
+                map.remove(&confirmed_key);
+                self.save(&map)?;
+                return Ok(SessionMode::Resume(old));
+            }
+            return Ok(SessionMode::New(id.clone()));
+        }
+        // Nothing (valid) stored. A leftover confirmed id is still resumable.
+        if let (true, Some(old)) = (resume, confirmed) {
+            map.insert(key, old.clone());
+            map.remove(&confirmed_key);
+            self.save(&map)?;
+            return Ok(SessionMode::Resume(old));
+        }
+        let fresh = new_session_id();
+        map.insert(key, fresh.clone());
+        self.save(&map)?;
+        Ok(SessionMode::New(fresh))
     }
 }
+
+/// Suffix of the map key that holds the last transcript-backed id of a project.
+const CONFIRMED_SUFFIX: &str = "\u{1}confirmed";
 
 #[cfg(test)]
 mod tests {
@@ -282,12 +381,92 @@ mod tests {
     }
 
     #[test]
+    fn a_fresh_unused_session_does_not_displace_the_resumable_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let projects = dir.path().join("projects");
+        let store =
+            SessionStore::new(dir.path().join("s.json")).with_projects_dir(Some(projects.clone()));
+        let root = Path::new("proj");
+        let SessionMode::New(a) = store.mode_for(root, false).unwrap() else {
+            panic!("expected New");
+        };
+        // A real conversation happens in session A.
+        let proj = projects.join("p");
+        std::fs::create_dir_all(&proj).unwrap();
+        std::fs::write(proj.join(format!("{a}.jsonl")), "{}").unwrap();
+        // `c` starts a fresh session B that is closed without a prompt; so does a second `c`.
+        let SessionMode::New(b) = store.mode_for(root, false).unwrap() else {
+            panic!("expected New");
+        };
+        assert_ne!(a, b);
+        assert_eq!(
+            store.mode_for(root, false).unwrap(),
+            SessionMode::New(b.clone()),
+            "an unused id is reused, not churned"
+        );
+        // `g r` resumes the last real conversation, not the empty B.
+        assert_eq!(
+            store.mode_for(root, true).unwrap(),
+            SessionMode::Resume(a.clone())
+        );
+        assert_eq!(store.get(root), Some(a.clone()));
+        // And forgetting drops both slots.
+        store.forget(root).unwrap();
+        assert!(matches!(
+            store.mode_for(root, true).unwrap(),
+            SessionMode::New(n) if n != a && n != b
+        ));
+    }
+
+    #[test]
     fn forget_removes() {
         let dir = tempfile::tempdir().unwrap();
         let store = store_at(dir.path().join("s.json"));
         store.set(Path::new("p"), &new_session_id()).unwrap();
         store.forget(Path::new("p")).unwrap();
         assert_eq!(store.get(Path::new("p")), None);
+    }
+
+    #[test]
+    fn transcripts_are_looked_up_in_the_launch_cwds_project_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let projects = dir.path().join("projects");
+        let id = new_session_id();
+        let other = projects.join("D--other-app");
+        std::fs::create_dir_all(&other).unwrap();
+        std::fs::write(other.join(format!("{id}.jsonl")), "{}").unwrap();
+        let mine = Path::new("proj");
+        // The cwd's project dir does not exist yet: the fallback scan finds it.
+        assert!(transcript_exists_for(&projects, mine, &id));
+        // Once the cwd's own project dir exists, only it counts.
+        std::fs::create_dir_all(projects.join(project_dir_name(mine))).unwrap();
+        assert!(!transcript_exists_for(&projects, mine, &id));
+        assert_eq!(
+            project_dir_name(Path::new(r"\\?\C:\Users\me\my app")),
+            "C--Users-me-my-app"
+        );
+    }
+
+    #[test]
+    fn a_transcript_in_a_subdirectory_counts_for_the_project_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let projects = dir.path().join("projects");
+        let store =
+            SessionStore::new(dir.path().join("s.json")).with_projects_dir(Some(projects.clone()));
+        let root = Path::new("repo");
+        let cwd = Path::new("repo/sub");
+        // The root has a project dir of its own from earlier runs.
+        std::fs::create_dir_all(projects.join(project_dir_name(root))).unwrap();
+        let SessionMode::New(id) = store.mode_for_in(root, cwd, true).unwrap() else {
+            panic!("expected New");
+        };
+        let sub = projects.join(project_dir_name(cwd));
+        std::fs::create_dir_all(&sub).unwrap();
+        std::fs::write(sub.join(format!("{id}.jsonl")), "{}").unwrap();
+        assert_eq!(
+            store.mode_for_in(root, cwd, true).unwrap(),
+            SessionMode::Resume(id)
+        );
     }
 
     #[test]
@@ -306,7 +485,7 @@ mod tests {
             SessionMode::New(id.clone())
         );
         // Claude wrote a transcript in some project directory: now it resumes.
-        let proj = projects.join("E--dev-proj");
+        let proj = projects.join(project_dir_name(root));
         std::fs::create_dir_all(&proj).unwrap();
         std::fs::write(proj.join(format!("{id}.jsonl")), "{}").unwrap();
         assert_eq!(store.mode_for(root, true).unwrap(), SessionMode::Resume(id));

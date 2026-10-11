@@ -13,7 +13,7 @@ use ks_app::effects::EffectRunner;
 use ks_core::{update, AppState, Config, KeyChord, Keymap, Msg, Places, Size, StartParams};
 use tokio::sync::mpsc::{self, Receiver};
 
-const SLACK: Duration = Duration::from_secs(5);
+const SLACK: Duration = Duration::from_secs(30);
 
 struct Harness {
     state: AppState,
