@@ -1,4 +1,4 @@
-//! Theme tokens (PLAN §4.4), theme files and colour-depth handling.
+//! Theme tokens, theme files and colour-depth handling.
 
 use std::fmt;
 use std::path::PathBuf;

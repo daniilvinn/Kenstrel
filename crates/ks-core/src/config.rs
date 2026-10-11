@@ -1,4 +1,4 @@
-//! The user configuration model (PLAN §9).
+//! The user configuration model.
 //!
 //! Pure data and parsing; locating, reading and writing the file is the application's job.
 //! Every field has a default, so an empty file is a valid config.
@@ -59,7 +59,7 @@ impl Default for SortConfig {
     }
 }
 
-/// Visibility toggles (PLAN §6.2, §7).
+/// Visibility toggles.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct FilesConfig {
@@ -226,8 +226,8 @@ impl PanePosition {
     }
 }
 
-/// Environment variables removed from every `claude` child so the subscription login is used
-/// (PLAN §10.1). Kept in sync with `ks_claude::DEFAULT_STRIP_ENV` by a test in `ks-app`.
+/// Environment variables removed from every `claude` child so the subscription login is used.
+/// Kept in sync with `ks_claude::DEFAULT_STRIP_ENV` by a test in `ks-app`.
 pub const DEFAULT_CLAUDE_STRIP_ENV: &[&str] = &[
     "ANTHROPIC_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
@@ -240,7 +240,7 @@ pub const DEFAULT_CLAUDE_STRIP_ENV: &[&str] = &[
 /// The default key that moves keyboard focus between the explorer and the Claude pane.
 pub const DEFAULT_CLAUDE_FOCUS_KEY: &str = "ctrl-\\";
 
-/// Claude Code integration (PLAN §10).
+/// Claude Code integration.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ClaudeConfig {

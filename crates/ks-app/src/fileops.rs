@@ -1,4 +1,4 @@
-//! The file-operation half of the effect runner (PLAN §7, phase P6): owns the job engine and
+//! The file-operation half of the effect runner: owns the job engine and
 //! the shell runs, maps the engine's events 1:1 to [`Msg`]s and executes the file effects.
 //!
 //! Everything blocking runs on `spawn_blocking` or on the engine's own threads; the engine's

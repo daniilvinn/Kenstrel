@@ -20,7 +20,7 @@ impl Rgb {
     }
 }
 
-/// Semantic colour roles the UI maps to theme tokens (PLAN.md section 4.4).
+/// Semantic colour roles the UI maps to theme tokens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role {
     Fg,

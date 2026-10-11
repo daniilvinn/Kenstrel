@@ -1,4 +1,4 @@
-//! Git status by shelling out to `git status --porcelain=v2 -z` (PLAN §7).
+//! Git status by shelling out to `git status --porcelain=v2 -z`.
 //!
 //! The format (from `git status --help`, "Porcelain Format Version 2"), with `-z` so that
 //! every record, headers included, ends in NUL and paths are never quoted:

@@ -1,4 +1,4 @@
-//! In-directory filter (`/`, PLAN.md section 6.1): fuzzy-matches a query against an in-memory
+//! In-directory filter (`/`): fuzzy-matches a query against an in-memory
 //! list of names on every keystroke. Synchronous and cheap (a few thousand names take well
 //! under a millisecond); no threads are involved.
 

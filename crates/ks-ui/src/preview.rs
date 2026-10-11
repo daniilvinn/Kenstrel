@@ -1,5 +1,5 @@
 //! The body of the main screen when more than the list is shown: optional parent column,
-//! the list, and the preview pane (PLAN §4.2, §8).
+//! the list, and the preview pane.
 //!
 //! Pane geometry comes from `ks-core` ([`AppState::pane_widths_at`]) so `update` and the
 //! renderer agree on it. This module only draws; the engine results are plain data in
@@ -158,7 +158,7 @@ fn dir_row(
     } else {
         Style::new()
     };
-    // Everything here is dimmed, like the PLAN's "same renderer as the list, dimmed".
+    // Everything here is dimmed, like the list, dimmed.
     let name_style = if style.current {
         Style::new().fg(theme.dir).add_modifier(Modifier::BOLD)
     } else if info.hidden {

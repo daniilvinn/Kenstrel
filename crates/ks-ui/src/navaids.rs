@@ -1,4 +1,4 @@
-//! Tab strip (header), bookmark list and frecency jump overlays (PLAN §4.2, §4.3).
+//! Tab strip (header), bookmark list and frecency jump overlays.
 
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Modifier, Style};

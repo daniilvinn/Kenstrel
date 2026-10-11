@@ -1,4 +1,4 @@
-//! Find file (`ctrl-p`, PLAN 6.2): the overlay's state and its transitions.
+//! Find file (`ctrl-p`): the overlay's state and its transitions.
 //!
 //! The fuzzy matcher itself lives in the effect runner (a `FinderSession` owned by a worker
 //! thread). This module only holds what the screen shows: the query, the window of ranked

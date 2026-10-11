@@ -471,7 +471,7 @@ fn hex_rows_never_overflow_the_content_width() {
     assert!(at(76) < at(75), "76 columns fit 16 bytes per row");
 }
 
-/// Keeps the per-keypress budget honest (PLAN section 11: under 16 ms): `update` plus a full
+/// Keeps the per-keypress budget honest (under 16 ms): `update` plus a full
 /// render of a 1000 entry directory with a text preview. Debug builds are several times
 /// slower than release, so the assertion is generous there; the measured numbers are in
 /// docs/progress/p2.md (`cargo test -p ks-ui --release keypress -- --nocapture`).
@@ -649,7 +649,7 @@ fn a_window_preview_numbers_its_gutter_from_the_offset() {
     );
 }
 
-/// PLAN 4.2 main screen at 120x32: sizes and child counts show next to the open preview.
+/// Main screen at 120x32: sizes and child counts show next to the open preview.
 #[test]
 fn main_screen_120x32_shows_sizes_and_child_counts() {
     for theme_name in THEMES {

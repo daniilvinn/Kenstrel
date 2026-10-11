@@ -1,4 +1,4 @@
-//! Search scope roots: cwd, git root, home, drive root (PLAN.md section 6.2, `ctrl-r`).
+//! Search scope roots: cwd, git root, home, drive root (`ctrl-r`).
 
 use std::path::{Component, Path, PathBuf};
 

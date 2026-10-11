@@ -1,4 +1,4 @@
-//! PLAN section 2: `ks.exe` is a single static executable. Cargo ignores
+//! `ks.exe` is a single static executable. Cargo ignores
 //! `[target.*] rustflags` from `.cargo/config.toml` when the `RUSTFLAGS` environment variable is
 //! set, which would silently relink the C runtime dynamically; this fails loudly instead.
 

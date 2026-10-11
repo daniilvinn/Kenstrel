@@ -14,7 +14,7 @@ use crate::metadata::FileMetadata;
 use crate::model::{mtime_nanos, Preview, PreviewBody, UnavailableReason};
 use crate::options::PreviewOptions;
 
-/// Number of previews kept in the LRU cache (PLAN.md section 8).
+/// Number of previews kept in the LRU cache.
 pub const CACHE_CAPACITY: usize = 64;
 /// Approximate byte budget of the cache (decoded images dominate). The oldest entries
 /// are evicted when the sum of [`Preview::approx_bytes`] exceeds it; a single preview

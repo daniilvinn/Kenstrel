@@ -1252,7 +1252,7 @@ fn every_new_action_is_bound_by_default() {
     }
 }
 
-// ----- integration with tabs (P7) and the preview pane (P2) -----
+// ----- integration with tabs and the preview pane -----
 
 fn wide(s: &mut AppState) {
     update(s, Msg::Resize(Size::new(120, 40)));
@@ -1711,7 +1711,7 @@ fn a_grep_hit_the_preview_still_cannot_reach_says_so() {
         .is_some_and(|st| st.text.contains("beyond the preview limit")));
 }
 
-// ----- sending a hit to Claude (PLAN 10c) -----
+// ----- sending a hit to Claude -----
 
 fn start_claude(s: &mut AppState) {
     use crate::claude::ClaudePreflight;

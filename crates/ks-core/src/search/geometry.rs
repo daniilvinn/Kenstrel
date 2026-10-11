@@ -2,7 +2,7 @@
 //!
 //! All numbers are cells. The overlay is centred, leaves two columns and two rows of the main
 //! screen visible around it, and shows a preview pane to the right of the results when the
-//! terminal is at least [`PREVIEW_MIN_WIDTH`] wide (PLAN 4.3).
+//! terminal is at least [`PREVIEW_MIN_WIDTH`] wide.
 
 use crate::state::Size;
 

@@ -1,4 +1,4 @@
-//! The command palette overlay (PLAN §4.3).
+//! The command palette overlay.
 
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};

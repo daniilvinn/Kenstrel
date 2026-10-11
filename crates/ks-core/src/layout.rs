@@ -2,9 +2,9 @@
 
 use crate::state::Size;
 
-/// The hint line is hidden on terminals shorter than this (PLAN §4.2).
+/// The hint line is hidden on terminals shorter than this.
 pub const HINT_MIN_HEIGHT: u16 = 20;
-/// Terminals narrower than this hide the size column (PLAN §4.2).
+/// Terminals narrower than this hide the size column.
 pub const SIZES_MIN_WIDTH: u16 = 60;
 
 /// Rows above the list: the header and its rule.

@@ -1,6 +1,6 @@
 //! Raw mode, the alternate screen and the panic hook that undoes them.
 //!
-//! Mouse capture is intentionally never enabled (PLAN §0.2).
+//! Mouse capture is intentionally never enabled.
 
 use std::io::{self, Stdout};
 use std::panic;

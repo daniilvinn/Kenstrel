@@ -1,4 +1,4 @@
-//! File operations (PLAN §7, phase P6): yank register, paste, trash, delete, rename, create,
+//! File operations: yank register, paste, trash, delete, rename, create,
 //! bulk rename, undo, conflict prompts, the jobs table, copy-path/open-with menus, the `!`
 //! pager, and the prompt / confirm state behind them.
 //!

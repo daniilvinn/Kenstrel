@@ -11,7 +11,7 @@ pub struct Debouncer {
 }
 
 impl Debouncer {
-    /// The 120 ms delay from PLAN.md section 6.3.
+    /// The 120 ms quiet period.
     pub const DEFAULT_DELAY: Duration = Duration::from_millis(120);
 
     /// New debouncer with the given quiet period.

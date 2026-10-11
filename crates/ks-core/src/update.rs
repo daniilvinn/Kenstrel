@@ -23,7 +23,7 @@ use crate::{help, palette};
 
 /// How long informational messages stay on the status line.
 const TOAST_DURATION: Duration = Duration::from_secs(3);
-/// Errors stay longer than PLAN section 4.1's 3 s so config errors can actually be read
+/// Errors stay longer than the usual 3 s so config errors can actually be read
 /// (PROGRESS.md deviation 11).
 const ERROR_DURATION: Duration = Duration::from_secs(8);
 

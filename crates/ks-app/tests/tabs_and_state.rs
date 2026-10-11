@@ -1,4 +1,4 @@
-//! Headless end-to-end tests of phase P7 with the real effect runner, real directories and
+//! Headless end-to-end tests of tabs and state with the real effect runner, real directories and
 //! real state files: tabs (listing and watcher follow the active tab), bookmarks and frecency
 //! persisting across runs, damaged state files, and the cwd file written on `Q`.
 

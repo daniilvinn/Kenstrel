@@ -1,4 +1,4 @@
-//! Shell integration (PLAN §7): the `k` function that runs `ks` and, after `Q`, changes the
+//! Shell integration: the `k` function that runs `ks` and, after `Q`, changes the
 //! shell's directory to the one Kestrel ended in. Printed by `ks --print-shell-init <shell>`.
 
 use clap::ValueEnum;

@@ -1,4 +1,4 @@
-//! Content search (`ctrl-f`, PLAN.md section 6.3) built on the ripgrep crates.
+//! Content search (`ctrl-f`) built on the ripgrep crates.
 //!
 //! Pipeline: parallel walker (with gitignore/hidden/glob filtering, size and cloud-placeholder
 //! pre-checks) -> bounded channel -> N worker threads, each with its own

@@ -29,7 +29,7 @@ pub enum TimerKind {
     GitRefresh,
     /// The debounce before the frecency database is written.
     StateSave,
-    /// The 120 ms quiet period of the content-search query (PLAN 6.3).
+    /// The 120 ms quiet period of the content-search query.
     GrepDebounce,
     /// The grace period after which a freshly opened conflict dialog accepts keys.
     ConflictArm,
@@ -127,7 +127,7 @@ pub enum Msg {
     ThemeApplied(String),
     /// Bookmarks and frecency read from the state directory (`Effect::LoadNavData`).
     NavDataLoaded(Box<LoadedNavData>),
-    // ----- file operations (P6) -----
+    // ----- file operations -----
     /// An event of the job engine (progress, conflict prompt, result).
     Job(JobMsg),
     /// An event of a `!` shell command.

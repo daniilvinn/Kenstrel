@@ -1,4 +1,4 @@
-//! File-operation engine (PLAN section 7, phase P6).
+//! File-operation engine.
 //!
 //! Self-contained: it does not depend on `ks-core`. The app wires it in by
 //!

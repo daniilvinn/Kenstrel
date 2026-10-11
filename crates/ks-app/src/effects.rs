@@ -167,7 +167,7 @@ pub struct EffectRunner {
     slots: HashMap<Slot, CancellationToken>,
     /// Where bookmarks and frecency live; without it state effects are ignored (tests).
     store: Option<(StateStore, StateWriter)>,
-    /// Jobs, shell runs and launching (P6).
+    /// Jobs, shell runs and launching.
     fileops: FileOpsRunner,
     /// Preview engines, created on first use (they start worker threads). The main pane and
     /// the parent column each have their own because a `Previewer` has one request slot.
@@ -186,7 +186,7 @@ pub struct EffectRunner {
     parked_lists: Vec<(PathBuf, CancellationToken)>,
     /// The `git status` run in flight, if any (see [`GitRun`]).
     git_run: Option<Arc<std::sync::Mutex<GitRun>>>,
-    /// Performs the `Effect::Claude*` requests (PLAN section 10).
+    /// Performs the `Effect::Claude*` requests.
     claude: ClaudeHost,
 }
 
@@ -414,7 +414,7 @@ impl EffectRunner {
                 | Effect::ClaudeIpcReply { .. }
                 | Effect::ClaudeDiff { .. }
                 | Effect::ClaudeIpcWork { .. }) => self.claude.run(claude),
-                // File operations, shell runs and launching (P6).
+                // File operations, shell runs and launching.
                 other => self.fileops.handle(other),
             }
         }

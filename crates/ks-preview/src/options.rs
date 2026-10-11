@@ -60,7 +60,7 @@ impl Default for Palette {
     }
 }
 
-/// Size and time limits. Defaults follow PLAN.md section 8.
+/// Size and time limits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Limits {
     /// Bytes read for text / markdown (256 KB).

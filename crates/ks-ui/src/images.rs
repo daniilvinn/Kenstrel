@@ -1,4 +1,4 @@
-//! Terminal graphics for the preview pane (PLAN §8: `ratatui-image`).
+//! Terminal graphics for the preview pane (`ratatui-image`).
 //!
 //! The decoded image comes from the preview engine (`Arc<DynamicImage>`, already downscaled
 //! to at most 2048 px). Turning it into Sixel / halfblock cells at the size of the pane is

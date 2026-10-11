@@ -1,8 +1,7 @@
-//! The embedded Claude Code pane, its dialogs, the "Claude changes" view and the `◆` marker
-//! (PLAN section 10).
+//! The embedded Claude Code pane, its dialogs, the "Claude changes" view and the `◆` marker.
 //!
 //! The layout lives in [`split_body`], deliberately separate from the main screen so that the
-//! preview layout of phase P2 only has to split the list area this function returns.
+//! preview layout only has to split the list area this function returns.
 
 use std::path::Path;
 
@@ -37,7 +36,7 @@ fn area(rect: Rect) -> Area {
 }
 
 /// Divides the body of the main screen: the area left for the list, and the pane if Claude
-/// is running. P2's preview layout divides the returned list area further.
+/// is running. The preview layout divides the returned list area further.
 pub fn split_body(body: Rect, state: &AppState) -> (Rect, Option<(Rect, BodySplit)>) {
     if !state.claude.is_running() {
         return (body, None);
@@ -229,7 +228,7 @@ fn centered(area: Rect, wanted_width: u16, wanted_height: u16) -> Rect {
 }
 
 /// Draws the Claude changes view when it is the overlay on top (the billing / install / login
-/// dialogs are P6's generic confirm overlay, drawn by `fileops::render_overlays`).
+/// dialogs are the generic confirm overlay, drawn by `fileops::render_overlays`).
 pub fn render_overlays(frame: &mut Frame, state: &AppState, theme: &Theme) {
     if state.overlays.last() == Some(&Overlay::ClaudeChanges) {
         render_changes(frame, state, theme);

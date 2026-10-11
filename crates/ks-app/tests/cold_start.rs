@@ -1,6 +1,6 @@
 #![allow(clippy::print_stderr)]
 
-//! Cold start (PLAN P8: first frame in under 60 ms). Headless: the real session build (config,
+//! Cold start (first frame in under 60 ms). Headless: the real session build (config,
 //! keymap, theme), the real event loop and effect runner on a `TestBackend`, a real directory.
 //! The probe is the loop's "first frame drawn" hook, which is also where the real terminal
 //! runs the graphics query and starts reading input, so nothing in this test waits for either.

@@ -1,4 +1,4 @@
-//! Launching things: clipboard, default apps, editors and the `!` shell runner (PLAN section 5).
+//! Launching things: clipboard, default apps, editors and the `!` shell runner.
 //!
 //! - [`clipboard`]: format paths (absolute / relative / name) and put them on the clipboard
 //!   behind the [`Clipboard`] trait.

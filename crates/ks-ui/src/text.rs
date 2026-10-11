@@ -142,7 +142,7 @@ fn strip_home<'a>(path: &'a Path, home: &Path) -> Option<&'a Path> {
 }
 
 /// The segments of `path` for display: `~` replaces the home directory, `\\?\` prefixes are
-/// stripped and the separator is always `/` (PLAN §4.2).
+/// stripped and the separator is always `/`.
 fn breadcrumb_segments(path: &Path, home: Option<&Path>) -> Vec<String> {
     let path = dunce::simplified(path);
     let home = home.map(dunce::simplified);

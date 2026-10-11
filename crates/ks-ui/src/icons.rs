@@ -1,4 +1,4 @@
-//! Icons for the three icon sets of PLAN §4.5, chosen by special name, then extension, then
+//! Icons for the three icon sets, chosen by special name, then extension, then
 //! kind. Every icon is a single terminal cell wide.
 
 use ks_core::config::IconSet;

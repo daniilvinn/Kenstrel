@@ -1,4 +1,4 @@
-//! Content search (`ctrl-f`, PLAN 6.3): the overlay's state and its transitions.
+//! Content search (`ctrl-f`): the overlay's state and its transitions.
 //!
 //! Two fields (query, glob), regex and whole-word toggles, a 120 ms debounce, and the results
 //! the engine streams in, grouped by file. Every engine event carries the search generation;
@@ -19,7 +19,7 @@ use crate::msg::TimerKind;
 use crate::nav;
 use crate::state::{AppState, Size};
 
-/// The quiet period before a changed query starts a search (PLAN 6.3).
+/// The quiet period before a changed query starts a search.
 pub const DEBOUNCE: Duration = Duration::from_millis(120);
 
 /// Which input field has the cursor.

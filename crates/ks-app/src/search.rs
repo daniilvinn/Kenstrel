@@ -1,4 +1,4 @@
-//! Workers behind the search effects (phases P3 + P4).
+//! Workers behind the search effects.
 //!
 //! * [`FinderWorker`] owns a `ks_search::FinderSession` on a dedicated thread. nucleo's
 //!   snapshot model is pull based, so the worker ticks the session while it is walking or

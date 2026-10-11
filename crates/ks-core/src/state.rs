@@ -133,11 +133,11 @@ pub struct AppState {
     pub help: HelpState,
     /// Names of the themes that can be switched to (built-ins and user files).
     pub themes: Vec<String>,
-    /// File operations: yank register, jobs table, dialogs, pager (P6).
+    /// File operations: yank register, jobs table, dialogs, pager.
     pub fileops: FileOps,
     /// The preview pane and parent column.
     pub preview: PreviewState,
-    /// Claude Code integration (PLAN section 10).
+    /// Claude Code integration.
     pub claude: ClaudeState,
     pub(crate) history: History,
     /// Where the cursor was in directories left earlier (by entry name).
@@ -151,7 +151,7 @@ pub struct AppState {
     pub(crate) git_gen: GenCounter,
     pub(crate) git_timer_gen: GenCounter,
     pub(crate) children_gen: GenCounter,
-    /// In-directory filter input, find file and content search (P3 + P4).
+    /// In-directory filter input, find file and content search.
     pub search: crate::search::SearchState,
 }
 

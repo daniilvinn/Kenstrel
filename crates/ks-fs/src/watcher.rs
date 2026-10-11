@@ -1,4 +1,4 @@
-//! Watching one directory for changes (PLAN §7).
+//! Watching one directory for changes.
 //!
 //! `notify` uses `ReadDirectoryChangesW` on Windows. The watch is non-recursive: only direct
 //! children of the directory are reported. Events are debounced, then collapsed into a
@@ -22,7 +22,7 @@ use notify_debouncer_full::{
     new_debouncer_opt, DebounceEventResult, DebouncedEvent, Debouncer, NoCache,
 };
 
-/// How long events are collected before they are reported (PLAN §7).
+/// How long events are collected before they are reported.
 pub const DEBOUNCE: Duration = Duration::from_millis(100);
 
 /// The debouncer releases events as each one matures, so a long burst arrives as a stream of

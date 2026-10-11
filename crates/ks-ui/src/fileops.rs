@@ -1,4 +1,4 @@
-//! Rendering of the file-operation feature (P6): the inline prompt, the job summary in the
+//! Rendering of the file-operation feature: the inline prompt, the job summary in the
 //! prompt line, and the overlays (jobs, conflict, confirm, copy-as / open-with menus, and the
 //! `!` pager).
 

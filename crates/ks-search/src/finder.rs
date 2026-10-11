@@ -1,4 +1,4 @@
-//! Fuzzy file finder (`ctrl-p`, PLAN.md section 6.2): a [`FinderSession`] streams walker
+//! Fuzzy file finder (`ctrl-p`): a [`FinderSession`] streams walker
 //! results into a [`nucleo::Nucleo`] matcher so results appear while the walk is still running.
 //!
 //! # Usage
@@ -45,7 +45,7 @@ use crate::Notify;
 ///
 /// Stored as one reference-counted string whose first byte tags the kind (and whether the
 /// name is a lossy conversion), so the walk cache and the matcher share a single allocation
-/// per path (PLAN P8 memory budget).
+/// per path (memory budget).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FinderItem {
     repr: Arc<str>,

@@ -414,7 +414,7 @@ impl Keymap {
     }
 }
 
-/// The built-in bindings (PLAN §5). Keys are space-separated sequences.
+/// The built-in bindings. Keys are space-separated sequences.
 pub const DEFAULT_BINDINGS: &[(KeyContext, &str, &str)] = &[
     (C::Normal, "j", "cursor.down"),
     (C::Normal, "down", "cursor.down"),
@@ -538,7 +538,7 @@ pub const DEFAULT_BINDINGS: &[(KeyContext, &str, &str)] = &[
     (C::Grep, "esc", "cancel"),
     (C::Grep, "ctrl-c", "cancel"),
     (C::Grep, "enter", "accept"),
-    // In-directory filter, find file and content search (P3 + P4). Printable characters
+    // In-directory filter, find file and content search. Printable characters
     // go to the input field; these are the non-text keys.
     (C::Filter, "down", "cursor.down"),
     (C::Filter, "up", "cursor.up"),
@@ -654,7 +654,7 @@ pub const DEFAULT_BINDINGS: &[(KeyContext, &str, &str)] = &[
     (C::Pager, "ctrl-u", "page.half_up"),
     (C::Pager, "pagedown", "page.half_down"),
     (C::Pager, "pageup", "page.half_up"),
-    // Claude pane (P10). While the pane has focus every key that is not bound here goes to
+    // Claude pane. While the pane has focus every key that is not bound here goes to
     // Claude verbatim, so only the keys below are ever intercepted.
     (C::Claude, "ctrl-\\", "claude.focus"),
     (C::Claude, "alt-=", "claude.grow"),

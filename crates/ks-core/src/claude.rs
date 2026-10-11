@@ -1,4 +1,4 @@
-//! Claude Code integration state and logic (PLAN section 10), as plain data.
+//! Claude Code integration state and logic, as plain data.
 //!
 //! The engine (`ks-claude`) lives outside this crate; the app's effect runner turns engine events
 //! into the `Msg::Claude*` variants that carry the types defined here, and performs the
@@ -10,8 +10,8 @@
 //! # Layout
 //!
 //! The pane is carved out of the body of the main screen (between the header rule and the
-//! prompt) by [`split_body`]. It is deliberately a separate function: the preview layout of
-//! phase P2 splits the *list area* that this function returns, so the two compose without
+//! prompt) by [`split_body`]. It is deliberately a separate function: the preview pane
+//! splits the *list area* that this function returns, so the two compose without
 //! knowing about each other.
 
 use std::collections::BTreeMap;
@@ -28,7 +28,7 @@ use crate::nav;
 use crate::state::{AppState, Level, Size};
 use crate::update::set_status;
 
-/// The exact warning shown when `claude auth status` reports API-key billing (PLAN 10.1).
+/// The exact warning shown when `claude auth status` reports API-key billing.
 pub const BILLING_WARNING: &str = "Claude would bill your API key; aborting";
 /// Shown when the user is not logged in.
 pub const NOT_LOGGED_IN_HELP: &str =
@@ -248,7 +248,7 @@ pub enum ClaudePreflight {
 pub struct ClaudeSpawn {
     /// Explicit executable; `None` means look it up on `PATH`.
     pub binary: Option<PathBuf>,
-    /// Environment variables to remove from the child (PLAN 10.1).
+    /// Environment variables to remove from the child.
     pub strip_env: Vec<String>,
 }
 
@@ -284,7 +284,7 @@ pub enum ClaudePhase {
     Running,
 }
 
-/// A modal message about the Claude integration. It is presented by P6's generic confirm
+/// A modal message about the Claude integration. It is presented by the generic confirm
 /// overlay (`Overlay::Confirm` with a `fileops::ConfirmDialog` built by [`show_dialog`]); this
 /// records which Claude question is open.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -738,7 +738,7 @@ fn wrap_lines(text: &str, width: usize) -> Vec<String> {
     out
 }
 
-/// Opens `dialog` in P6's confirm overlay. The billing warning asks `y` (the overlay's
+/// Opens `dialog` in the confirm overlay. The billing warning asks `y` (the overlay's
 /// accept key for questions with an action); enter does not accept it, see [`handle_action`].
 fn show_dialog(state: &mut AppState, dialog: ClaudeDialog) {
     const WRAP: usize = 64;
@@ -1305,7 +1305,7 @@ fn clear_changes(state: &mut AppState, effects: &mut Vec<Effect>) {
     );
 }
 
-/// Whether the command palette should list `action` right now (P5 hook: filter its entries with
+/// Whether the command palette should list `action` right now (hook: filter its entries with
 /// this). `claude.proceed` only means something inside the billing dialog, and
 /// `claude.changes_clear` only when there is something to clear; every other action is listed.
 pub fn palette_visible(state: &AppState, action: Action) -> bool {
@@ -1635,7 +1635,7 @@ mod tests {
             .iter()
             .filter(|(ctx, keys, _)| *ctx == KeyContext::Confirm && *keys == "y")
             .count();
-        // `y` is the generic confirm overlay's own accept key (P6 `confirm_key`), not a binding.
+        // `y` is the generic confirm overlay's own accept key (`confirm_key`), not a binding.
         assert_eq!(matches, 0, "a keymap binding for y in Confirm would clash");
         // A confirm that is not Claude's dialog (another feature's) does nothing on y.
         let mut s = state();

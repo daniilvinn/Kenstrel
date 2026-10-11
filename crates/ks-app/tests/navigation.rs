@@ -1,6 +1,6 @@
 #![allow(clippy::print_stderr)]
 
-//! Headless end-to-end tests of phase P1: the real `update`, the real effect runner and a
+//! Headless end-to-end tests of navigation: the real `update`, the real effect runner and a
 //! real temporary directory, with no terminal. A tiny harness plays the event loop's part:
 //! it feeds messages to `update` and hands the resulting effects to the runner.
 
@@ -476,7 +476,7 @@ async fn a_directory_of_20k_files_lists_in_reasonable_time() {
     assert_eq!(h.cursor().as_deref(), Some("file_00000.dat"));
 }
 
-/// The performance budget of PLAN §11: entering a directory with 100k entries shows the first
+/// The performance budget: entering a directory with 100k entries shows the first
 /// rows in under 150 ms and has listed everything in under a second. Creating 100k files
 /// takes a while, so this runs on demand:
 ///

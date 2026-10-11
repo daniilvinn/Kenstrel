@@ -1,4 +1,4 @@
-//! Memory budget guard (PLAN P8: a 1M-path finder cache plus an open session stays under
+//! Memory budget guard (a 1M-path finder cache plus an open session stays under
 //! 250 MB peak working set). The workspace forbids `unsafe`, so the measurement is taken from
 //! outside: the `mem` example fills the cache, opens a session and idles; this test reads the
 //! peak working set of that process with PowerShell. Windows only.

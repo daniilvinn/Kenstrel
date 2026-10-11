@@ -1,4 +1,4 @@
-//! Formatting rules of PLAN §4.6 as pure functions: human sizes and relative times.
+//! Formatting rules as pure functions: human sizes and relative times.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -7,7 +7,7 @@ use ks_core::config::SizeBase;
 const UNITS: [&str; 6] = ["B", "KB", "MB", "GB", "TB", "PB"];
 
 /// `412 B`, `14.2 KB`, `1.0 MB`. The unit label is `KB` for both bases (`SizeBase::Si`
-/// divides by 1000, `SizeBase::Binary` by 1024), as in the PLAN's mock-up. Never longer
+/// divides by 1000, `SizeBase::Binary` by 1024). Never longer
 /// than 8 cells.
 pub fn human_size(bytes: u64, base: SizeBase) -> String {
     let divisor = base.divisor() as f64;

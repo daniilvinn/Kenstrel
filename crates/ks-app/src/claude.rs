@@ -1,4 +1,4 @@
-//! Glue between the `ks-claude` engine and the app (PLAN section 10): performs the
+//! Glue between the `ks-claude` engine and the app: performs the
 //! `Effect::Claude*` requests of `update` and turns engine events into `Msg`s.
 //!
 //! Nothing here reads application state. Requests carry everything they need, and results come

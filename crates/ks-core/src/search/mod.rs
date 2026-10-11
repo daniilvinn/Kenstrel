@@ -1,4 +1,4 @@
-//! Search features (phases P3 + P4): the in-directory filter (`/`), find file (`ctrl-p`) and
+//! Search features: the in-directory filter (`/`), find file (`ctrl-p`) and
 //! content search (`ctrl-f`).
 //!
 //! * [`finder`], [`grep`]: overlay state and transitions. The engines (`ks-search`) run in
@@ -92,7 +92,7 @@ impl SearchState {
     }
 }
 
-/// The file an open search overlay highlights: the hook through which a preview pane (P2)
+/// The file an open search overlay highlights: the hook through which a preview pane
 /// can follow the selection. `line` is set for content-search hits.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreviewTarget {
@@ -346,7 +346,7 @@ fn clear_filter(state: &mut AppState) {
 
 // ----- walk cache -----
 
-/// The path changes between two listings of `dir`, for the walk cache (PLAN 6.2: the cache
+/// The path changes between two listings of `dir`, for the walk cache (the cache
 /// is refreshed incrementally from what the watcher saw). A rename shows up as a removal
 /// plus an addition.
 pub(crate) fn diff_listing(dir: &Path, old: &[Entry], new: &[Entry]) -> Vec<PathChange> {

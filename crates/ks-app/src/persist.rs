@@ -1,4 +1,4 @@
-//! Reading and writing Kestrel's state files (bookmarks, frecency; PLAN §9).
+//! Reading and writing Kestrel's state files (bookmarks, frecency).
 //!
 //! Writes are atomic (temporary file in the same directory, then rename), so a crash or a
 //! second instance never leaves a half-written file. Concurrent instances do not lose each

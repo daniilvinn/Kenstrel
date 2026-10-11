@@ -1,9 +1,9 @@
-//! The find-file and content-search overlays (PLAN 4.3) and the helpers that draw matched
+//! The find-file and content-search overlays and the helpers that draw matched
 //! characters.
 //!
 //! Layout comes from [`ks_core::search::geometry`], the same numbers `update` uses to size the
-//! result windows. On terminals of 100 columns or more both overlays show the preview pane of
-//! P2 next to the results: [`preview_rect`] says where it goes and [`ks_core::preview_target`]
+//! result windows. On terminals of 100 columns or more both overlays show the preview pane
+//! next to the results: [`preview_rect`] says where it goes and [`ks_core::preview_target`]
 //! what it shows (`ks_core::preview` keeps the pane's request in step with the highlight).
 
 use ratatui::layout::Rect;

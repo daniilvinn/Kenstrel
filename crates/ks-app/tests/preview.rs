@@ -1,6 +1,6 @@
 #![allow(clippy::print_stderr, clippy::print_stdout)]
 
-//! Headless end-to-end tests of the preview wiring (phase P2): the real `update`, the real
+//! Headless end-to-end tests of the preview wiring: the real `update`, the real
 //! effect runner with the real preview engine, and real files in a temporary directory.
 
 use std::fs;

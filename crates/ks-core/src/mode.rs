@@ -1,4 +1,4 @@
-//! Input modes and the overlay stack (PLAN §3.3).
+//! Input modes and the overlay stack.
 
 use std::fmt;
 use std::str::FromStr;
@@ -34,11 +34,11 @@ pub enum Overlay {
     Claude,
     Bookmarks,
     Jump,
-    /// A job waits for an answer to "destination exists" (P6).
+    /// A job waits for an answer to "destination exists".
     Conflict,
-    /// The `!` command output pager (P6).
+    /// The `!` command output pager.
     Pager,
-    /// A small choice list: `Y` copy-as, `O` open-with (P6).
+    /// A small choice list: `Y` copy-as, `O` open-with.
     Menu,
     ClaudeChanges,
 }

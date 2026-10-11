@@ -46,7 +46,7 @@ struct Columns {
 }
 
 impl Columns {
-    /// `pane` is the list pane width, `terminal` the whole terminal width: PLAN 4.6 hides
+    /// `pane` is the list pane width, `terminal` the whole terminal width: hides
     /// sizes under 60 terminal columns, and the pane must still leave names their minimum.
     fn for_width(pane: u16, terminal: u16) -> Self {
         Self {
@@ -169,7 +169,7 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
     if entry.is_dir {
         name.push('/');
     }
-    // A file Claude edited gets a glyph at the end of the name column (PLAN 10e).
+    // A file Claude edited gets a glyph at the end of the name column.
     let touched = crate::claude::touched_glyph(entry, state);
     let name_width = if touched.is_some() {
         name_width.saturating_sub(crate::claude::TOUCHED_WIDTH)

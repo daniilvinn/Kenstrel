@@ -1,4 +1,4 @@
-//! Line-range selection in the text preview (PLAN 10c, "a preview line range in visual mode").
+//! Line-range selection in the text preview.
 //!
 //! `V` starts a selection at the first visible line; `j`/`k` extend it, `esc` cancels, `C` or
 //! `enter` sends `@path#L<a>-<b>` to the Claude pane. The selection lives in

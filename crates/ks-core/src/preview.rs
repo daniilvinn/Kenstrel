@@ -1,4 +1,4 @@
-//! The preview pane (PLAN §4.2, §8): which file is shown, the result delivered by the
+//! The preview pane: which file is shown, the result delivered by the
 //! preview engine, scrolling and the pane toggles.
 //!
 //! `update` stays free of I/O. After every message [`sync`] compares what the pane *should*
@@ -24,7 +24,7 @@ use crate::generation::{Gen, GenCounter};
 use crate::mode::Overlay;
 use crate::state::AppState;
 
-/// Terminals narrower than this hide the preview unless `w` forces it (PLAN §4.2).
+/// Terminals narrower than this hide the preview unless `w` forces it.
 pub const PREVIEW_MIN_WIDTH: u16 = 80;
 /// Terminals narrower than this never show the parent column.
 pub const PARENT_MIN_TERMINAL_WIDTH: u16 = 100;
@@ -327,7 +327,7 @@ pub fn content_len(preview: &Preview, pane_width: u16) -> usize {
 }
 
 /// A find-file / content-search overlay is open on a terminal wide enough for its own preview
-/// pane (PLAN 4.3): the pane then follows the overlay's highlighted result, not the cursor.
+/// pane: the pane then follows the overlay's highlighted result, not the cursor.
 fn overlay_mode(state: &AppState) -> bool {
     matches!(state.overlays.last(), Some(Overlay::Finder | Overlay::Grep))
         && crate::search::geometry::shows_preview(state.size)

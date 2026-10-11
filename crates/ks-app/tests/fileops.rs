@@ -1,6 +1,6 @@
 #![allow(clippy::print_stderr)]
 
-//! Headless end-to-end tests of phase P6: the real `update`, the real effect runner (with the
+//! Headless end-to-end tests of file operations: the real `update`, the real effect runner (with the
 //! real job engine) and real temporary directories, no terminal. A tiny harness plays the
 //! event loop's part: it feeds messages to `update` and hands the effects to the runner.
 

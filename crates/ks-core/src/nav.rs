@@ -27,7 +27,7 @@ use crate::view::DirView;
 
 /// How many directories get a lazily computed child count after a listing.
 pub const CHILD_COUNT_LIMIT: usize = 256;
-/// Debounce between a file system change and the `git status` it triggers (PLAN §7).
+/// Debounce between a file system change and the `git status` it triggers.
 pub const GIT_DEBOUNCE: Duration = Duration::from_millis(300);
 
 const HISTORY_LIMIT: usize = 200;
@@ -308,7 +308,7 @@ pub(crate) fn can_refresh(state: &AppState) -> bool {
             .is_none_or(|p| matches!(p.kind, NavKind::Refresh))
 }
 
-// ----- search integration (P3 + P4) -----
+// ----- search integration -----
 
 /// Shows the directory of `path` with the cursor on `path`'s entry, and marks `marks` (names
 /// in that directory) once it has loaded. Used by find file.

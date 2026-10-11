@@ -1,4 +1,4 @@
-//! File-system work behind Claude's MCP tools (PLAN 10d), run on the blocking pool.
+//! File-system work behind Claude's MCP tools, run on the blocking pool.
 //!
 //! Requests that only need application state are answered by `update` itself; what is left
 //! here uses the real engines: `ks-search` (the same walker, fuzzy matcher and content search

@@ -1,4 +1,4 @@
-//! Search engines for Kestrel (phases P3 and P4): directory walker, fuzzy file finder,
+//! Search engines for Kestrel: directory walker, fuzzy file finder,
 //! in-directory filter and streaming content search.
 //!
 //! This crate is deliberately self-contained: it defines its own types and does not depend on

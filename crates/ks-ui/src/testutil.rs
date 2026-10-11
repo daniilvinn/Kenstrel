@@ -147,7 +147,7 @@ pub fn empty_state(width: u16, height: u16) -> AppState {
     state
 }
 
-/// The entries of the mock-up in PLAN section 4.2, plus one of every special kind.
+/// The entries of the mock-up main screen, plus one of every special kind.
 pub fn fixture_entries() -> Vec<Entry> {
     let mut shaders = Entry::dir("shaders").with_mtime(ago(2 * 86_400));
     shaders.children = Some(12);

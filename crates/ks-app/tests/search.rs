@@ -1,6 +1,6 @@
 #![allow(clippy::print_stderr)]
 
-//! Headless end-to-end tests of phases P3 + P4: the real `update`, the real effect runner, the
+//! Headless end-to-end tests of search: the real `update`, the real effect runner, the
 //! real search engines and a real temporary tree, with no terminal.
 
 use std::fs;
@@ -324,7 +324,7 @@ async fn content_search_streams_groups_by_file_and_counts() {
     assert_eq!(g.stats.binary, 1, "binary.bin is counted, not searched");
     assert!(!g.capped);
 
-    // `enter` hands the hit to P6's editor launcher with its line (the runner decides between a
+    // `enter` hands the hit to the editor launcher with its line (the runner decides between a
     // detached GUI editor and a suspended terminal one); the effect is checked without running it.
     let effects = update(&mut h.state, Msg::Key("enter".parse::<KeyChord>().unwrap()));
     let open = effects.iter().find_map(|e| match e {

@@ -80,7 +80,7 @@ pub enum Effect {
     LoadNavData,
     /// Atomically replace a state file with `contents`. Writes are applied in order.
     WriteState { file: StateFile, contents: String },
-    // ----- file operations (P6) -----
+    // ----- file operations -----
     /// Start a job (copy, move, trash, delete, bulk rename). `keep_both` answers conflicts
     /// with `name (1).ext` instead of asking.
     SubmitJob {
@@ -197,7 +197,7 @@ pub enum Effect {
     /// Cancel the running content search.
     GrepCancel,
     /// Apply listing differences of the displayed directory to the walk cache (the
-    /// incremental refresh of PLAN 6.2).
+    /// incremental refresh).
     WalkCacheChanges(Vec<ks_search::PathChange>),
     /// Enable or disable bracketed paste in the terminal (on while a pane has focus).
     SetBracketedPaste(bool),

@@ -68,7 +68,7 @@ actions! {
     JobsOpen => "jobs.open", "Jobs overlay";
     JobCancel => "job.cancel", "Cancel selected job";
     JobsClear => "jobs.clear", "Clear finished jobs";
-    // Find file / content search overlays (P3+P4)
+    // Find file / content search overlays
     FinderScope => "finder.scope", "Find file: cycle scope (cwd, git root, home, drive)";
     FinderHidden => "finder.hidden", "Find file: toggle hidden files";
     FinderGitignore => "finder.gitignore", "Find file: toggle gitignored files";

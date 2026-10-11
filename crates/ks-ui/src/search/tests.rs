@@ -602,7 +602,7 @@ fn long_paths_keep_the_file_name() {
     assert!(width(&text) <= 16, "{text}");
 }
 
-// ----- the preview pane inside the overlays (P2) -----
+// ----- the preview pane inside the overlays -----
 
 /// Makes a 150-line text file the engine result for the highlighted result of the open
 /// overlay and scrolls like `ks_core::preview` does for a content-search hit.

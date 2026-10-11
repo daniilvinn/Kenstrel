@@ -1,4 +1,4 @@
-//! The main screen (PLAN §4.2): header, separator, body, separator, prompt, hint line.
+//! The main screen: header, separator, body, separator, prompt, hint line.
 //!
 //! `render` is a pure function of the state and the theme.
 
