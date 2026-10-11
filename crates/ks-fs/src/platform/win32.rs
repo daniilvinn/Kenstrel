@@ -27,6 +27,8 @@ use windows::Win32::System::Threading::{
     GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::System::Time::{GetTimeZoneInformation, TIME_ZONE_INFORMATION};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyboardLayout, VkKeyScanExW};
+use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
 use crate::attrs::win;
 
@@ -121,18 +123,69 @@ fn drive_kind(wide_root: &[u16]) -> DriveKind {
     }
 }
 
-/// Queries one drive. Runs on a thread of its own (the error mode is per thread).
-fn query_drive(root: PathBuf) -> DriveInfo {
+/// The character the key that types `ch` in the active keyboard layout has on a US layout:
+/// `p` for the `з` of a Russian layout. Shortcuts with ctrl or alt are meant by key position,
+/// but the console reports them with the character of the active layout. `None` when the
+/// layout has no key for `ch` or that key has no US character.
+pub fn latin_key(ch: char) -> Option<char> {
+    let mut units = [0u16; 2];
+    let [unit] = ch.encode_utf16(&mut units) else {
+        return None;
+    };
+    // The same guess at the active layout as crossterm's: the layout of the foreground
+    // window's thread (Windows Terminal's), falling back to ours.
+    // SAFETY: no pointers are passed; a null window yields thread 0, which is valid here.
+    let scan = unsafe {
+        let thread = GetWindowThreadProcessId(GetForegroundWindow(), None);
+        VkKeyScanExW(*unit, GetKeyboardLayout(thread))
+    };
+    if scan == -1 {
+        return None;
+    }
+    crate::keyboard::us_char_for_vk(scan.to_le_bytes()[0])
+}
+
+/// A cheap fingerprint of the drives: which letters exist and which removable or optical
+/// drives hold a medium. It changes when a drive is plugged in, removed or ejected. Fixed
+/// and network drives are not touched, so a dead share cannot block it.
+pub fn drives_signature() -> u64 {
+    // SAFETY: no pointers involved.
+    let mask = unsafe { GetLogicalDrives() };
+    let mut signature = u64::from(mask);
+    for bit in (0..26u8).filter(|bit| mask & (1 << bit) != 0) {
+        let root = wide(Path::new(&format!("{}:\\", char::from(b'A' + bit))));
+        if !matches!(drive_kind(&root), DriveKind::Removable | DriveKind::Optical) {
+            continue;
+        }
+        // SAFETY: `root` is NUL-terminated and outlives the call; no out-buffers.
+        let ready = without_error_dialogs(|| unsafe {
+            GetVolumeInformationW(PCWSTR(root.as_ptr()), None, None, None, None, None)
+        })
+        .is_ok();
+        if ready {
+            signature |= 1 << (32 + u32::from(bit));
+        }
+    }
+    signature
+}
+
+/// Runs `f` with the "no disk in drive" system dialog suppressed for this thread.
+fn without_error_dialogs<T>(f: impl FnOnce() -> T) -> T {
     let mut previous_mode = Default::default();
     // SAFETY: `previous_mode` is a valid out-pointer for the call.
     let mode_set =
         unsafe { SetThreadErrorMode(SEM_FAILCRITICALERRORS, Some(&mut previous_mode)) }.is_ok();
-    let info = query_drive_inner(root);
+    let result = f();
     if mode_set {
         // SAFETY: restores the value returned by the call above.
         let _ = unsafe { SetThreadErrorMode(previous_mode, None) };
     }
-    info
+    result
+}
+
+/// Queries one drive. Runs on a thread of its own (the error mode is per thread).
+fn query_drive(root: PathBuf) -> DriveInfo {
+    without_error_dialogs(|| query_drive_inner(root))
 }
 
 fn query_drive_inner(root: PathBuf) -> DriveInfo {

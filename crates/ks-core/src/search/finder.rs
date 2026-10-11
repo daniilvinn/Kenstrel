@@ -69,6 +69,9 @@ pub struct FinderState {
     /// (a scope that resolves to one of them, such as the git root when already at it, is
     /// skipped).
     cycle_seen: Option<Vec<PathBuf>>,
+    /// After a toggle restarted the session: the result that was highlighted. The selection
+    /// follows it while the walk runs, until the user moves or types.
+    follow: Option<PathBuf>,
 }
 
 impl FinderState {
@@ -121,6 +124,7 @@ pub(crate) fn open(state: &mut AppState, effects: &mut Vec<Effect>) {
         scroll: 0,
         marks: Vec::new(),
         cycle_seen: None,
+        follow: None,
     };
     state.search.finder = Some(finder);
     state.overlays.push(Overlay::Finder);
@@ -173,6 +177,7 @@ pub(crate) fn on_text_key(state: &mut AppState, effects: &mut Vec<Effect>, key: 
         Edit::Changed => {
             f.selected = 0;
             f.scroll = 0;
+            f.follow = None;
             let (offset, limit) = f.window(rows);
             effects.push(Effect::FinderQuery {
                 gen: f.gen,
@@ -191,6 +196,7 @@ pub(crate) fn on_results(
     gen: u64,
     snapshot: FinderSnapshot,
 ) {
+    let rows = FinderState::rows(state.size);
     let Some(f) = state.search.finder.as_mut() else {
         return;
     };
@@ -219,6 +225,24 @@ pub(crate) fn on_results(
     f.window_offset = snapshot.offset;
     f.results = snapshot.results;
     f.selected = f.selected.min(f.matched.saturating_sub(1));
+    if let Some(path) = &f.follow {
+        if let Some(index) = f.results.iter().position(|r| r.path == *path) {
+            f.selected = f.window_offset + u32::try_from(index).unwrap_or(0);
+            let before = f.scroll;
+            keep_visible(f, rows);
+            if f.scroll != before {
+                let (offset, limit) = f.window(rows);
+                effects.push(Effect::FinderWindow {
+                    gen: f.gen,
+                    offset,
+                    limit,
+                });
+            }
+        }
+        if !f.walking {
+            f.follow = None;
+        }
+    }
     state.dirty = true;
 }
 
@@ -252,6 +276,7 @@ pub(crate) fn move_selection(state: &mut AppState, effects: &mut Vec<Effect>, de
     let last = i64::from(f.matched.saturating_sub(1));
     let target = (i64::from(f.selected) + delta).clamp(0, last);
     f.selected = u32::try_from(target).unwrap_or(0);
+    f.follow = None;
     let before = f.scroll;
     keep_visible(f, rows);
     if f.scroll != before || f.result_at(f.selected).is_none() {
@@ -300,7 +325,7 @@ pub(crate) fn toggle_hidden(state: &mut AppState, effects: &mut Vec<Effect>) {
         f.show_hidden = !f.show_hidden;
         state.search.finder_hidden = f.show_hidden;
     }
-    reset_view(state);
+    reset_view_following(state);
     restart(state, effects, rows);
 }
 
@@ -311,7 +336,7 @@ pub(crate) fn toggle_gitignore(state: &mut AppState, effects: &mut Vec<Effect>) 
         // `finder_gitignore` remembers "show ignored files".
         state.search.finder_gitignore = !f.respect_gitignore;
     }
-    reset_view(state);
+    reset_view_following(state);
     restart(state, effects, rows);
 }
 
@@ -321,6 +346,22 @@ fn reset_view(state: &mut AppState) {
         f.scroll = 0;
         f.window_offset = 0;
         f.results.clear();
+        f.follow = None;
+    }
+}
+
+/// [`reset_view`] for a toggle that keeps the scope: the highlighted result stays
+/// highlighted if the new results still hold it near the top.
+fn reset_view_following(state: &mut AppState) {
+    let follow = state
+        .search
+        .finder
+        .as_ref()
+        .and_then(|f| f.current())
+        .map(|r| r.path.clone());
+    reset_view(state);
+    if let Some(f) = state.search.finder.as_mut() {
+        f.follow = follow;
     }
 }
 

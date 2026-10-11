@@ -278,9 +278,14 @@ pub(crate) fn go_place(state: &mut AppState, effects: &mut Vec<Effect>, action: 
     }
 }
 
+/// Re-lists what is shown: the drives on "This PC", otherwise the current directory.
 pub(crate) fn refresh(state: &mut AppState, effects: &mut Vec<Effect>) {
-    let cwd = state.cwd.clone();
-    request(state, effects, Location::Dir(cwd), NavKind::Refresh, None);
+    let target = if state.show_drives {
+        Location::Drives
+    } else {
+        Location::Dir(state.cwd.clone())
+    };
+    request(state, effects, target, NavKind::Refresh, None);
 }
 
 /// Re-lists the displayed directory, unless a real navigation is in flight: that one lists
@@ -704,19 +709,39 @@ pub(crate) fn on_drives(
     let Some(pending) = state.nav.take_if(|p| p.gen == gen) else {
         return;
     };
+    // A refresh keeps the cursor on the drive it was on; arriving puts it on the drive of
+    // the directory we came from.
+    let near = match state.drives.current() {
+        Some(drive) if state.show_drives && matches!(pending.kind, NavKind::Refresh) => {
+            drive.root.clone()
+        }
+        _ => state.cwd.clone(),
+    };
     leave_current(state, &pending.kind, &Location::Drives);
     state.show_drives = true;
     let height = state.viewport_height();
-    let near = state.cwd.clone();
     state.drives.set(drives, &near, height);
     state.git = None;
     state.git_gen.bump();
     state.git_timer_gen.bump();
     state.children_gen.bump();
-    state.watch_gen.bump();
     effects.push(Effect::CancelTimer(TimerKind::GitRefresh));
-    effects.push(Effect::StopWatching);
+    effects.push(Effect::WatchDrives {
+        gen: state.watch_gen.bump(),
+    });
     state.dirty = true;
+}
+
+/// A drive was plugged in or removed while "This PC" is shown: list the drives again.
+pub(crate) fn on_drives_changed(state: &mut AppState, effects: &mut Vec<Effect>, gen: Gen) {
+    if !state.watch_gen.is_current(gen) || !state.show_drives || state.view.label.is_some() {
+        return;
+    }
+    // A navigation in flight lists afresh anyway, or leaves "This PC".
+    if state.nav.is_some() {
+        return;
+    }
+    refresh(state, effects);
 }
 
 /// The watcher reported a change in the displayed directory.
@@ -1674,12 +1699,97 @@ mod tests {
         assert_eq!(w.state.drives.cursor.index, 1, "clamped");
         w.key("h");
         assert!(w.state.show_drives, "nothing is above This PC");
-        // The watcher and git are stopped while the drive list is shown.
-        assert!(w.log.contains(&Effect::StopWatching));
+        // Git is stopped while the drive list is shown, and the drives are watched instead
+        // of the directory.
+        assert!(w
+            .log
+            .iter()
+            .any(|e| matches!(e, Effect::WatchDrives { .. })));
         w.key("k l");
         assert!(!w.state.show_drives);
         assert_eq!(w.cwd(), Path::new("/"));
         assert_eq!(w.names(), ["etc", "home"]);
+    }
+
+    fn last_drive_watch(w: &World) -> Gen {
+        w.log
+            .iter()
+            .rev()
+            .find_map(|e| match e {
+                Effect::WatchDrives { gen } => Some(*gen),
+                _ => None,
+            })
+            .expect("the drives are watched")
+    }
+
+    fn drive_listings(w: &World) -> usize {
+        w.log
+            .iter()
+            .filter(|e| matches!(e, Effect::ListDrives { .. }))
+            .count()
+    }
+
+    #[test]
+    fn a_plugged_in_drive_appears_and_the_cursor_stays_on_its_drive() {
+        let mut w = World::new("/");
+        w.drives = vec![DriveInfo::new("/"), DriveInfo::new("/mnt/usb")];
+        w.start();
+        w.key("h j");
+        assert_eq!(
+            w.state.drives.current().unwrap().root,
+            Path::new("/mnt/usb")
+        );
+        let gen = last_drive_watch(&w);
+        w.drives = vec![
+            DriveInfo::new("/"),
+            DriveInfo::new("/mnt/a"),
+            DriveInfo::new("/mnt/usb"),
+        ];
+        w.send(Msg::DrivesChanged { gen });
+        assert!(w.state.show_drives);
+        assert_eq!(w.state.drives.drives.len(), 3);
+        assert_eq!(
+            w.state.drives.current().unwrap().root,
+            Path::new("/mnt/usb")
+        );
+        // Unplugging the drive under the cursor removes it.
+        let gen = last_drive_watch(&w);
+        w.drives = vec![DriveInfo::new("/"), DriveInfo::new("/mnt/a")];
+        w.send(Msg::DrivesChanged { gen });
+        assert_eq!(w.state.drives.drives.len(), 2);
+        assert!(w.state.drives.current().is_some());
+    }
+
+    #[test]
+    fn stale_or_misplaced_drive_changes_are_ignored() {
+        let mut w = World::new("/");
+        w.drives = vec![DriveInfo::new("/")];
+        w.start();
+        w.key("h");
+        let old = last_drive_watch(&w);
+        w.send(Msg::DrivesChanged { gen: old });
+        let listings = drive_listings(&w);
+        // `old` was replaced by the watch of the refresh.
+        w.send(Msg::DrivesChanged { gen: old });
+        assert_eq!(drive_listings(&w), listings);
+        // Left "This PC": the change of its last watch does nothing.
+        let gen = last_drive_watch(&w);
+        w.key("l");
+        assert!(!w.state.show_drives);
+        w.send(Msg::DrivesChanged { gen });
+        assert_eq!(drive_listings(&w), listings);
+        assert!(!w.state.show_drives);
+    }
+
+    #[test]
+    fn refreshing_this_pc_lists_the_drives_not_the_last_directory() {
+        let mut w = World::new("/");
+        w.drives = vec![DriveInfo::new("/")];
+        w.start();
+        w.key("h");
+        let mut effects = Vec::new();
+        refresh_if_idle(&mut w.state, &mut effects);
+        assert!(matches!(effects[..], [Effect::ListDrives { .. }]));
     }
 
     #[test]

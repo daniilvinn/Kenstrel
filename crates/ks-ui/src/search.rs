@@ -629,6 +629,9 @@ fn render_grep(frame: &mut Frame, state: &AppState, theme: &Theme) {
             "searching…"
         } else if g.error.is_some() {
             ""
+        } else if g.query.is_empty() && !g.glob.text().is_empty() {
+            // The glob only narrows the files that are searched; listing files is find file's job.
+            "type text to search the files the glob matches"
         } else if g.query.is_empty() {
             "type to search file contents"
         } else {

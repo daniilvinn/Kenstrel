@@ -398,6 +398,20 @@ fn glob_focused_state(w: u16, h: u16) -> AppState {
 }
 
 #[test]
+fn a_glob_without_search_text_explains_that_text_is_needed() {
+    let mut s = listing_state(80, 24);
+    key(&mut s, "ctrl-f");
+    assert!(text_only(&s).contains("type to search file contents"));
+    key(&mut s, "tab");
+    type_text(&mut s, "*.rs");
+    let text = text_only(&s);
+    assert!(
+        text.contains("type text to search the files the glob matches"),
+        "{text}"
+    );
+}
+
+#[test]
 fn grep_glob_field_and_chips_snapshots() {
     for name in THEMES {
         for (w, h) in SIZES {

@@ -156,6 +156,10 @@ fn entry_line(entry: &Entry, ctx: RowContext<'_>) -> Line<'static> {
         name_style = dimmed(name_style, theme);
         icon_style = dimmed(icon_style, theme);
     }
+    if cursor {
+        name_style = readable_on_cursor(name_style, theme);
+        icon_style = readable_on_cursor(icon_style, theme);
+    }
     spans.push(span(
         format!("{} ", icon_for(entry, state.config.icons)),
         icon_style,
@@ -227,6 +231,16 @@ fn dimmed(style: Style, theme: &Theme) -> Style {
         .fg(theme.fg_muted)
         .remove_modifier(Modifier::BOLD)
         .add_modifier(Modifier::DIM)
+}
+
+/// Faint text (hidden or cut entries) on the cursor row: the selection background already
+/// marks the row, and dim text on it is barely readable, so it gets the secondary text colour.
+fn readable_on_cursor(style: Style, theme: &Theme) -> Style {
+    if style.add_modifier.contains(Modifier::DIM) {
+        style.remove_modifier(Modifier::DIM).fg(theme.fg_dim)
+    } else {
+        style
+    }
 }
 
 /// Lookup key of a name in this directory (file names compare case-insensitively on Windows).
@@ -515,6 +529,18 @@ fn space_text(drive: &DriveInfo, base: ks_core::config::SizeBase) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn faint_names_are_readable_on_the_cursor_row() {
+        let theme = Theme::builtin("ember", crate::theme::ColorDepth::TrueColor).unwrap();
+        let hidden = Style::new().fg(theme.hidden).add_modifier(Modifier::DIM);
+        let lifted = readable_on_cursor(hidden, &theme);
+        assert!(!lifted.add_modifier.contains(Modifier::DIM));
+        assert_eq!(lifted.fg, Some(theme.fg_dim));
+        // Styles that are not faint are left alone.
+        let dir = Style::new().fg(theme.dir);
+        assert_eq!(readable_on_cursor(dir, &theme), dir);
+    }
 
     #[test]
     fn highlight_survives_truncation() {

@@ -502,6 +502,132 @@ fn scope_cycles_and_toggles_restart_the_session_under_a_new_generation() {
     ));
 }
 
+fn finder_gen(s: &AppState) -> u64 {
+    s.search.finder.as_ref().unwrap().gen
+}
+
+fn selected_rel(s: &AppState) -> String {
+    let f = s.search.finder.as_ref().unwrap();
+    f.current().map(|r| r.rel.clone()).unwrap_or_default()
+}
+
+#[test]
+fn toggling_hidden_files_keeps_the_highlighted_result() {
+    let mut s = state_with(&[]);
+    let (gen, _) = open_finder(&mut s);
+    let results = || {
+        vec![
+            result("a.rs", &[]),
+            result("b.rs", &[]),
+            result("c.rs", &[]),
+        ]
+    };
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: snapshot("", results()),
+        },
+    );
+    key(&mut s, "down");
+    key(&mut s, "down");
+    assert_eq!(selected_rel(&s), "c.rs");
+
+    key(&mut s, "alt-.");
+    let gen = finder_gen(&s);
+    // Hidden files come in above it while the walk runs: the selection stays on c.rs.
+    let mut walking = snapshot(
+        "",
+        vec![result(".x", &[]), result("a.rs", &[]), result("c.rs", &[])],
+    );
+    walking.walking = true;
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: walking,
+        },
+    );
+    assert_eq!(selected_rel(&s), "c.rs");
+    let mut more = results();
+    more.insert(0, result(".x", &[]));
+    more.insert(0, result(".y", &[]));
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: snapshot("", more.clone()),
+        },
+    );
+    assert_eq!(selected_rel(&s), "c.rs");
+    // The walk is over: later snapshots no longer move the selection.
+    let mut reranked = more;
+    reranked.swap(3, 4);
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: snapshot("", reranked),
+        },
+    );
+    assert_eq!(s.search.finder.as_ref().unwrap().selected, 4);
+}
+
+#[test]
+fn moving_or_typing_after_a_toggle_stops_following() {
+    let mut s = state_with(&[]);
+    let (gen, _) = open_finder(&mut s);
+    let results = || {
+        vec![
+            result("a.rs", &[]),
+            result("b.rs", &[]),
+            result("c.rs", &[]),
+        ]
+    };
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: snapshot("", results()),
+        },
+    );
+    key(&mut s, "down");
+    key(&mut s, "down");
+    key(&mut s, "alt-.");
+    let gen = finder_gen(&s);
+    let mut walking = snapshot("", results());
+    walking.walking = true;
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: walking.clone(),
+        },
+    );
+    assert_eq!(selected_rel(&s), "c.rs");
+    key(&mut s, "up");
+    assert_eq!(selected_rel(&s), "b.rs");
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: walking,
+        },
+    );
+    assert_eq!(selected_rel(&s), "b.rs", "the user's move wins");
+    // A result that is gone leaves the selection at the top.
+    key(&mut s, "alt-.");
+    let gen = finder_gen(&s);
+    update(
+        &mut s,
+        Msg::FinderResults {
+            gen,
+            snapshot: snapshot("", vec![result("a.rs", &[])]),
+        },
+    );
+    assert_eq!(selected_rel(&s), "a.rs");
+}
+
 #[test]
 fn scope_wraps_around_after_four_presses() {
     let mut s = state_with(&[]);

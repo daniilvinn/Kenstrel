@@ -16,6 +16,16 @@ pub fn list_drives() -> Vec<DriveInfo> {
     vec![root]
 }
 
+/// Terminals elsewhere report shortcuts by key already.
+pub fn latin_key(_ch: char) -> Option<char> {
+    None
+}
+
+/// The drive set never changes on other hosts.
+pub fn drives_signature() -> u64 {
+    0
+}
+
 /// Owners are only resolved on Windows.
 pub fn file_owner(_path: &Path) -> Option<String> {
     None

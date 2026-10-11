@@ -94,6 +94,10 @@ pub enum Msg {
     DirChanged {
         gen: Gen,
     },
+    /// The drives changed while "This PC" is shown (see `Effect::WatchDrives`).
+    DrivesChanged {
+        gen: Gen,
+    },
     /// A directory shown by a parked (background) tab changed (see `Effect::WatchParked`).
     ParkedDirChanged {
         path: std::path::PathBuf,

@@ -37,6 +37,10 @@ pub enum Effect {
     /// Watch `path` (not recursively) and report `Msg::DirChanged { gen }`. Replaces the
     /// previous watch.
     WatchDir { gen: Gen, path: PathBuf },
+    /// Report `Msg::DrivesChanged { gen }` when a drive letter appears or goes away, or a
+    /// removable drive gets or loses its medium. Replaces the previous watch (it shares the
+    /// slot of [`Effect::WatchDir`]).
+    WatchDrives { gen: Gen },
     /// Stop watching.
     StopWatching,
     /// Read size and modification time of `dir/<name>` for each name (names may be relative

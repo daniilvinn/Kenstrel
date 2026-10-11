@@ -90,6 +90,7 @@ pub fn update(state: &mut AppState, msg: Msg) -> Vec<Effect> {
         Msg::ChildCounts { gen, counts } => nav::on_child_counts(state, gen, counts),
         Msg::EntryStats { gen, stats } => nav::on_entry_stats(state, gen, stats),
         Msg::DirChanged { gen } => nav::on_dir_changed(state, &mut effects, gen),
+        Msg::DrivesChanged { gen } => nav::on_drives_changed(state, &mut effects, gen),
         Msg::ParkedDirChanged { path } => tabs::on_parked_dir_changed(state, &mut effects, &path),
         Msg::GitStatus { gen, snapshot } => nav::on_git_status(state, gen, snapshot),
         Msg::ConfigReloaded {

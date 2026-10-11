@@ -55,11 +55,32 @@ pub fn translate_key(event: KeyEvent) -> Option<KeyChord> {
     if has(KeyModifiers::SHIFT) {
         mods = mods | Modifiers::SHIFT;
     }
+    let key = match key {
+        Key::Char(c)
+            if !c.is_ascii()
+                && (mods.contains(Modifiers::CTRL) || mods.contains(Modifiers::ALT)) =>
+        {
+            Key::Char(by_position(c, ks_fs::latin_key))
+        }
+        other => other,
+    };
     Some(KeyChord::new(key, mods))
+}
+
+/// A shortcut typed with a non-Latin layout active (`ctrl-з` on a Russian one) means the key
+/// at that position: `ctrl-p`. The case is kept (shift or caps lock).
+fn by_position(c: char, latin_key: impl Fn(char) -> Option<char>) -> char {
+    match latin_key(c) {
+        Some(latin) if c.is_uppercase() => latin.to_ascii_uppercase(),
+        Some(latin) => latin,
+        None => c,
+    }
 }
 
 /// Converts a terminal event into a message, if it is one the app cares about.
 pub fn translate_event(event: Event) -> Option<Msg> {
+    // `KESTREL_LOG=ks_app::input=trace` shows what the terminal really sends.
+    tracing::trace!(?event, "terminal event");
     match event {
         Event::Key(key) => translate_key(key).map(Msg::Key),
         Event::Resize(width, height) => Some(Msg::Resize(Size::new(width, height))),
@@ -105,6 +126,41 @@ mod tests {
     use crossterm::event::{KeyEventState, MouseEvent, MouseEventKind};
 
     use super::*;
+
+    fn russian(c: char) -> Option<char> {
+        match c {
+            'з' | 'З' => Some('p'),
+            'ю' => Some('.'),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn shortcuts_on_a_non_latin_layout_mean_the_key_position() {
+        assert_eq!(by_position('з', russian), 'p');
+        assert_eq!(by_position('З', russian), 'P', "shift is kept");
+        assert_eq!(by_position('ю', russian), '.');
+        assert_eq!(by_position('ж', russian), 'ж', "no Latin key: unchanged");
+    }
+
+    #[test]
+    fn plain_non_latin_text_is_never_remapped() {
+        let typed = translate_key(key(
+            KeyCode::Char('з'),
+            KeyModifiers::NONE,
+            KeyEventKind::Press,
+        ))
+        .unwrap();
+        assert_eq!(typed.key, Key::Char('з'));
+        // AltGr (ctrl+alt) characters are text too.
+        let alt_gr = translate_key(key(
+            KeyCode::Char('ё'),
+            KeyModifiers::CONTROL | KeyModifiers::ALT,
+            KeyEventKind::Press,
+        ))
+        .unwrap();
+        assert_eq!(alt_gr.key, Key::Char('ё'));
+    }
 
     fn key(code: KeyCode, modifiers: KeyModifiers, kind: KeyEventKind) -> KeyEvent {
         KeyEvent {

@@ -40,6 +40,8 @@ enum Slot {
 /// Most parked-tab directories that are watched at once (one per tab, the active tab has its
 /// own watch).
 const PARKED_WATCH_LIMIT: usize = ks_core::tabs::MAX_TABS - 1;
+/// How often "This PC" checks whether drives were plugged in or removed.
+const DRIVE_POLL: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Arming slower than this triggers one catch-up event (a change may have slipped in
 /// between the listing and the watch going live).
@@ -292,6 +294,7 @@ impl EffectRunner {
                 Effect::ListParked { gen, path } => self.list_parked(gen, path),
                 Effect::ListDrives { gen } => self.list_drives(gen),
                 Effect::WatchDir { gen, path } => self.watch_dir(gen, path),
+                Effect::WatchDrives { gen } => self.watch_drives(gen),
                 Effect::StopWatching => {
                     if let Some(token) = self.slots.remove(&Slot::Watcher) {
                         token.cancel();
@@ -510,6 +513,33 @@ impl EffectRunner {
             move || Msg::DirChanged { gen },
             true,
         );
+    }
+
+    /// Polls the drive set (a cheap call) and reports each change until cancelled.
+    fn watch_drives(&mut self, gen: Gen) {
+        let token = self.claim(Slot::Watcher);
+        let tx = self.tx.clone();
+        tokio::spawn(async move {
+            let mut known = tokio::task::spawn_blocking(ks_fs::drives_signature)
+                .await
+                .ok();
+            loop {
+                tokio::select! {
+                    () = token.cancelled() => return,
+                    () = sleep(DRIVE_POLL) => {}
+                }
+                let Ok(now) = tokio::task::spawn_blocking(ks_fs::drives_signature).await else {
+                    return;
+                };
+                if known.is_some_and(|k| k != now)
+                    && !token.is_cancelled()
+                    && tx.send(Msg::DrivesChanged { gen }).await.is_err()
+                {
+                    return;
+                }
+                known = Some(now);
+            }
+        });
     }
 
     /// Makes the set of watched parked-tab directories exactly `paths`: new ones get a

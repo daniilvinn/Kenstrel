@@ -6,11 +6,12 @@
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::task::Poll;
 use std::time::{Duration, SystemTime};
 
 use anyhow::{anyhow, Result};
 use crossterm::event::Event;
-use futures_util::{FutureExt, Stream, StreamExt};
+use futures_util::{Stream, StreamExt};
 use ks_core::{update, AppState, Effect, Level, Msg, QuitKind};
 use ks_ui::Theme;
 use ratatui::backend::Backend;
@@ -327,7 +328,8 @@ where
             Some(Msg::Key(chord)) if is_paste_key(chord) && ks_core::claude::has_focus(state) => {
                 let mut run = vec![chord];
                 let mut after = None;
-                while let Some(Some(Ok(event))) = events.next().now_or_never() {
+                while let Some(Some(Ok(event))) = ready_event(&mut events).await {
+                    tracing::trace!(?event, "terminal event");
                     match event {
                         Event::Key(key) => match translate_key(key) {
                             Some(c) if is_paste_key(c) => run.push(c),
@@ -380,6 +382,22 @@ where
     });
     let _ = finish.await;
     outcome
+}
+
+/// The next item of `events` if one is ready right now, without waiting.
+///
+/// Polls with this task's waker. crossterm's `EventStream` hands the waker of a pending poll
+/// to its wake-up thread and ignores later wakers until that thread fires, so polling it with
+/// a no-op waker (`now_or_never`) would leave the next key presses unnoticed until something
+/// else woke the loop.
+async fn ready_event<S: Stream + Unpin>(events: &mut S) -> Option<Option<S::Item>> {
+    std::future::poll_fn(|cx| {
+        Poll::Ready(match events.poll_next_unpin(cx) {
+            Poll::Ready(item) => Some(item),
+            Poll::Pending => None,
+        })
+    })
+    .await
 }
 
 /// Runs a program attached to the terminal: the TUI is suspended, the program runs, the TUI
@@ -535,6 +553,64 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    /// Keeps only the waker of the first pending poll, like crossterm's `EventStream`.
+    #[derive(Default)]
+    struct FirstWakerStream {
+        items: std::collections::VecDeque<u32>,
+        waker: Option<std::task::Waker>,
+    }
+
+    impl Stream for FirstWakerStream {
+        type Item = u32;
+        fn poll_next(
+            mut self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> Poll<Option<u32>> {
+            if let Some(item) = self.items.pop_front() {
+                self.waker = None;
+                return Poll::Ready(Some(item));
+            }
+            if self.waker.is_none() {
+                self.waker = Some(cx.waker().clone());
+            }
+            Poll::Pending
+        }
+    }
+
+    #[tokio::test]
+    async fn checking_for_ready_events_keeps_the_loop_wakeable() {
+        let shared = Arc::new(std::sync::Mutex::new(FirstWakerStream::default()));
+        struct Handle(Arc<std::sync::Mutex<FirstWakerStream>>);
+        impl Stream for Handle {
+            type Item = u32;
+            fn poll_next(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+            ) -> Poll<Option<u32>> {
+                std::pin::Pin::new(&mut *self.0.lock().unwrap()).poll_next(cx)
+            }
+        }
+        let mut events = Handle(Arc::clone(&shared));
+        assert_eq!(ready_event(&mut events).await, None);
+        let feeder = Arc::clone(&shared);
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            let mut s = feeder.lock().unwrap();
+            s.items.push_back(7);
+            if let Some(w) = s.waker.take() {
+                w.wake();
+            }
+        });
+        let start = std::time::Instant::now();
+        let next = tokio::time::timeout(Duration::from_secs(5), events.next()).await;
+        assert_eq!(next.ok(), Some(Some(7)));
+        // A lost wake-up still ends at the timeout, which re-polls the stream.
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "the key press must wake the loop at once"
+        );
     }
 
     #[tokio::test(start_paused = true)]

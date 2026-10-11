@@ -229,7 +229,11 @@ fn schedule(state: &mut AppState, effects: &mut Vec<Effect>) {
     };
     g.gen = state.search.grep_gen;
     g.running = false;
-    g.waiting = true;
+    // Without search text nothing will run: no "searching…" and no stale hits meanwhile.
+    g.waiting = !g.query.is_empty();
+    if !g.waiting {
+        g.clear_results();
+    }
     effects.push(Effect::GrepCancel);
     effects.push(Effect::StartTimer {
         kind: TimerKind::GrepDebounce,

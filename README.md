@@ -436,7 +436,9 @@ value is a command id from [docs/keymap.md](docs/keymap.md) (optionally with an 
 `confirm`, `jobs`, `claude`, `bookmarks`, `jump`, `conflict`, `pager`, `menu`,
 `claude_changes`. Binding a prefix such as `g` removes the longer defaults that start with it
 (`g g`, `g h`, ...); the status line tells you when that happens. Avoid `ctrl-shift-*`,
-`alt-enter`, `ctrl-,` and `ctrl-tab`: Windows Terminal consumes them.
+`alt-enter`, `ctrl-,` and `ctrl-tab`: Windows Terminal consumes them. `ctrl-` and `alt-`
+chords are matched by key position, so they keep working with a non-Latin keyboard layout
+active (`ctrl-з` on a Russian layout is `ctrl-p`); plain keys are taken as typed.
 
 ### Themes
 
@@ -469,6 +471,8 @@ Kestrel does not read any credentials, so none can end up in it.
 
 - **Icons show as boxes or question marks**: the terminal font is not a Nerd Font. Install one,
   or set `icons = "unicode"` / `"ascii"`.
+- **What does the terminal actually send?** Start with `KESTREL_LOG=ks_app::input=trace`: every
+  key event is logged as it arrives.
 - **A key does nothing in Windows Terminal** (`ctrl-enter` is the usual one): the terminal did
   not deliver it as a distinct key. Use the alternative (`ctrl-o` in the find-file overlay) or
   rebind. Kestrel does not rely on the Kitty keyboard protocol, only on plain console key

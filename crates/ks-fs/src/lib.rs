@@ -8,6 +8,7 @@ pub mod attrs;
 pub mod children;
 pub mod drives;
 pub mod git;
+mod keyboard;
 pub mod launch;
 pub mod listing;
 pub mod ops;
@@ -18,6 +19,8 @@ pub mod watcher;
 pub use children::count_children;
 pub use git::read_status as git_status;
 pub use listing::{link_target, list_dir};
-pub use platform::{file_owner, list_drives, pid_alive, utc_offset_secs};
+pub use platform::{
+    drives_signature, file_owner, latin_key, list_drives, pid_alive, utc_offset_secs,
+};
 pub use stat::{stat_entries, EntryStat};
 pub use watcher::DirWatcher;

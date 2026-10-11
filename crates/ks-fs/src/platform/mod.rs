@@ -45,6 +45,17 @@ mod tests {
         eprintln!("{drive:?}");
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn the_drive_signature_holds_every_listed_letter_and_is_stable() {
+        let signature = drives_signature();
+        for drive in list_drives() {
+            let letter = drive.root.to_string_lossy().as_bytes()[0].to_ascii_uppercase();
+            assert_ne!(signature & (1 << (letter - b'A')), 0, "{drive:?}");
+        }
+        assert_eq!(drives_signature(), signature);
+    }
+
     #[test]
     fn utc_offset_is_a_plausible_zone() {
         let offset = utc_offset_secs();
