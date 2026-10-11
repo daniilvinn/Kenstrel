@@ -13,12 +13,46 @@ use crate::settings::{build_keymap, load_config};
 pub struct Reloader {
     paths: AppPaths,
     loader: ThemeLoader,
+    /// Test hook run as the last statement of every background job, so a test can order
+    /// "quit" after the job's results through the same FIFO channel (no sleeps).
+    #[cfg(test)]
+    pub(crate) after_job: Option<AfterJob>,
 }
+
+/// Which background job just finished.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum JobKind {
+    Reload,
+    Theme,
+}
+
+#[cfg(test)]
+pub(crate) type AfterJob = std::sync::Arc<
+    dyn Fn(JobKind, &tokio::sync::mpsc::UnboundedSender<crate::event_loop::Side>) + Send + Sync,
+>;
 
 impl Reloader {
     pub fn new(paths: AppPaths, depth: ColorDepth) -> Self {
         let loader = ThemeLoader::new(Some(paths.themes_dir()), depth);
-        Self { paths, loader }
+        Self {
+            paths,
+            loader,
+            #[cfg(test)]
+            after_job: None,
+        }
+    }
+
+    /// Runs the test hook (a no-op outside tests).
+    #[allow(unused_variables)]
+    pub(crate) fn job_done(
+        &self,
+        kind: JobKind,
+        side: &tokio::sync::mpsc::UnboundedSender<crate::event_loop::Side>,
+    ) {
+        #[cfg(test)]
+        if let Some(hook) = &self.after_job {
+            hook(kind, side);
+        }
     }
 
     /// Themes that can be switched to: built-ins plus `themes/*.toml`.

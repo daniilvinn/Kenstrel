@@ -66,7 +66,7 @@ impl World {
 
     /// Runs the message loop until `done` holds.
     async fn pump_until(&mut self, what: &str, done: impl Fn(&AppState) -> bool) {
-        let deadline = Instant::now() + Duration::from_secs(60);
+        let deadline = Instant::now() + Duration::from_secs(180);
         loop {
             if done(&self.state) {
                 return;
@@ -200,6 +200,9 @@ async fn a_fake_claude_runs_through_preflight_launch_keys_mentions_hooks_and_exi
         .pump_until("the pane to run", |s| s.claude.is_running())
         .await;
     world.pump_until_screen_has("FAKE-CLAUDE-READY").await;
+    // The fake prints its ARG/IPC/KEY lines after READY and only then asks for input: wait
+    // for the prompt, the last thing it prints, before reading any of them.
+    world.pump_until_screen_has("prompt>").await;
     assert_eq!(world.state.key_context(), KeyContext::Claude);
 
     let screen = world.screen();
@@ -303,6 +306,7 @@ async fn a_fake_claude_runs_through_preflight_launch_keys_mentions_hooks_and_exi
         .pump_until("the resumed pane", |s| s.claude.is_running())
         .await;
     world.pump_until_screen_has("FAKE-CLAUDE-READY").await;
+    world.pump_until_screen_has("prompt>").await;
     assert_eq!(arg_after(&world.screen(), "--resume"), session);
     assert!(!world.screen().contains("--session-id"));
     world.runner.shutdown();

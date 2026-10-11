@@ -456,9 +456,9 @@ mod tests {
     fn cancel_kills() {
         let (tx, rx) = channel();
         let cmd = if cfg!(windows) {
-            "Start-Sleep -Seconds 30"
+            "Start-Sleep -Seconds 120"
         } else {
-            "sleep 30"
+            "sleep 120"
         };
         let started = Instant::now();
         let h = spawn_shell(
@@ -481,7 +481,8 @@ mod tests {
                 generation: Generation(0)
             })
         );
-        assert!(started.elapsed() < Duration::from_secs(10));
+        // Far below the 120 s sleep; slack for PowerShell start-up under load.
+        assert!(started.elapsed() < Duration::from_secs(60));
     }
 
     #[test]

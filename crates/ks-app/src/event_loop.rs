@@ -66,7 +66,7 @@ where
 
 /// Results of file work done off the loop thread (config and theme reads), delivered
 /// through a side channel because `Msg` cannot carry a `Theme`.
-enum Side {
+pub(crate) enum Side {
     Msg(Msg),
     Theme {
         name: String,
@@ -104,6 +104,7 @@ fn dispatch<B: Backend>(
                         tokio::task::spawn_blocking(move || {
                             let _ = side.send(Side::Msg(reloader.reload_config()));
                             let _ = side.send(Side::Msg(Msg::ThemesAvailable(reloader.themes())));
+                            reloader.job_done(crate::reload::JobKind::Reload, &side);
                         });
                     }
                     None => queue.push_back(unavailable("Config reload")),
@@ -124,6 +125,7 @@ fn dispatch<B: Backend>(
                                 }),
                             };
                             let _ = side.send(result);
+                            reloader.job_done(crate::reload::JobKind::Theme, &side);
                         });
                     }
                     None => queue.push_back(unavailable("Theme switching")),
@@ -282,6 +284,11 @@ where
             }
         }
         if let Some(kind) = state.quit {
+            // Whatever the last messages changed is drawn once more, throttle or not.
+            if state.dirty {
+                let _ = terminal.draw(|frame| ks_ui::render(frame, state, &theme));
+                state.dirty = false;
+            }
             break Ok(kind);
         }
 
@@ -536,6 +543,17 @@ mod tests {
         let (result, terminal) =
             drive(vec![key('q', KeyEventKind::Press)], &mut state, options()).await;
         assert_eq!(result.unwrap(), QuitKind::Exit);
+        assert!(screen(&terminal).contains("~/code"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_last_changes_are_drawn_before_quitting() {
+        let mut state = state();
+        // Both keys arrive in one batch, so the quit lands inside the frame throttle.
+        let events = vec![key('.', KeyEventKind::Press), key('q', KeyEventKind::Press)];
+        let (result, terminal) = drive(events, &mut state, options()).await;
+        assert_eq!(result.unwrap(), QuitKind::Exit);
+        assert!(!state.dirty, "the final state was drawn");
         assert!(screen(&terminal).contains("~/code"));
     }
 
@@ -852,12 +870,29 @@ mod tests {
         text.chars().map(|c| key(c, KeyEventKind::Press)).collect()
     }
 
-    /// Delays `events` so the start-up theme listing (read on a blocking thread) has
-    /// arrived before the first key.
-    fn settled(events: Vec<std::io::Result<Event>>) -> impl Stream<Item = std::io::Result<Event>> {
-        stream::once(async { sleep(Duration::from_millis(300)).await })
-            .filter_map(|()| async { None })
-            .chain(stream::iter(events))
+    /// A reloader that, after a theme job, sends `Interrupt` through the same FIFO
+    /// channel as the job's results: the loop always applies the results before it quits.
+    fn quitting_reloader(paths: crate::paths::AppPaths) -> Reloader {
+        let mut reloader = Reloader::new(paths, ColorDepth::TrueColor);
+        // Every scenario ends in a theme job (a reload that changes the theme starts one).
+        reloader.after_job = Some(Arc::new(
+            |kind: crate::reload::JobKind, side: &mpsc::UnboundedSender<Side>| {
+                if kind == crate::reload::JobKind::Theme {
+                    let _ = side.send(Side::Msg(Msg::Interrupt));
+                }
+            },
+        ));
+        reloader
+    }
+
+    /// Start-up messages that stand in for the (asynchronous) start-up theme listing.
+    fn themes_startup(names: &[&str]) -> LoopOptions {
+        LoopOptions {
+            startup: vec![Msg::ThemesAvailable(
+                names.iter().map(|n| (*n).to_owned()).collect(),
+            )],
+            ..options()
+        }
     }
 
     /// Like `drive`, but with a reloader over a temporary config directory.
@@ -874,28 +909,18 @@ mod tests {
         }
         let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
         let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
-        // A pause before quitting lets the final frame be drawn.
-        let quit = stream::once(async {
-            sleep(Duration::from_millis(200)).await;
-            Ok(Event::Key(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: KeyEventKind::Press,
-                state: KeyEventState::NONE,
-            }))
-        });
-        let stream = settled(events).chain(quit).chain(stream::pending());
+        let stream = stream::iter(events).chain(stream::pending());
         let result = run_with(
             &mut terminal,
             stream,
             state,
             &theme,
-            options(),
-            Some(Reloader::new(paths, ColorDepth::TrueColor)),
+            themes_startup(&["ember", "paper"]),
+            Some(quitting_reloader(paths)),
         );
-        let result = tokio::time::timeout(Duration::from_secs(20), result)
+        let result = tokio::time::timeout(Duration::from_secs(60), result)
             .await
-            .expect("loop did not quit");
+            .expect("loop did not quit (no theme job ran after the reload?)");
         (result, terminal, dir)
     }
 
@@ -972,28 +997,19 @@ icons = \"ascii\"
         events.push(special(KeyCode::Enter));
         let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
         let theme = Theme::builtin("ember", ColorDepth::TrueColor).unwrap();
-        let quit = stream::once(async {
-            sleep(Duration::from_millis(300)).await;
-            Ok(Event::Key(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-                kind: KeyEventKind::Press,
-                state: KeyEventState::NONE,
-            }))
-        });
-        let stream = settled(events).chain(quit).chain(stream::pending());
-        let reloader = Reloader::new(paths, ColorDepth::TrueColor);
+        let stream = stream::iter(events).chain(stream::pending());
+        let reloader = quitting_reloader(paths);
         let result = run_with(
             &mut terminal,
             stream,
             &mut state,
             &theme,
-            options(),
+            themes_startup(&["ember", "broken"]),
             Some(reloader),
         );
         tokio::time::timeout(Duration::from_secs(20), result)
             .await
-            .expect("loop did not quit")
+            .expect("loop did not quit (no theme job ran after the reload?)")
             .unwrap();
         assert_eq!(state.config.theme, "ember", "theme unchanged");
         let status = state.status.as_ref().unwrap();

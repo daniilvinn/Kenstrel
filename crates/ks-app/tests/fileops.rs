@@ -570,7 +570,13 @@ async fn shell_command_streams_into_the_pager_and_can_be_cancelled() {
         "sleep 60"
     });
     h.keys("enter");
-    h.settle_ms(300).await;
+    h.until("the command to be running", |s| {
+        s.fileops
+            .pager
+            .as_ref()
+            .is_some_and(|p| p.status == ks_core::fileops::PagerStatus::Running)
+    })
+    .await;
     let started = Instant::now();
     h.keys("ctrl-c");
     h.until("the command to be cancelled", |s| {
@@ -580,21 +586,12 @@ async fn shell_command_streams_into_the_pager_and_can_be_cancelled() {
             .is_some_and(|p| p.status == ks_core::fileops::PagerStatus::Cancelled)
     })
     .await;
-    assert!(started.elapsed() < Duration::from_secs(10));
+    assert!(
+        started.elapsed() < Duration::from_secs(40),
+        "cancel must not wait for the sleep"
+    );
     assert_eq!(h.state.quit, None, "ctrl-c in the pager does not quit");
     h.keys("esc");
-}
-
-impl Harness {
-    async fn settle_ms(&mut self, ms: u64) {
-        let deadline = Instant::now() + Duration::from_millis(ms);
-        while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
-            match tokio::time::timeout(remaining, self.rx.recv()).await {
-                Ok(Some(msg)) => self.send(msg),
-                _ => break,
-            }
-        }
-    }
 }
 
 /// Both bulk-rename tests create and delete edit files in the shared temp directory.
@@ -620,6 +617,7 @@ fn edit_files(script: &Path) -> Vec<PathBuf> {
 /// Every edit file the editor was given has been removed.
 #[cfg(windows)]
 fn assert_edit_files_gone(script: &Path, what: &str) {
+    assert!(!edit_files(script).is_empty(), "the editor never ran");
     let left: Vec<PathBuf> = edit_files(script)
         .into_iter()
         .filter(|p| p.exists())
@@ -627,13 +625,26 @@ fn assert_edit_files_gone(script: &Path, what: &str) {
     assert!(left.is_empty(), "{what}: {left:?}");
 }
 
-/// A script that stands in for `$EDITOR`: prefixes every line of the file it is given.
+/// A script that stands in for `$EDITOR`: prefixes every line of the file it is given. Pure
+/// `cmd` (no PowerShell start-up, which starves under load) and it logs the path it was given.
+/// Limits of `for /f`: it handles plain file names only (an empty line, or `&`, `%`, `^`, `!`
+/// in a name, would be dropped or mangled); `eol=` keeps lines starting with `;`.
 #[cfg(windows)]
 fn fake_editor(dir: &Path) -> PathBuf {
     let script = dir.join("fake-editor.cmd");
+    let lines = [
+        "@echo off",
+        "echo %~1 >> \"%~dpn0.paths\"",
+        "(for /f \"usebackq eol= delims=\" %%l in (\"%~1\") do @echo x_%%l)> \"%~1.new\"",
+        "move /y \"%~1.new\" \"%~1\" >nul",
+        "",
+    ];
     fs::write(
         &script,
-        "@echo off\r\npowershell -NoProfile -Command \"(Get-Content -LiteralPath '%~1') -replace '^','x_' | Set-Content -LiteralPath '%~1'\"\r\n",
+        lines.join(
+            "
+",
+        ),
     )
     .unwrap();
     script
@@ -701,10 +712,10 @@ fn flaky_editor(dir: &Path) -> PathBuf {
 echo %~1 >> \"%~dpn0.paths\"
 if exist \"{m}\" goto fixed
 echo x> \"{m}\"
-powershell -NoProfile -Command \"Set-Content -LiteralPath '%~1' -Value @('same.txt','same.txt')\"
+(echo same.txt&echo same.txt)> \"%~1\"
 goto :eof
 :fixed
-powershell -NoProfile -Command \"Set-Content -LiteralPath '%~1' -Value @('one.txt','two.txt')\"
+(echo one.txt&echo two.txt)> \"%~1\"
 ",
             m = marker.display()
         ),
@@ -780,7 +791,10 @@ async fn abandoning_an_invalid_bulk_rename_removes_the_edit_file() {
     .await;
     h.keys("esc");
     assert!(h.state.overlays.is_empty());
-    h.settle_ms(500).await;
+    h.until("the edit file to be removed", |_| {
+        edit_files(&editor).iter().all(|p| !p.exists())
+    })
+    .await;
     assert_edit_files_gone(&editor, "the edit file was discarded");
     assert_eq!(listing(&work), ["a.txt", "b.txt"]);
 }
