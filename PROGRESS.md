@@ -525,3 +525,11 @@ Merged `fix/f2` (finder cache freshness with background re-walk, `Touched` cache
 - Decisions: persist lock wait 8 s / STALE 30 s kept as on the branch; draw-before-quit and test-only reload hook kept; no keymap/README changes (no Actions or bindings touched).
 - Gates: fmt, clippy -D warnings, cargo test --workspace clean (two full runs, no failures).
 - Open issues: orphan `.*.tmp` sweep at start-up deferred; lock fall-through can lose a merge after 8 s by design; b3 touches watcher code, re-run effects watcher tests after merging it.
+
+## Integration: r2/b3
+
+- Merged after r2/b4. One conflict, in `crates/ks-app/tests/claude_flow.rs`: both branches fixed the READY-then-ARG-lines race. Kept b4's wait for `prompt>` (the last line the fake prints) and dropped b3's `KEY=[]` wait; kept b3's `project_dir_name` transcript paths.
+- `ci.yml`: b3 moved `RUSTFLAGS` to a job-level env that adds `+crt-static` on Windows, since a `RUSTFLAGS` env var would override `.cargo/config.toml`. Release workflow sets none, so the config applies. Release build passes locally.
+- No Actions or default keys changed, so `docs/keymap.md` and the README key tables need no update.
+- Gates: fmt, clippy `-D warnings` and `cargo test --workspace` (1260 passed, 0 failed) are clean.
+- Open: the Claude pane cwd on resume is the directory the session was created in (see `docs/progress/p10.md`). Any new git call must go through `ks_fs::git::git_command`.

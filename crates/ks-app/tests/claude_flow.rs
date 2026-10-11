@@ -297,7 +297,10 @@ async fn a_fake_claude_runs_through_preflight_launch_keys_mentions_hooks_and_exi
 
     // g r resumes the remembered session. Claude writes a transcript after the first message;
     // stand in for it so the store offers `--resume <id>`.
-    let transcripts = dir.path().join("projects").join("proj");
+    let transcripts = dir
+        .path()
+        .join("projects")
+        .join(ks_claude::session::project_dir_name(&project));
     std::fs::create_dir_all(&transcripts).unwrap();
     std::fs::write(transcripts.join(format!("{session}.jsonl")), "{}").unwrap();
     world.key("g");
@@ -349,7 +352,10 @@ async fn a_rejected_resume_shows_the_reason_and_forgets_the_stale_session() {
     ks_claude::session::SessionStore::new(opts.sessions_file.clone().unwrap())
         .set(&ks_app::claude::project_root(&project), &id)
         .unwrap();
-    let transcripts = dir.path().join("projects").join("elsewhere");
+    let transcripts = dir
+        .path()
+        .join("projects")
+        .join(ks_claude::session::project_dir_name(&project));
     std::fs::create_dir_all(&transcripts).unwrap();
     std::fs::write(transcripts.join(format!("{id}.jsonl")), "{}").unwrap();
 

@@ -93,6 +93,8 @@ struct Running {
 struct LaunchInfo {
     generation: u64,
     root: PathBuf,
+    /// Directory the process was started in.
+    cwd: PathBuf,
     resumed: bool,
     started: std::time::Instant,
 }
@@ -437,7 +439,8 @@ impl Inner {
         }
         let ipc_name = self.ensure_ipc();
 
-        let mode = match &self.options.sessions_file {
+        let root = project_root(&cwd);
+        let (mode, cwd) = match &self.options.sessions_file {
             // Sessions belong to the project (the enclosing git repository), not to the
             // directory Kestrel happened to be in.
             Some(file) => {
@@ -445,13 +448,17 @@ impl Inner {
                 if self.options.projects_dir.is_some() {
                     store = store.with_projects_dir(self.options.projects_dir.clone());
                 }
-                store.mode_for_in(&project_root(&cwd), &cwd, resume)?
+                // The process starts where the stored session was created: Claude only
+                // finds its transcript from that directory.
+                let launch = store.launch_for(&root, &cwd, resume)?;
+                (launch.mode, launch.cwd)
             }
-            None => SessionMode::New(new_session_id()),
+            None => (SessionMode::New(new_session_id()), cwd),
         };
         *lock(&self.last_launch) = Some(LaunchInfo {
             generation,
-            root: project_root(&cwd),
+            root,
+            cwd: cwd.clone(),
             resumed: matches!(mode, SessionMode::Resume(_)),
             started: std::time::Instant::now(),
         });
@@ -532,9 +539,7 @@ const DIFF_MAX_BYTES: u64 = 512 * 1024;
 /// Runs git and reads at most [`DIFF_MAX_BYTES`] of its output, killing it after that.
 fn run_git(dir: &Path, args: &[&std::ffi::OsStr]) -> std::io::Result<(bool, Vec<u8>)> {
     use std::io::Read;
-    let mut child = std::process::Command::new("git")
-        .arg("-C")
-        .arg(dir)
+    let mut child = ks_fs::git::git_command(dir)
         .args(["-c", "core.quotepath=false", "--no-pager"])
         .args(args)
         .stdin(std::process::Stdio::null())
@@ -571,6 +576,7 @@ fn git_diff_until(path: &Path, stale: impl Fn() -> bool) -> String {
         OsStr::new("diff"),
         OsStr::new("--no-color"),
         OsStr::new("--no-ext-diff"),
+        OsStr::new("--no-textconv"),
         OsStr::new("HEAD"),
         OsStr::new("--"),
         name,
@@ -595,6 +601,7 @@ fn git_diff_until(path: &Path, stale: impl Fn() -> bool) -> String {
             OsStr::new("diff"),
             OsStr::new("--no-color"),
             OsStr::new("--no-ext-diff"),
+            OsStr::new("--no-textconv"),
             OsStr::new("--no-index"),
             OsStr::new("--"),
             OsStr::new("NUL"),
@@ -781,7 +788,7 @@ fn forget_failed_resume(inner: &Arc<Inner>, generation: u64, code: Option<u32>) 
     if resume_failed(&info, code, &output) {
         tracing::warn!(root = %info.root.display(), "resume failed; forgetting the stored session");
         tokio::task::spawn_blocking(move || {
-            if let Err(error) = SessionStore::new(file).forget(&info.root) {
+            if let Err(error) = SessionStore::new(file).forget_launched_in(&info.root, &info.cwd) {
                 tracing::warn!(%error, "cannot forget the session");
             }
         });
@@ -1236,6 +1243,7 @@ mod resume_failed_tests {
         LaunchInfo {
             generation: 1,
             root: PathBuf::from("r"),
+            cwd: PathBuf::from("r"),
             resumed,
             started: std::time::Instant::now() - age,
         }
@@ -1314,6 +1322,70 @@ mod git_diff_tests {
         std::fs::write(root.join("new.txt"), "fresh\n").unwrap();
         let d = git_diff(&root.join("new.txt"));
         assert!(d.contains("+fresh"), "{d}");
+    }
+
+    /// A repository from an archive can carry `core.fsmonitor` and `diff.<x>.textconv` programs;
+    /// opening the Changes view must not run either.
+    #[test]
+    fn booby_trapped_repo_never_executes_hooks_on_diff() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("repo");
+        std::fs::create_dir(&root).unwrap();
+        if !git(&root, &["init", "-q"]) {
+            return; // no git on this machine
+        }
+        std::fs::write(
+            root.join("a.txt"),
+            "one
+",
+        )
+        .unwrap();
+        assert!(git(&root, &["add", "a.txt"]));
+        assert!(git(&root, &["commit", "-q", "-m", "init"]));
+        std::fs::write(
+            root.join(".gitattributes"),
+            "* diff=x
+",
+        )
+        .unwrap();
+        let fsm = dir.path().join("fsmonitor-ran");
+        let tc = dir.path().join("textconv-ran");
+        let q = |p: &std::path::Path| p.to_string_lossy().replace(char::from(92), "/");
+        let fsm_hook = format!("echo ran > \"{}\"; echo", q(&fsm));
+        let tc_hook = format!("echo ran > \"{}\"; cat", q(&tc));
+        assert!(git(&root, &["config", "core.fsmonitor", &fsm_hook]));
+        assert!(git(&root, &["config", "diff.x.textconv", &tc_hook]));
+        std::fs::write(
+            root.join("a.txt"),
+            "two
+",
+        )
+        .unwrap();
+
+        // Control: plain git fires both hooks, so the assertions below mean something.
+        let _ = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["diff", "HEAD", "--", "a.txt"])
+            .output();
+        let fired = (fsm.exists(), tc.exists());
+        let _ = std::fs::remove_file(&fsm);
+        let _ = std::fs::remove_file(&tc);
+        if !(fired.0 && fired.1) {
+            return; // this machine's git has no sh to run the hook strings: nothing to prove
+        }
+
+        let d = git_diff(&root.join("a.txt"));
+        assert!(d.contains("+two"), "{d}");
+        std::fs::write(
+            root.join("new.txt"),
+            "fresh
+",
+        )
+        .unwrap();
+        let _ = git_diff(&root.join("new.txt"));
+        assert!(!fsm.exists(), "fsmonitor ran");
+        assert!(!tc.exists(), "textconv ran");
     }
 
     #[test]
