@@ -21,16 +21,16 @@ sends a prompt for you), and most of section 9 only uses Claude's own `/status` 
 
 ## 1. Basics
 
-- [ ] **Starts.** `ks C:\`. Expect: the list of `C:\` renders with header, list, prompt line and hint
+- [x] **Starts.** `ks C:\`. Expect: the list of `C:\` renders with header, list, prompt line and hint
   line; no stray characters.
-- [ ] **Resize.** Drag the window edge larger and smaller about 20 times, also very narrow and very
+- [x] **Resize.** Drag the window edge larger and smaller about 20 times, also very narrow and very
   short. Expect: the screen redraws cleanly every time, no leftover fragments, no crash.
-- [ ] **One key, one move.** Press `j` once. Expect: the cursor moves exactly one row (not two).
+- [x] **One key, one move.** Press `j` once. Expect: the cursor moves exactly one row (not two).
   Hold `j`: it repeats smoothly.
-- [ ] **Quit.** Press `q`. Expect: the shell prompt returns cleanly with the old screen content
+- [x] **Quit.** Press `q`. Expect: the shell prompt returns cleanly with the old screen content
   restored (no alternate-screen residue), and the cursor is visible.
-- [ ] **Ctrl-C.** Start `ks`, press `ctrl-c`. Expect: it quits and the terminal is restored.
-- [ ] **Panic restore.** `ks --debug-panic` (hidden flag). Expect: the program panics right after
+- [x] **Ctrl-C.** Start `ks`, press `ctrl-c`. Expect: it quits and the terminal is restored.
+- [x] **Panic restore.** `ks --debug-panic` (hidden flag). Expect: the program panics right after
   the first frame, the terminal is restored first, and the panic message is readable on the
   normal screen; typing afterwards echoes normally.
 
@@ -38,57 +38,57 @@ sends a prompt for you), and most of section 9 only uses Claude's own `/status` 
 
 Steps in order, starting from `ks C:\`.
 
-- [ ] **Walk down.** `l` (or `enter`) into `Users`, into your user folder, into a repository. `h`
+- [x] **Walk down.** `l` (or `enter`) into `Users`, into your user folder, into a repository. `h`
   (or `backspace`) goes back up with the cursor on the directory you left.
-- [ ] **Jumps.** `gg` top, `G` bottom, `ctrl-d` / `ctrl-u` half pages. `ctrl-o` goes back in
+- [x] **Jumps.** `gg` top, `G` bottom, `ctrl-d` / `ctrl-u` half pages. `ctrl-o` goes back in
   history, `tab` forward. `g h` home, `g d` Downloads, `g D` Desktop, `g c` the Kestrel config
   directory (`%APPDATA%\kestrel`), `g /` This PC.
-- [ ] **This PC.** Expect: all drives with label, file system, a usage bar and `free of total`; the
+- [x] **This PC.** Expect: all drives with label, file system, a usage bar and `free of total`; the
   bar turns warning-coloured from 85 % full. `l` on a drive enters it; `h` at a drive root returns
   here.
 - [ ] **Removable drives.** With the This PC view open, plug in a USB drive, eject it, and open an
   empty card reader. Expect: no Windows "insert a disk" dialog at any point, and Kestrel keeps
   responding.
-- [ ] **Git header.** In a repository the header shows the branch and counts, and rows carry glyphs
+- [x] **Git header.** In a repository the header shows the branch and counts, and rows carry glyphs
   (`M + R D ? ! U`). Edit a tracked file in another program and save. Expect: its `M` glyph and the
   counts update within about half a second.
-- [ ] **External changes.** Create and delete files in the displayed directory from another
+- [x] **External changes.** Create and delete files in the displayed directory from another
   window. Expect: the list updates within about 200 ms and the cursor stays on the same entry.
 - [ ] **Icons.** Expect: file-type icons render as glyphs, not boxes. In the palette (`:`) run
   **Switch icon set** and pick `unicode`, then `ascii`: the icons change at once. **Reload config**
   returns to the file's value.
-- [ ] **Huge directory.** Open a directory with 100,000 files (create one with
+- [x] **Huge directory.** Open a directory with 100,000 files (create one with
   `1..100000 | % { New-Item "$env:TEMP\big\f$_.txt" -Force }`, slow, or use an existing one).
   Expect: first rows immediately, `j`/`G` stay instant. Delete the directory afterwards.
 
 ## 3. Layout
 
-- [ ] **80 x 24.** Resize to 80 columns by 24 rows. Expect: the preview pane is shown (the preview
+- [x] **80 x 24.** Resize to 80 columns by 24 rows. Expect: the preview pane is shown (the preview
   appears from 80 columns), the list has about 40 % of the width and shows the size column (item counts for folders). At 79
   columns the preview disappears and the list uses the full width with sizes.
-- [ ] **`w` forces.** At 70 columns press `w`: Expect: the preview appears (or a status message says
+- [x] **`w` forces.** At 70 columns press `w`: Expect: the preview appears (or a status message says
   there is no room); `w` again hides it. The choice survives resizes.
-- [ ] **Sizes vanish.** Narrow the window to 59 columns (hide the preview with `w` first if needed). Expect: the size column is gone, names remain.
-- [ ] **Parent column.** At 100 columns or more press `P`. Expect: a column with the parent
+- [x] **Sizes vanish.** Narrow the window to 59 columns (hide the preview with `w` first if needed). Expect: the size column is gone, names remain.
+- [x] **Parent column.** At 100 columns or more press `P`. Expect: a column with the parent
   directory appears to the left, the current directory highlighted. Below 100 columns it does not
   show.
 
 ## 4. Preview
 
-- [ ] **Hold `j`** through a directory of big text files (several MB each). Expect: no stutter; the
+- [x] **Hold `j`** through a directory of big text files (several MB each). Expect: no stutter; the
   preview of the final file appears when you stop.
-- [ ] **Images.** Select a PNG and a JPG. Expect: the image is drawn in the pane (Sixel in Windows
+- [x] **Images.** Select a PNG and a JPG. Expect: the image is drawn in the pane (Sixel in Windows
   Terminal 1.22+, otherwise half blocks). Look in the newest log for the line with
   `image protocol` and a `detected=` field.
 - [ ] **Forced protocol.** Set `image_protocol = "sixel"` (and then `"halfblocks"`) in
   `config.toml`, run **Reload config** (the protocol is read at start-up, so restart `ks`).
   Expect: the corresponding rendering.
-- [ ] **No remnants.** Move from an image to a text file, then to a directory, then resize the
+- [x] **No remnants.** Move from an image to a text file, then to a directory, then resize the
   window while an image is shown. Expect: no image pixels left behind anywhere.
-- [ ] **Kinds.** A `.rs` file (highlighted, line numbers), a `.md` file (headings), a `.zip` (entry
+- [x] **Kinds.** A `.rs` file (highlighted, line numbers), a `.md` file (headings), a `.zip` (entry
   list), an `.exe` (hex dump), a UTF-16 text file (readable text), a junction or symlink (metadata
   with its target). Expect: each renders sensibly.
-- [ ] **Metadata.** `i` toggles content and metadata; `J` / `K` scroll long previews.
+- [x] **Metadata.** `i` toggles content and metadata; `J` / `K` scroll long previews.
 - [ ] **OneDrive.** Select an online-only placeholder (cloud glyph in the list). Expect: the pane
   says why it is not shown and displays metadata; the file does **not** start downloading (check
   the OneDrive status icon).
@@ -97,93 +97,93 @@ Steps in order, starting from `ks C:\`.
 
 Use a repository with a few thousand files.
 
-- [ ] **Find file.** `ctrl-p`. Type part of a path. Expect: results stream in while the walk runs,
+- [x] **Find file.** `ctrl-p`. Type part of a path. Expect: results stream in while the walk runs,
   matched characters highlighted, a counter `matched / total`. At 100+ columns a live preview of
   the highlighted result is shown.
-- [ ] **Scopes and toggles.** `ctrl-r` cycles the scope (title changes: current directory, git root,
+- [x] **Scopes and toggles.** `ctrl-r` cycles the scope (title changes: current directory, git root,
   home, drive); `alt-.` toggles hidden files; `alt-g` toggles gitignored files (footer reflects it).
-- [ ] **Mark, open.** `tab` marks the result and moves down (a `●` appears). `enter` navigates to the
+- [x] **Mark, open.** `tab` marks the result and moves down (a `●` appears). `enter` navigates to the
   file with the cursor on it. With several marks in one directory, `enter` goes there and selects
   them; marks in different directories open a results list.
-- [ ] **Open with the default app.** In the finder press `ctrl-enter`. Expect: the file opens with
+- [x] **Open with the default app.** In the finder press `ctrl-enter`. Expect: the file opens with
   its default app. If nothing happens, note it (Windows Terminal may not deliver the key) and check
   `ctrl-o`, which must work.
-- [ ] **Reopen is instant.** Close the finder (`esc`) and press `ctrl-p` again. Expect: the full list
+- [x] **Reopen is instant.** Close the finder (`esc`) and press `ctrl-p` again. Expect: the full list
   at once (cached walk).
-- [ ] **New deep file.** Create a file several directories below the root from another window, then
+- [x] **New deep file.** Create a file several directories below the root from another window, then
   open the finder. Expect: it is found (a new file in an existing directory; brand-new directories
   may need a re-walk, which is a known limit).
-- [ ] **Content search.** `ctrl-f`, type quickly. Expect: no lag while typing, results grouped by
+- [x] **Content search.** `ctrl-f`, type quickly. Expect: no lag while typing, results grouped by
   file with `42│` line numbers, matches highlighted.
 - [ ] **Toggles and glob.** `ctrl-r` regex (chip appears), `ctrl-w` whole word, `tab` to the glob
   field and enter `*.rs` or `!target/**`. Expect: the results follow.
-- [ ] **Open at line.** `enter` on a hit. Expect: VS Code opens at that line (`code -g file:line`).
+- [x] **Open at line.** `enter` on a hit. Expect: VS Code opens at that line (`code -g file:line`).
   Then set `[editor] open_at_line = "nvim +{line} {file}"` (and again with `hx`), reload the config,
   repeat. Expect: Kestrel suspends, the editor shows the line, and after quitting the editor
   Kestrel is back, redrawn, with the search still open.
-- [ ] **Results tab.** `ctrl-l` in the search. Expect: a new tab listing the files with matches; `esc`
+- [x] **Results tab.** `ctrl-l` in the search. Expect: a new tab listing the files with matches; `esc`
   turns it into the real listing.
 
 ## 6. Palette, help, which-key, config
 
-- [ ] **Palette.** `:` then type `sort`. Expect: matching commands with their keys on the right;
+- [x] **Palette.** `:` then type `sort`. Expect: matching commands with their keys on the right;
   `enter` runs one; `esc` closes.
-- [ ] **Help.** `?`. Expect: all commands grouped by category; `/` filters; `esc` closes.
-- [ ] **Which-key.** Press `g` and wait. Expect: after about 300 ms a popup lists `g h`, `g d`, ...,
+- [x] **Help.** `?`. Expect: all commands grouped by category; `/` filters; `esc` closes.
+- [x] **Which-key.** Press `g` and wait. Expect: after about 300 ms a popup lists `g h`, `g d`, ...,
   `g r`, `g w`, `g a`, `g X`, `g p`, `g j`. Press a second key before 300 ms: no popup flashes.
-- [ ] **Custom keymap.** Add to `config.toml`: `[keymap.normal]` with `"H" = "dir.parent"`. Run
+- [x] **Custom keymap.** Add to `config.toml`: `[keymap.normal]` with `"H" = "dir.parent"`. Run
   **Reload config** from the palette. Expect: `H` goes to the parent. Add an invalid line
   (`"x" = "no.such.command"`) and reload: the status line shows the error and the rest still works.
-- [ ] **Themes.** Palette, **Switch theme**, `paper`, then back to `ember`. Expect: all colours change
+- [x] **Themes.** Palette, **Switch theme**, `paper`, then back to `ember`. Expect: all colours change
   at once, including the syntax colours in the preview of a `.rs` file.
 
 ## 7. File operations
 
 Work in a scratch directory.
 
-- [ ] **Big copy.** Copy a file of about 10 GB (or the largest you have) to another directory:
+- [x] **Big copy.** Copy a file of about 10 GB (or the largest you have) to another directory:
   `y`, move, `p`. Expect: progress with percentage, throughput and ETA in the prompt line; the UI stays
   responsive.
-- [ ] **Jobs view.** `g j` during the copy. Expect: the job with a progress bar; `x` cancels it, and
+- [x] **Jobs view.** `g j` during the copy. Expect: the job with a progress bar; `x` cancels it, and
   the partial `.part` file disappears. `esc` closes the view.
-- [ ] **Conflicts.** Copy files into a directory that already has the same names. Expect: a dialog
+- [x] **Conflicts.** Copy files into a directory that already has the same names. Expect: a dialog
   with `O` (shift) overwrite, `s` skip, `r` rename, `k` keep both, `a` apply to all, `c` cancel; `enter`
   keeps both, `esc` cancels the job. Try each key once.
-- [ ] **Delete and undo.** `d` on a file: it goes to the Recycle Bin (check it there). `u` restores
+- [x] **Delete and undo.** `d` on a file: it goes to the Recycle Bin (check it there). `u` restores
   it.
-- [ ] **Permanent delete.** `D`. Expect: a dialog that requires typing `yes` (for two or more items
+- [x] **Permanent delete.** `D`. Expect: a dialog that requires typing `yes` (for two or more items
   the count); `enter` on an empty or wrong answer does nothing destructive.
-- [ ] **Rename and create.** `r` renames (cursor before the extension). `a` creates a file; `a`
+- [x] **Rename and create.** `r` renames (cursor before the extension). `a` creates a file; `a`
   with `sub/dir/` creates a nested directory. Expect: the cursor lands on the new item.
-- [ ] **Clipboard path.** `Y`, then `a`, `r`, `n` in turn; paste elsewhere. Expect: absolute path,
+- [x] **Clipboard path.** `Y`, then `a`, `r`, `n` in turn; paste elsewhere. Expect: absolute path,
   relative path, name.
-- [ ] **Open.** `o` opens a file with its default app; `O` shows a menu of apps (`1`..`9`).
-- [ ] **Shell command.** `!` and run `dir` or `git status`. Expect: output streams into a pager;
+- [x] **Open.** `o` opens a file with its default app; `O` shows a menu of apps (`1`..`9`).
+- [x] **Shell command.** `!` and run `dir` or `git status`. Expect: output streams into a pager;
   `ctrl-c` stops a long command (`ping -t localhost`); `esc` closes.
-- [ ] **Bulk rename (GUI editor).** Mark three files, `R`, with `code` as editor. Change names, save,
+- [x] **Bulk rename (GUI editor).** Mark three files, `R`, with `code` as editor. Change names, save,
   close the tab. Expect: a preview `old -> new`; `enter` applies it; `u` undoes the whole batch.
-- [ ] **Bulk rename (terminal editor).** Set `[editor] open = "nvim"` (or `hx`), repeat. Expect:
+- [x] **Bulk rename (terminal editor).** Set `[editor] open = "nvim"` (or `hx`), repeat. Expect:
   Kestrel suspends while the editor runs and returns redrawn.
-- [ ] **Editor.** `e` opens the file in the configured editor (GUI detached; terminal suspends and
+- [x] **Editor.** `e` opens the file in the configured editor (GUI detached; terminal suspends and
   resumes).
-- [ ] **Quit with a job running.** Start a big copy, press `q`. Expect: a confirmation instead of an
+- [x] **Quit with a job running.** Start a big copy, press `q`. Expect: a confirmation instead of an
   immediate exit; cancelling it keeps the job going; confirming ends the job and quits.
 
 ## 8. Tabs, bookmarks, frecency, shell integration
 
-- [ ] **Tabs.** `t` opens a tab in the same directory (the header shows `1 ▏2`); navigate in each;
+- [x] **Tabs.** `t` opens a tab in the same directory (the header shows `1 ▏2`); navigate in each;
   `1` / `2` switch and each keeps its directory; `ctrl-w` closes; the last tab refuses to close.
-- [ ] **Bookmarks.** `m` then `a` in a directory; elsewhere `'` then `a` jumps back. `M` lists
+- [x] **Bookmarks.** `m` then `a` in a directory; elsewhere `'` then `a` jumps back. `M` lists
   bookmarks, `enter` jumps, `d` deletes. Restart `ks`: the bookmark is still there.
-- [ ] **Frecency.** Visit several directories, press `z`, type part of a name, `enter`. Expect: it jumps.
+- [x] **Frecency.** Visit several directories, press `z`, type part of a name, `enter`. Expect: it jumps.
   Quit and restart: the history persists (`frecency.toml` appears in the state folder).
-- [ ] **Shell init, PowerShell 7.** Add `ks --print-shell-init pwsh | Out-String | Invoke-Expression`
+- [x] **Shell init, PowerShell 7.** Add `ks --print-shell-init pwsh | Out-String | Invoke-Expression`
   to `$PROFILE`, restart the shell. Run `k`, navigate somewhere, press `Q`. Expect: the shell is now
   in that directory. Run `k` again and quit with `q`: the shell stays where it was.
-- [ ] **Shell init, Windows PowerShell 5.1.** Repeat in `powershell.exe`. Do it once in a directory
+- [x] **Shell init, Windows PowerShell 5.1.** Repeat in `powershell.exe`. Do it once in a directory
   with spaces and once with non-ASCII characters (for example `C:\temp\Zażółć gęślą jaźń`).
   Expect: `Q` changes into it correctly.
-- [ ] **Odd names.** Navigate, preview, rename and copy within directories with spaces and
+- [x] **Odd names.** Navigate, preview, rename and copy within directories with spaces and
   non-ASCII names. Expect: no garbled names, no errors.
 
 ## 9. Claude Code
@@ -258,7 +258,7 @@ exchange counts against your plan. Keep it to the minimum below.
 
 ## 10. Performance
 
-- [ ] **Start-up.** Run `ks` from a warm shell. Expect: the first frame appears with no noticeable delay
+- [x] **Start-up.** Run `ks` from a warm shell. Expect: the first frame appears with no noticeable delay
   (budget: under 60 ms from launch). The newest log has a `first frame elapsed_ms=...` line: the time
   from the start of `run` to the first drawn frame (5 to 6 ms on the development machine), which does
   **not** include process creation or the loader. That part is the bare process cost: time it with
@@ -266,9 +266,9 @@ exchange counts against your plan. Keep it to the minimum below.
   all of it because the image is 14.7 MB, see [performance.md](performance.md)) and add the two to judge the
   launch, or judge it by eye. The `image protocol ... took_ms=` line shows how long the terminal query
   took (it runs after the first frame; at most 250 ms in a terminal that never answers).
-- [ ] **Keypress latency.** `cargo test --release -p ks-ui keypress_to_frame_stays_within_budget -- --nocapture`.
+- [x] **Keypress latency.** `cargo test --release -p ks-ui keypress_to_frame_stays_within_budget -- --nocapture`.
   Expect: p99 under 16 ms (measured p50 about 0.21 ms, p99 0.26 to 0.41 ms on the final build; the terminal's own latency is not part of it).
-- [ ] **Ignored performance tests.** Run each in release mode, read the numbers it prints:
+- [x] **Ignored performance tests.** Run each in release mode, read the numbers it prints:
 
   ```powershell
   cargo test -p ks-app --release --test navigation a_directory_of_100k -- --ignored --nocapture
