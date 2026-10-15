@@ -33,10 +33,11 @@ fn find_powershell() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("powershell.exe"))
 }
 
+/// Splits on `\` as well as `/`, so Windows paths are recognised on every host (tests).
 fn is_pwsh(shell: &Path) -> bool {
-    shell
-        .file_stem()
-        .is_some_and(|s| s.eq_ignore_ascii_case("pwsh"))
+    let path = shell.to_string_lossy();
+    let name = path.rsplit(['\\', '/']).next().unwrap_or_default();
+    name.eq_ignore_ascii_case("pwsh.exe") || name.eq_ignore_ascii_case("pwsh")
 }
 
 /// The PowerShell session: `ks` is this `exe`, `k` is defined, and `k` runs in the process's
@@ -206,6 +207,16 @@ mod tests {
              Set-Location -LiteralPath ([Environment]::CurrentDirectory)\n\
              k\n"
         );
+    }
+
+    #[test]
+    fn pwsh_is_recognised_by_file_name() {
+        assert!(is_pwsh(Path::new(
+            r"C:\Program Files\PowerShell\7\PWSH.EXE"
+        )));
+        assert!(is_pwsh(Path::new("pwsh")));
+        assert!(!is_pwsh(Path::new(WINPS)));
+        assert!(!is_pwsh(Path::new(r"C:\pwsh\powershell.exe")));
     }
 
     #[test]
