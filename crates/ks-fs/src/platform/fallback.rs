@@ -44,3 +44,6 @@ pub fn pid_alive(pid: u32) -> bool {
         true
     }
 }
+
+/// No shell to notify off Windows.
+pub fn notify_association_changed() {}

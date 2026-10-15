@@ -12,6 +12,29 @@ fn main() -> ExitCode {
         print!("{}", ks_app::shell_init::script(shell));
         return ExitCode::SUCCESS;
     }
+    if cli.set_default || cli.unset_default {
+        return match ks_app::default_manager::run(cli.set_default) {
+            Ok(message) => {
+                println!("{message}");
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("ks: {e:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if cli.via_powershell {
+        return match ks_app::default_manager::launch_powershell(cli.path.as_deref()) {
+            Ok(code) => code,
+            Err(e) => {
+                eprintln!("ks: {e:#}");
+                // Started from Explorer in a fresh window: keep the error readable.
+                std::thread::sleep(std::time::Duration::from_secs(10));
+                ExitCode::FAILURE
+            }
+        };
+    }
     match cli.command {
         Some(Command::Hook) => {
             // Must be fast and must never fail the tool call: the hook always exits 0.

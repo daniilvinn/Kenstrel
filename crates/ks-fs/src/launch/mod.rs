@@ -7,10 +7,12 @@
 //!   Terminal editors need the TUI to be suspended: the app calls
 //!   [`editor::run_foreground`] after leaving the alternate screen / raw mode, and re-enters
 //!   afterwards. GUI editors use [`editor::spawn_detached`].
+//! - [`default_manager`]: register Kestrel as the default file manager and undo it.
 //! - [`shell`]: run a command string through the user's shell, streaming output as events,
 //!   cancellable.
 
 pub mod clipboard;
+pub mod default_manager;
 pub mod editor;
 pub mod open;
 pub mod registry;

@@ -5,6 +5,7 @@
 
 pub mod claude;
 pub mod cli;
+pub mod default_manager;
 pub mod effects;
 pub mod event_loop;
 pub mod fileops;

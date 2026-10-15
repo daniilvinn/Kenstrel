@@ -24,6 +24,8 @@ pub fn resolve_start_dir(arg: Option<&Path>, cwd: &Path) -> Result<PathBuf> {
     let Some(arg) = arg else {
         return Ok(dunce::simplified(cwd).to_owned());
     };
+    let repaired = repair_shell_quote(arg);
+    let arg = repaired.as_path();
     // Absolute and lexically normalised, but symlinks/junctions/subst drives stay as typed.
     let absolute =
         std::path::absolute(arg).with_context(|| format!("cannot open `{}`", arg.display()))?;
@@ -36,6 +38,16 @@ pub fn resolve_start_dir(arg: Option<&Path>, cwd: &Path) -> Result<PathBuf> {
     match resolved.parent() {
         Some(parent) => Ok(parent.to_owned()),
         None => bail!("`{}` has no parent directory", arg.display()),
+    }
+}
+
+/// Undoes a Windows quoting quirk: the shell starts `ks "%1"`, and for a drive root that is
+/// `ks "C:\"`, where `\"` escapes the quote and the argument arrives as `C:"`. `"` cannot
+/// appear in a Windows path, so a trailing one is the swallowed backslash.
+fn repair_shell_quote(arg: &Path) -> PathBuf {
+    match arg.to_str().and_then(|s| s.strip_suffix('"')) {
+        Some(stripped) if cfg!(windows) => PathBuf::from(format!("{stripped}\\")),
+        _ => arg.to_owned(),
     }
 }
 
@@ -85,6 +97,21 @@ pub fn finish(quit: QuitKind, cwd_file: Option<&Path>, cwd: &Path) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[test]
+    fn a_drive_root_with_a_swallowed_backslash_opens_the_root() {
+        // `ks "C:\"` from the shell's `"%1"` arrives as `C:"`.
+        let dir = tempfile::tempdir().unwrap();
+        let drive = &dir.path().to_str().unwrap()[..2];
+        let root = resolve_start_dir(Some(Path::new(&format!("{drive}\""))), dir.path()).unwrap();
+        assert_eq!(root, PathBuf::from(format!("{drive}\\")));
+        let quoted = format!("{}\"", dir.path().display());
+        assert_eq!(
+            resolve_start_dir(Some(Path::new(&quoted)), Path::new(".")).unwrap(),
+            dunce::simplified(dir.path())
+        );
+    }
 
     #[test]
     fn no_argument_uses_the_current_directory() {

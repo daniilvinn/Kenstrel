@@ -31,6 +31,21 @@ pub struct Cli {
     #[arg(long, value_name = "SHELL", value_enum)]
     pub print_shell_init: Option<crate::shell_init::Shell>,
 
+    /// Make Kestrel the default file manager for the current user (Windows): opening a
+    /// folder or drive, and Win+E, start `ks` instead of File Explorer. Then exit.
+    #[arg(long, conflicts_with = "unset_default")]
+    pub set_default: bool,
+
+    /// Give folders, drives and Win+E back to File Explorer, restoring what `--set-default`
+    /// replaced. Then exit.
+    #[arg(long)]
+    pub unset_default: bool,
+
+    /// Start PowerShell and run Kestrel there through the `k` function, so the window
+    /// stays a shell after quitting. This is what `--set-default` registers.
+    #[arg(long, hide = true)]
+    pub via_powershell: bool,
+
     /// Panic right after the first frame, to test that the terminal is restored.
     #[arg(long, hide = true)]
     pub debug_panic: bool,
@@ -91,6 +106,33 @@ mod tests {
         assert!(cli.path.is_none() && cli.cwd_file.is_none() && !cli.debug_panic);
         assert!(!cli.dump_keymap);
         assert!(cli.print_shell_init.is_none());
+        assert!(!cli.set_default && !cli.unset_default);
+    }
+
+    #[test]
+    fn default_manager_flags_parse_and_exclude_each_other() {
+        assert!(
+            Cli::try_parse_from(["ks", "--set-default"])
+                .unwrap()
+                .set_default
+        );
+        assert!(
+            Cli::try_parse_from(["ks", "--unset-default"])
+                .unwrap()
+                .unset_default
+        );
+        assert!(Cli::try_parse_from(["ks", "--set-default", "--unset-default"]).is_err());
+    }
+
+    #[test]
+    fn via_powershell_takes_the_path_and_is_hidden() {
+        let cli = Cli::try_parse_from(["ks", "--via-powershell", r"C:\x"]).unwrap();
+        assert!(cli.via_powershell);
+        assert_eq!(cli.path, Some(PathBuf::from(r"C:\x")));
+        let help = Cli::try_parse_from(["ks", "--help"])
+            .unwrap_err()
+            .to_string();
+        assert!(!help.contains("via-powershell"), "{help}");
     }
 
     #[test]

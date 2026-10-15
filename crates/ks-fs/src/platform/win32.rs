@@ -28,6 +28,7 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::System::Time::{GetTimeZoneInformation, TIME_ZONE_INFORMATION};
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyboardLayout, VkKeyScanExW};
+use windows::Win32::UI::Shell::{SHChangeNotify, SHCNE_ASSOCCHANGED, SHCNF_IDLIST};
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
 use crate::attrs::win;
@@ -247,6 +248,13 @@ pub fn pid_alive(pid: u32) -> bool {
     // SAFETY: `handle` came from `OpenProcess` and is closed exactly once.
     let _ = unsafe { CloseHandle(handle) };
     !queried || code == STILL_ACTIVE
+}
+
+/// Tells the shell that file associations changed, so Explorer picks up new or removed
+/// verbs without a sign-out.
+pub fn notify_association_changed() {
+    // SAFETY: SHCNE_ASSOCCHANGED takes no items; both item pointers are null.
+    unsafe { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, None, None) };
 }
 
 /// Owner of `path` as `DOMAIN\user`, or the SID string when the account cannot be resolved

@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `ks --set-default` makes Kestrel the default file manager on Windows (folders, drives and
+  Win+E open Kestrel in a PowerShell window, where `Q` leaves you in the directory you quit in);
+  `ks --unset-default` gives the job back to File Explorer and restores the
+  registry values it replaced.
+
 ## [0.1.0] - 2026-10-11
 
 First release.

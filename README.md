@@ -267,6 +267,27 @@ Use `"commandline": "ks.exe"` if you do not need `Q` to change the shell's direc
 
 </details>
 
+#### Default file manager
+
+`ks --set-default` makes Kestrel the default file manager for your Windows account: opening a
+folder or a drive (from the desktop, the Start menu, a download prompt, another program) and
+Win+E start Kestrel in a new PowerShell window instead of File Explorer. No administrator rights
+are needed; Explorer stays one right-click away as "Open".
+
+```powershell
+ks --set-default     # folders, drives and Win+E open Kestrel
+ks --unset-default   # back to File Explorer
+```
+
+The registration points at the `ks.exe` you ran it with, so run `--set-default` again after
+moving it. `--unset-default` restores exactly what was there before, including another file
+manager's registration, and leaves alone anything a different program changed in the meantime.
+Kestrel opens in a new Windows Terminal window with Terminal's PowerShell profile (your font,
+colours and icon), running PowerShell 7 (`pwsh`) when it is on your `PATH`, otherwise Windows
+PowerShell, with your PowerShell profile loaded and the `k` function set up for you. `Q` therefore leaves the window as a PowerShell prompt in the directory you quit in; `q`
+leaves it in the folder you opened. Without Windows Terminal it uses a classic console window;
+run `--set-default` again after installing or removing Terminal or PowerShell 7.
+
 ### Icons
 
 The default `icons = "nerd"` needs a [Nerd Font](https://www.nerdfonts.com/), for example
